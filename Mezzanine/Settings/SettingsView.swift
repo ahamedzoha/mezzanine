@@ -1,8 +1,8 @@
 import SwiftUI
 import MezzanineKit
 
-/// Settings (⌘,): Account, Playback (binge rules), Sound (per-device setups),
-/// Shortcuts (every player key, rebindable), Library.
+/// Settings (⌘,): Account, Playback (binge rules), Sound (per-device setups), Subtitles
+/// (Find Subtitles' languages and sources), Shortcuts (every player key, rebindable), Library.
 struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
@@ -109,6 +109,9 @@ struct SettingsView: View {
                     .disabled(sound.current.kind == .hdmi || sound.current.kind == .airPods)
                 }
                 .formStyle(.grouped)
+            }
+            Tab("Subtitles", systemImage: "captions.bubble", value: "subtitles") {
+                SubtitleSettingsView()
             }
             Tab("Shortcuts", systemImage: "keyboard", value: "shortcuts") {
                 ShortcutSettings()

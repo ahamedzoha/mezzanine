@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-11-15 (overnight) — Find Subtitles from every free source
+
+- Owner asked for subtitles searchable from OpenSubtitles and other free popular sources
+  (M12 AI subtitles paused for it; no M12 code yet).
+- Find Subtitles (⋯ ▸ Subtitles ▸ Find Subtitles…, ⌥F, Playback ▸ Find Subtitles…) asks every
+  source at once and fills as each answers: Plex (the server's own OpenSubtitles search),
+  OpenSubtitles.com (owner's free API key, optional sign-in, file-hash match from two 64 KiB
+  range reads), Subdl (free key; ZIP archives, season packs matched to the episode) and
+  Addic7ed through Gestdown (keyless, TV only). Ranked: made for this file, then language
+  order, then downloads. Podnapisi left out (unreachable from here).
+- Plex results are saved on the server as before; the others are kept on this Mac
+  (Application Support ▸ Mezzanine ▸ Subtitles ▸ server ▸ title), load every time the title
+  plays (streamed, downloaded or offline) and come back on screen if they were last chosen.
+- Settings ▸ Subtitles: one or two search languages, Plex/Addic7ed toggles, Set Up… sheets for
+  the OpenSubtitles and Subdl keys (Keychain), Check shows downloads left today.
+- Verified live (read-only, no play history): Severance S02E09 found on Plex and Addic7ed, an
+  Addic7ed file chosen, shown, kept, and re-selected on the next play. OpenSubtitles and Subdl
+  wait for the owner's keys.
+- Kit: `Subtitles/` (SubtitleSearch, sources, OpenSubtitles hash, minimal ZIP reader, UTF-8
+  conversion), 7 new tests + a live Gestdown test.
+
 ## 2026-11-15 (late) — M7 Home shelves, smart shelves, Quick Open
 
 - Owner picked **Edit in Place** on the decision page (over typed rules in ⌘K and a separate

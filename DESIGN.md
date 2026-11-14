@@ -393,3 +393,10 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - Removing a finished download always asks, once, app-wide; the files go to the Trash. Cancelling an unfinished one is immediate.
 - Files: Movies ▸ Mezzanine ▸ "Show/Show S05E03 Title.mkv" or "Title (Year).mkv", with poster, backdrop, clear logo and sidecar subtitles beside each. A downloaded copy always plays instead of the server's ("Downloaded copy" in Playback info).
 - Offline (Plex unreachable, something downloaded): the sidebar shows only Downloads with a quiet Offline note and Try Again; search goes away; downloads play from their saved details. Positions watched offline are sent to Plex when it's back.
+
+## Find Subtitles
+
+- The ⋯ panel's Find Subtitles page (⌥F) lists what every source finds as it answers: a caption line "Searching Plex, OpenSubtitles and Addic7ed…" with a small spinner while any are out, then rows of release name and one detail line ("Matches this file · English · Addic7ed · SDH · 214 downloads"). The language appears only when two are searched. No colour, no badges: "Matches this file" leads the line and those rows sort first.
+- Choosing a row loads it, selects it and returns to the Subtitles list, which opens scrolled to the track in use. A source that fails says why in one caption line ("Subdl: the API key was refused."); nothing blocks the rest.
+- The page ends with Subtitle Sources… (the searched languages as its value), opening Settings ▸ Subtitles. Without the free keys, a caption says what they add.
+- Settings ▸ Subtitles: Find Subtitles (language, also search in), Sources (Plex and Addic7ed toggles with one-line explanations; OpenSubtitles.com and Subdl rows with Set Up… / Edit…). Keys are typed in a small sheet (SecureField, Check, Done), never on the main form.

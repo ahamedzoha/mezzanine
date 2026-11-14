@@ -156,6 +156,27 @@ public actor PlexServerClient {
         return c.streams.sorted { ($0.score ?? 0) > ($1.score ?? 0) }
     }
 
+    /// A byte range of a media file (OpenSubtitles' hash reads the first and last 64 KiB).
+    public func partBytes(key: String, offset: Int64, length: Int) async throws -> Data {
+        guard let url = urls.part(key: key) else { throw PlexError.notFound }
+        var request = URLRequest(url: url)
+        for (name, value) in requestHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("bytes=\(offset)-\(offset + Int64(length) - 1)", forHTTPHeaderField: "Range")
+        return try await perform(request)
+    }
+
+    /// Asks the server to fetch a subtitle Plex's search found, by its fields.
+    public func downloadSubtitle(ratingKey: String, key: String, codec: String?, language: String?, hearingImpaired: Bool,
+                                 forced: Bool, providerTitle: String?) async throws {
+        var q = [URLQueryItem(name: "key", value: key)]
+        if let codec { q.append(URLQueryItem(name: "codec", value: codec)) }
+        if let language { q.append(URLQueryItem(name: "language", value: language)) }
+        q.append(URLQueryItem(name: "hearingImpaired", value: hearingImpaired ? "1" : "0"))
+        q.append(URLQueryItem(name: "forced", value: forced ? "1" : "0"))
+        if let providerTitle { q.append(URLQueryItem(name: "providerTitle", value: providerTitle)) }
+        try await write("PUT", "/library/metadata/\(ratingKey)/subtitles", query: q)
+    }
+
     // MARK: Raw pages (for the local index)
 
     /// One page of a section with each item's own JSON kept, so the index can

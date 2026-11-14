@@ -9,7 +9,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
     case previousFrame, nextFrame, slower, faster
     case skipMarker, nextEpisode, previousEpisode
     case volumeUp, volumeDown, mute, dialogueBoost, nightMode
-    case cycleAudio, cycleSubtitles, subtitleOptions, subtitlesEarlier, subtitlesLater
+    case cycleAudio, cycleSubtitles, subtitleOptions, findSubtitles, subtitlesEarlier, subtitlesLater
     case fullScreen, pictureInPicture, options, stats
 
     var id: String { rawValue }
@@ -38,6 +38,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .cycleAudio: "Next audio track"
         case .cycleSubtitles: "Next subtitle track"
         case .subtitleOptions: "Subtitle options"
+        case .findSubtitles: "Find subtitles"
         case .subtitlesEarlier: "Subtitles earlier (0.1 s)"
         case .subtitlesLater: "Subtitles later (0.1 s)"
         case .fullScreen: "Full screen"
@@ -72,6 +73,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .cycleAudio: "Next Audio Track"
         case .cycleSubtitles: "Next Subtitle Track"
         case .subtitleOptions: "Subtitle Options…"
+        case .findSubtitles: "Find Subtitles…"
         case .subtitlesEarlier: "Subtitles Earlier"
         case .subtitlesLater: "Subtitles Later"
         case .fullScreen: "Enter Full Screen"
@@ -92,7 +94,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
              .previousFrame, .nextFrame, .slower, .faster: .playback
         case .skipMarker, .nextEpisode, .previousEpisode: .episodes
         case .volumeUp, .volumeDown, .mute, .dialogueBoost, .nightMode: .sound
-        case .cycleAudio, .cycleSubtitles, .subtitleOptions, .subtitlesEarlier, .subtitlesLater: .subtitles
+        case .cycleAudio, .cycleSubtitles, .subtitleOptions, .findSubtitles, .subtitlesEarlier, .subtitlesLater: .subtitles
         case .fullScreen, .pictureInPicture, .options, .stats: .view
         }
     }
@@ -121,6 +123,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .cycleAudio: [.char("a")]
         case .cycleSubtitles: [.char("c")]
         case .subtitleOptions: [.char("C")]
+        case .findSubtitles: [.char("f", option: true)]
         case .subtitlesEarlier: [.char("g")]
         case .subtitlesLater: [.char("h")]
         case .fullScreen: [.char("f")]

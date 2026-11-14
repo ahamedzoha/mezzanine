@@ -68,3 +68,18 @@ struct LiveSyncTests {
         #expect(!hits.isEmpty)
     }
 }
+
+/// Gestdown (Addic7ed) needs no key: a real search and download for a well-known episode.
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["MEZZANINE_LIVE"] == "1"))
+struct GestdownLiveTests {
+    @Test func findsAndDownloadsAnEpisode() async throws {
+        let query = SubtitleQuery(kind: .episode, title: "Good News About Hell", showTitle: "Severance",
+                                  season: 1, episode: 1, languages: ["en"])
+        let source = GestdownSource()
+        let results = try await source.search(query)
+        #expect(!results.isEmpty)
+        let first = try #require(results.first)
+        let file = try await source.download(first, for: query)
+        #expect(String(decoding: file.data, as: UTF8.self).contains("-->"))
+    }
+}

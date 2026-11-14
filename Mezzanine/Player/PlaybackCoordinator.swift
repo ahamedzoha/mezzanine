@@ -26,6 +26,11 @@ final class PlaybackCoordinator {
     weak var downloads: DownloadStore?
     /// The title on screen is playing from its download (Playback info says so).
     private(set) var playingDownload = false
+    /// Find Subtitles files on this Mac: track ID → saved entry ID.
+    @ObservationIgnored private var savedTracks: [Int: String] = [:]
+    /// Server sidecars added during playback: track ID → Plex stream ID.
+    @ObservationIgnored private var addedSidecars: [Int: Int] = [:]
+    @ObservationIgnored private var savedServerID: String?
     private(set) var reporter: ActivityReporter?
     /// Called after a session ends with the item and where it stopped, so the
     /// local library reflects the new resume point at once.
@@ -166,14 +171,15 @@ final class PlaybackCoordinator {
         let previousSession = transcodeSession
         var url: URL?
         var headers = client.requestHeaders
-        var subtitleFiles = sidecars
+        let saved = SavedSubtitles.available(serverID: session.currentServer?.clientIdentifier, ratingKey: detail.ratingKey)
+        var subtitleFiles = sidecars + saved.map(\.subtitle)
         switch mode {
         case .direct:
             if let local = downloads?.localFile(for: detail.ratingKey), let record = downloads?.record(detail.ratingKey) {
                 // Downloaded: the server does nothing at all.
                 url = local
                 headers = [:]
-                subtitleFiles = Self.localSubtitles(record, downloads: downloads)
+                subtitleFiles = Self.localSubtitles(record, downloads: downloads) + saved.map(\.subtitle)
                 playingDownload = true
             } else {
                 url = media.parts.first?.key.flatMap { client.urls.part(key: $0) }
@@ -202,6 +208,7 @@ final class PlaybackCoordinator {
                                                   preferredAudioLanguages: audio.map { [$0] } ?? [],
                                                   preferredSubtitleLanguages: subtitle.map { [$0] } ?? [],
                                                   externalSubtitles: subtitleFiles))
+            restoreSavedSubtitle(saved, after: subtitleFiles.count - saved.count)
         } catch {
             #if DEBUG
             print("LOADFAIL mode=\(mode) url=\(PlexURLs.redacted(url)) error=\(error)")
@@ -224,12 +231,16 @@ final class PlaybackCoordinator {
         self.origin = origin
         withAnimation(Theme.Motion.object) { self.item = detail }
         let streams = detail.media.first?.parts.first?.streams ?? []
+        let subtitle = streams.first { $0.streamType == .subtitle && $0.selected == true }?.languageCode
+        let local = Self.localSubtitles(record, downloads: downloads)
+        let saved = SavedSubtitles.available(serverID: record.serverID, ratingKey: detail.ratingKey)
         do {
             try await player.load(PlaybackRequest(
                 url: file, headers: [:], startPosition: detail.viewOffset.map { Double($0) / 1000 },
                 preferredAudioLanguages: streams.first { $0.streamType == .audio && $0.selected == true }?.languageCode.map { [$0] } ?? [],
-                preferredSubtitleLanguages: streams.first { $0.streamType == .subtitle && $0.selected == true }?.languageCode.map { [$0] } ?? [],
-                externalSubtitles: Self.localSubtitles(record, downloads: downloads)))
+                preferredSubtitleLanguages: subtitle.map { [$0] } ?? [],
+                externalSubtitles: local + saved.map(\.subtitle)))
+            restoreSavedSubtitle(saved, after: local.count)
             mode = .direct
             playingDownload = true
             reporter = nil
@@ -291,17 +302,43 @@ final class PlaybackCoordinator {
 
     func selectSubtitle(trackID: Int?) {
         player.selectSubtitle(id: trackID)
+        if let item {
+            SavedSubtitles.setActive(trackID.flatMap { savedTracks[$0] }, serverID: savedServerID, ratingKey: item.ratingKey)
+        }
         guard let part = item?.media.first?.parts.first else { return }
         guard let trackID else { remember(partID: part.id, audio: nil, subtitle: 0); return }
         let externalBase = 100_000
         let streamID: Int?
-        if trackID >= externalBase {
+        if let added = addedSidecars[trackID] {
+            streamID = added
+        } else if trackID >= externalBase {
             let n = trackID - externalBase
             streamID = sidecarStreamIDs.indices.contains(n) ? sidecarStreamIDs[n] : nil
         } else {
             streamID = part.streams.first { $0.streamType == .subtitle && $0.index == trackID }?.id
         }
         if let streamID { remember(partID: part.id, audio: nil, subtitle: streamID) }
+    }
+
+    /// A subtitle Find Subtitles just added: a file kept on this Mac (`savedEntry`) or a
+    /// sidecar the server fetched (`plexStream`). Selects it and remembers the choice.
+    func adoptFoundSubtitle(trackID: Int, savedEntry: String?, plexStream: Int?) {
+        if let savedEntry { savedTracks[trackID] = savedEntry }
+        if let plexStream { addedSidecars[trackID] = plexStream }
+        selectSubtitle(trackID: trackID)
+    }
+
+    /// After a load: maps the saved files' track IDs (they follow the other external files)
+    /// and puts the one last on screen back on.
+    private func restoreSavedSubtitle(_ saved: [(entry: SavedSubtitles.Entry, subtitle: ExternalSubtitle)], after offset: Int) {
+        savedTracks = [:]
+        addedSidecars = [:]
+        savedServerID = session.currentServer?.clientIdentifier ?? item.flatMap { downloads?.record($0.ratingKey)?.serverID }
+        for (i, s) in saved.enumerated() { savedTracks[100_000 + offset + i] = s.entry.id }
+        guard let active = saved.first(where: { $0.entry.active == true }),
+              let trackID = savedTracks.first(where: { $0.value == active.entry.id })?.key,
+              player.subtitleTracks.contains(where: { $0.id == trackID }) else { return }
+        player.selectSubtitle(id: trackID)
     }
 
     private func remember(partID: Int, audio: Int?, subtitle: Int?) {

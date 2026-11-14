@@ -90,6 +90,13 @@ struct PlayerStage: View {
             scheduleHide()
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "PlayerOptionsOpen") { optionsOpen = true }
+            // -PlayerOptionsPage search|subtitles|audio: open the ⋯ panel on that page.
+            switch UserDefaults.standard.string(forKey: "PlayerOptionsPage") {
+            case "search": optionsPage = .search; optionsOpen = true
+            case "subtitles": optionsPage = .subtitles; optionsOpen = true
+            case "audio": optionsPage = .audio; optionsOpen = true
+            default: break
+            }
             // -PlayerKeyScript "i,c,g,shift+c": posts real key events through the app's event
             // queue (router, menus) after 4 s, 0.6 s apart, for review captures.
             if let script = UserDefaults.standard.string(forKey: "PlayerKeyScript") {
@@ -586,6 +593,7 @@ struct PlayerStage: View {
         case .cycleAudio: cycleAudio()
         case .cycleSubtitles: cycleSubtitles()
         case .subtitleOptions: setOptions(open: !(optionsOpen && optionsPage == .subtitles), page: .subtitles)
+        case .findSubtitles: setOptions(open: !(optionsOpen && optionsPage == .search), page: .search)
         case .subtitlesEarlier: shiftSubtitles(by: -0.1)
         case .subtitlesLater: shiftSubtitles(by: 0.1)
         case .fullScreen: NSApp.keyWindow?.toggleFullScreen(nil)

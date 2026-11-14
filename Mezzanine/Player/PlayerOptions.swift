@@ -16,10 +16,11 @@ struct PlayerOptions: View {
     @AppStorage("subtitleScale") private var subtitleScale: Double = 1
     @AppStorage("subtitleBackground") private var subtitleBackground = false
     @AppStorage("subtitleOffset") private var subtitleOffset: Double = 0
-    @State private var results: [PlexStream] = []
-    @State private var searching = false
-    @State private var searchError: String?
-    @State private var downloading: String?
+    @AppStorage("settingsTab") private var settingsTab = "account"
+    @Environment(SubtitleFinder.self) private var finder
+    @Environment(SubtitleSourceSettings.self) private var sources
+    @Environment(DownloadStore.self) private var downloads
+    @Environment(\.openSettings) private var openSettings
 
     enum Page { case root, audio, subtitles, search, sound, speed, quality }
 
@@ -44,6 +45,15 @@ struct PlayerOptions: View {
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.rule, lineWidth: 1))
         .animation(Theme.Motion.quick, value: page)
+        .task(id: page) { if page == .search { startSearch() } }
+        #if DEBUG
+        // -FindSubtitlesChoose YES: picks the first non-Plex result once the search ends (local only).
+        .task(id: finder.isSearching) {
+            guard page == .search, !finder.isSearching, UserDefaults.standard.bool(forKey: "FindSubtitlesChoose"),
+                  let first = finder.results.first(where: { $0.source != PlexSubtitleSource.sourceName }) else { return }
+            choose(first)
+        }
+        #endif
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Playback options")
     }
@@ -63,11 +73,12 @@ struct PlayerOptions: View {
     private var audio: some View {
         Group {
             header("Audio")
-            boundedList {
+            boundedList(selected: player.selectedAudioID) {
                 ForEach(player.audioTracks) { track in
                     choice(trackLabel(track), detail: trackDetail(track), selected: track.id == player.selectedAudioID) {
                         playback.selectAudio(trackID: track.id)
                     }
+                    .id(track.id)
                 }
             }
         }
@@ -76,16 +87,17 @@ struct PlayerOptions: View {
     private var subtitles: some View {
         Group {
             header("Subtitles")
-            boundedList {
+            boundedList(selected: player.selectedSubtitleID) {
                 choice("Off", detail: nil, selected: player.selectedSubtitleID == nil) { playback.selectSubtitle(trackID: nil) }
                 ForEach(player.subtitleTracks) { track in
                     choice(trackLabel(track), detail: subtitleDetail(track), selected: track.id == player.selectedSubtitleID) {
                         playback.selectSubtitle(trackID: track.id)
                     }
+                    .id(track.id)
                 }
             }
             Divider().overlay(Theme.rule).padding(.vertical, 4)
-            row("Find Subtitles…", value: nil) { page = .search; Task { await runSearch() } }
+            row("Find Subtitles…", value: nil) { page = .search }
             stepper("Size", value: "\(Int(subtitleScale * 100)) %",
                     minus: { subtitleScale = max(0.6, subtitleScale - 0.1) }, plus: { subtitleScale = min(2, subtitleScale + 0.1) })
             toggleRow("Background box", isOn: $subtitleBackground)
@@ -94,33 +106,110 @@ struct PlayerOptions: View {
         }
     }
 
+    /// Every source at once; results arrive as each answers, files made for exactly this
+    /// one first.
     private var search: some View {
         Group {
             header("Find Subtitles")
-            if searching {
-                HStack(spacing: Theme.Space.s) { ProgressView().controlSize(.small); Text("Searching OpenSubtitles through Plex…") }
-                    .font(Theme.Typeface.caption).foregroundStyle(Theme.inkSecondary).padding(Theme.Space.m)
-            } else if let searchError {
-                Text(searchError).font(Theme.Typeface.caption).foregroundStyle(Theme.inkSecondary).padding(Theme.Space.m)
-            } else if results.isEmpty {
-                Text("No subtitles found in \(languageName).").font(Theme.Typeface.caption).foregroundStyle(Theme.inkSecondary).padding(Theme.Space.m)
-            } else {
+            if finder.isSearching {
+                HStack(spacing: Theme.Space.s) {
+                    ProgressView().controlSize(.small)
+                    Text("Searching \(finder.pending.formatted(.list(type: .and)))…").lineLimit(2)
+                }
+                .font(Theme.Typeface.caption).foregroundStyle(Theme.inkSecondary)
+                .padding(.horizontal, Theme.Space.m).padding(.vertical, 8)
+                .accessibilityElement(children: .combine)
+            }
+            if !finder.results.isEmpty {
                 ScrollView {
                     VStack(spacing: 2) {
-                        ForEach(results.prefix(20)) { result in
-                            choice(result.title ?? result.label,
-                                   detail: [result.providerTitle, result.hearingImpaired ? "SDH" : nil,
-                                            downloading == result.key ? "Downloading…" : nil].compactMap { $0 }.joined(separator: " · "),
-                                   selected: false) { Task { await download(result) } }
+                        ForEach(finder.results.prefix(Self.shownResults)) { result in
+                            choice(result.release, detail: resultDetail(result), selected: false,
+                                   busy: finder.downloading == result.id, detailLines: 2) { choose(result) }
+                                .help(result.release)
+                                .accessibilityHint("Loads this subtitle")
+                        }
+                        if finder.results.count > Self.shownResults {
+                            note("Showing the best \(Self.shownResults) of \(finder.results.count).")
                         }
                     }
                 }
                 .frame(maxHeight: 300)
-                Text("A chosen subtitle is saved on your server, so every Plex app sees it.")
-                    .font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkTertiary).padding(.horizontal, Theme.Space.m).padding(.vertical, 6)
+                .fixedSize(horizontal: false, vertical: true)
             }
+            if let failure = finder.failure { problemNote(failure) }
+            if finder.problems.count > 2 {
+                problemNote("\(finder.problems.map(\.source).formatted(.list(type: .and))) didn’t answer.")
+            } else {
+                ForEach(finder.problems, id: \.source) { problem in problemNote("\(problem.source): \(problem.message).") }
+            }
+            if finder.results.isEmpty && !finder.isSearching {
+                note("No subtitles found in \(languageList).")
+            }
+            Divider().overlay(Theme.rule).padding(.vertical, 4)
+            if !finder.isSearching {
+                row("Search Again", value: nil, symbol: "arrow.clockwise") { startSearch(again: true) }
+            }
+            if let missing = missingKeysNote {
+                note(missing)
+            } else if !finder.results.isEmpty {
+                note("Plex results are saved on your server for every Plex app. The rest are kept on this Mac.")
+            }
+            row("Subtitle Settings…", value: languageList, symbol: "arrow.up.forward.app") {
+                settingsTab = "subtitles"
+                openSettings()
+                close()
+            }
+            .accessibilityHint("Opens Settings")
+        }
+        .onChange(of: finder.isSearching) { _, searching in
+            guard !searching, page == .search else { return }
+            let n = finder.results.count
+            AccessibilityNotification.Announcement(n == 0 ? "No subtitles found" : (n == 1 ? "1 subtitle found" : "\(n) subtitles found")).post()
         }
     }
+
+    private static let shownResults = 60
+
+    private var missingKeysNote: String? {
+        switch (sources.openSubtitlesKey.isEmpty, sources.subdlKey.isEmpty) {
+        case (true, true): "Free OpenSubtitles and Subdl keys find more, including subtitles made for this exact file."
+        case (true, false): "A free OpenSubtitles key finds more, including subtitles made for this exact file."
+        case (false, true): "A free Subdl key finds more."
+        case (false, false): nil
+        }
+    }
+
+    private func resultDetail(_ r: SubtitleResult) -> String {
+        if finder.downloading == r.id { return "Loading…" }
+        return [r.hashMatch ? "Matches this file" : nil,
+                finder.languages.count > 1 ? Locale.current.localizedString(forLanguageCode: r.language) : nil,
+                r.sourceLabel, r.hearingImpaired ? "SDH" : nil, r.forced ? "Forced" : nil,
+                r.downloads.map { $0 == 1 ? "1 download" : "\($0.formatted(.number.notation(.compactName))) downloads" }]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private func note(_ text: String, color: Color = Theme.inkSecondary) -> some View {
+        Text(text).font(Theme.Typeface.cardMeta).foregroundStyle(color)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, Theme.Space.m).padding(.vertical, 4)
+    }
+
+    /// A source that failed, or a choice that didn't load: marked with a symbol, not colour alone.
+    private func problemNote(_ text: String) -> some View {
+        Label { Text(text) } icon: { Image(systemName: "exclamationmark.triangle") }
+            .font(Theme.Typeface.cardMeta).foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, Theme.Space.m).padding(.vertical, 4)
+            .accessibilityLabel("Problem: \(text)")
+    }
+
+    private var languageList: String {
+        finder.languages.isEmpty ? languageName(sources.languages.first ?? "en")
+            : finder.languages.map(languageName).formatted(.list(type: .and))
+    }
+
+    private func languageName(_ code: String) -> String { Locale.current.localizedString(forLanguageCode: code) ?? code }
 
     private var soundPage: some View {
         Group {
@@ -176,20 +265,26 @@ struct PlayerOptions: View {
 
     // MARK: Rows
 
-    /// Long track lists scroll inside the panel instead of running off the window.
-    private func boundedList<C: View>(@ViewBuilder _ content: () -> C) -> some View {
-        ScrollView { VStack(spacing: 2) { content() } }
-            .frame(maxHeight: 260)
-            .fixedSize(horizontal: false, vertical: true)
+    /// Long track lists scroll inside the panel instead of running off the window, opened
+    /// on the track in use.
+    private func boundedList<C: View>(selected: Int?, @ViewBuilder _ content: () -> C) -> some View {
+        let rows = content()
+        return ScrollViewReader { proxy in
+            ScrollView { VStack(spacing: 2) { rows } }
+                .frame(maxHeight: 260)
+                .fixedSize(horizontal: false, vertical: true)
+                .onAppear { if let selected { proxy.scrollTo(selected, anchor: .center) } }
+                .onChange(of: selected) { _, id in if let id { withAnimation(Theme.Motion.quick) { proxy.scrollTo(id, anchor: .center) } } }
+        }
     }
 
-    private func row(_ title: String, value: String?, action: @escaping () -> Void) -> some View {
+    private func row(_ title: String, value: String?, symbol: String = "chevron.right", action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: Theme.Space.m) {
                 Text(title).font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink)
                 Spacer(minLength: Theme.Space.s)
                 if let value { Text(value).font(Theme.Typeface.caption).foregroundStyle(Theme.inkSecondary).lineLimit(1) }
-                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.inkTertiary)
+                Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.inkTertiary)
             }
             .padding(.horizontal, Theme.Space.m)
             .frame(height: 40)
@@ -213,18 +308,24 @@ struct PlayerOptions: View {
         }
         .buttonStyle(.plain)
         .focusEffectDisabled(false)
-        .accessibilityLabel("Back to playback options")
+        .accessibilityLabel("\(title). Back to \(page == .search ? "Subtitles" : "playback options")")
+        .accessibilityAddTraits(.isHeader)
     }
 
-    private func choice(_ title: String, detail: String?, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func choice(_ title: String, detail: String?, selected: Bool, busy: Bool = false, detailLines: Int = 1,
+                        action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: Theme.Space.m) {
-                Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.lilac).opacity(selected ? 1 : 0)
+                ZStack {
+                    Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.lilac).opacity(selected && !busy ? 1 : 0)
+                    if busy { ProgressView().controlSize(.mini) }
+                }
+                .frame(width: 12)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink).lineLimit(1)
                     if let detail, !detail.isEmpty {
-                        Text(detail).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+                        Text(detail).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary).lineLimit(detailLines)
                     }
                 }
                 Spacer()
@@ -235,6 +336,7 @@ struct PlayerOptions: View {
         }
         .buttonStyle(OptionRowStyle())
         .focusEffectDisabled(false)
+        .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -305,7 +407,7 @@ struct PlayerOptions: View {
     }
 
     private func subtitleDetail(_ t: PlayerTrack) -> String {
-        [t.codec.uppercased(), t.isForced ? "Forced" : nil, t.isHearingImpaired ? "SDH" : nil,
+        [t.codec.lowercased() == "subrip" ? "SRT" : t.codec.uppercased(), t.isForced ? "Forced" : nil, t.isHearingImpaired ? "SDH" : nil,
          t.isExternal ? "File" : nil, t.name.isEmpty ? nil : t.name].compactMap { $0 }.joined(separator: " · ")
     }
 
@@ -313,46 +415,23 @@ struct PlayerOptions: View {
         r == 1 ? "Normal" : (r == r.rounded() ? "\(Int(r))×" : String(format: "%g×", r))
     }
 
-    private var languageCode: String { Locale.current.language.languageCode?.identifier ?? "en" }
-    private var languageName: String { Locale.current.localizedString(forLanguageCode: languageCode) ?? "your language" }
-
     // MARK: Subtitle search
 
-    private func runSearch() async {
-        guard let client = session.client else { return }
-        searching = true
-        searchError = nil
-        defer { searching = false }
-        do {
-            results = try await client.searchSubtitles(ratingKey: playback.item?.ratingKey ?? item.ratingKey, language: languageCode)
-        } catch {
-            searchError = (error as? PlexError)?.userMessage ?? "Search didn’t work."
-        }
+    private func startSearch(again: Bool = false) {
+        let current = playback.item ?? item
+        finder.search(current, client: session.client,
+                      localFile: playback.playingDownload ? downloads.localFile(for: current.ratingKey) : nil,
+                      settings: sources, again: again)
     }
 
-    /// Downloads to the server as a sidecar, then adds it to this session and selects it.
-    private func download(_ result: PlexStream) async {
-        guard let client = session.client, let current = playback.item else { return }
-        downloading = result.key
-        defer { downloading = nil }
-        do {
-            let before = Set(current.media.first?.parts.first?.streams.map(\.id) ?? [])
-            try await client.downloadSubtitle(ratingKey: current.ratingKey, result: result)
-            let fresh = try await client.metadata(current.ratingKey)
-            guard let added = fresh.media.first?.parts.first?.streams.first(where: {
-                $0.streamType == .subtitle && $0.key != nil && !before.contains($0.id)
-            }), let key = added.key, let url = client.urls.subtitle(streamKey: key) else {
-                searchError = "The server saved it, but it isn’t listed yet. Try again in a moment."
-                return
+    private func choose(_ result: SubtitleResult) {
+        let current = playback.item ?? item
+        let serverID = session.currentServer?.clientIdentifier ?? downloads.record(current.ratingKey)?.serverID
+        Task {
+            if let found = await finder.choose(result, current: current, client: session.client, serverID: serverID, player: player) {
+                playback.adoptFoundSubtitle(trackID: found.trackID, savedEntry: found.savedEntry, plexStream: found.plexStream)
+                page = .subtitles
             }
-            let track = player.addExternalSubtitle(ExternalSubtitle(url: url, name: added.label, language: added.languageCode,
-                                                                    format: added.codec, isForced: added.forced,
-                                                                    isHearingImpaired: added.hearingImpaired),
-                                                   headers: client.requestHeaders)
-            player.selectSubtitle(id: track.id)
-            page = .subtitles
-        } catch {
-            searchError = (error as? PlexError)?.userMessage ?? "Couldn’t download that subtitle."
         }
     }
 }

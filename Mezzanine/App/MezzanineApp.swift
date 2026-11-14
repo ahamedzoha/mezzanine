@@ -28,6 +28,8 @@ struct MezzanineApp: App {
     @State private var layouts = HomeLayoutStore()
     @State private var downloads = DownloadStore()
     @State private var sound: SoundSettings
+    @State private var subtitleSources = SubtitleSourceSettings()
+    @State private var subtitleFinder = SubtitleFinder()
 
     init() {
         TitleFont.register()
@@ -50,6 +52,8 @@ struct MezzanineApp: App {
                 .environment(layouts)
                 .environment(downloads)
                 .environment(sound)
+                .environment(subtitleSources)
+                .environment(subtitleFinder)
                 .task {
                     playback.downloads = downloads
                     appDelegate.beforeQuit = { [playback, downloads] in
@@ -77,6 +81,7 @@ struct MezzanineApp: App {
                 .environment(layouts)
                 .environment(downloads)
                 .environment(sound)
+                .environment(subtitleSources)
         }
 
         Window("Keyboard Shortcuts", id: "shortcuts") {
@@ -93,6 +98,7 @@ struct MezzanineApp: App {
                 .environment(session)
                 .environment(library)
                 .environment(commands)
+                .environment(subtitleSources)
         }
         Window("Lab", id: "lab") {
             LabView()
@@ -103,6 +109,8 @@ struct MezzanineApp: App {
                 .environment(library)
                 .environment(layouts)
                 .environment(downloads)
+                .environment(subtitleSources)
+                .environment(subtitleFinder)
         }
         .defaultSize(width: 1200, height: 800)
         #endif
@@ -146,6 +154,8 @@ private struct SheetPreview: View {
                 let key = UserDefaults.standard.string(forKey: "ArtworkKey") ?? "52003"
                 artworkItem = try? library.index?.item(key)?.metadata()
             }
+        } else if kind == "opensubtitles" {
+            OpenSubtitlesSheet()
         } else if kind == "picker" {
             if session.client != nil && !commands.sections.isEmpty {
                 CollectionPicker(sections: commands.sections, existing: []) { _, _ in }

@@ -362,6 +362,7 @@ struct MezzanineCommands: Commands {
                 item(.cycleAudio)
                 item(.cycleSubtitles)
                 item(.subtitleOptions)
+                item(.findSubtitles)
                 item(.subtitlesEarlier)
                 item(.subtitlesLater)
                 Divider()

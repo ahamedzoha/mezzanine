@@ -51,7 +51,7 @@ Build output goes to `build.noindex/` (Spotlight skips it).
 `-MezzanineNoActivity YES` · `-ApplePersistenceIgnoreState YES` · Lab window: Window ▸ Lab
 (or the Open Lab button on the placeholder root). Player: `-MezzanineAutoplay <ratingKey>`
 `-MezzanineAutoSeek <s>` `-MezzanineAutoClose <s>` `-PlayerChromePinned YES`
-`-PlayerOptionsOpen YES` `-PlayerFullScreen YES` `-PlayerKeyScript "i,c,shift+right,!snapshot"`
+`-PlayerOptionsOpen YES` `-PlayerOptionsPage search|subtitles|audio` `-FindSubtitlesChoose YES` (picks the first non-Plex result; local only) `-PlayerFullScreen YES` `-PlayerKeyScript "i,c,shift+right,!snapshot"`
 (real key events through the router; menus ignore keys while the app is in the background, so
 ⌘ items use `!action`) `-ScrubHoverAt 0.6` `-SnapshotNoClipboard YES`; detail:
 `-MezzanineOpen <ratingKey>` `-DetailSection cast`; windows: `-MezzanineOpenWindow shortcuts|settings`
@@ -63,7 +63,12 @@ defaults and Keychain item), so test runs never change the installed app's setti
 Shelves: `-HomeSeedShelves YES` (smart shelf, collection, hidden row), `-HomeEditing YES`,
 `-HomeKeyScript "down,opt+down,space"`, `-SmartShelfSheet YES`, `-CollectionPicker YES`,
 `-QuickOpenQuery "after"` (`_` for empty). Window snapshots of an attached sheet fail: capture
-`-MezzanineOpenWindow sheetPreview -SheetPreviewKind rules|picker` instead.
+`-MezzanineOpenWindow sheetPreview -SheetPreviewKind rules|picker|artwork|opensubtitles` instead.
+
+Subtitles: Find Subtitles' sources live in `MezzanineKit/Subtitles/`; the keys in the Keychain
+(`<bundleID>.subtitles`). Never choose a Plex result while testing (it writes a sidecar on the
+server); internet results only write under the Debug container's Application Support.
+Debug builds open onboarding unless launched with `-onboardingComplete YES`.
 
 SwiftUI gotcha: never mutate a `@Binding` array twice in one transaction (remove, then insert):
 the second read sees the stale array and duplicates the element. Build the new array, assign once.
