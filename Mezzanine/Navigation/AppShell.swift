@@ -29,7 +29,6 @@ struct AppShell: View {
                 split
                     .disabled(playback.isPresented)
                     .accessibilityHidden(playback.isPresented)
-                    .toolbarVisibility(playback.isPresented ? .hidden : .visible, for: .windowToolbar)
             } else {
                 SignInView()
             }
@@ -43,6 +42,11 @@ struct AppShell: View {
                 .transition(.opacity)
             }
         }
+        // While a film plays the window is only the film: no toolbar, no toolbar
+        // material, no title (AppKit draws those above SwiftUI content).
+        .toolbarVisibility(playback.isPresented ? .hidden : .visible, for: .windowToolbar)
+        .toolbarBackgroundVisibility(playback.isPresented ? .hidden : .automatic, for: .windowToolbar)
+        .background(WindowChrome(hidden: playback.isPresented))
         // Theme reads Increase Contrast at render time; rebuild when it changes.
         .id(contrast)
         .frame(minWidth: 900, minHeight: 600)
@@ -106,6 +110,14 @@ struct AppShell: View {
             }
             #endif
             contentFocused = true
+            #if DEBUG
+            // -MezzanineAutoplay <ratingKey> starts a title at launch (player tests).
+            if let key = UserDefaults.standard.string(forKey: "MezzanineAutoplay"), let client = session.client,
+               let item = try? await client.metadata(key) {
+                if UserDefaults.standard.bool(forKey: "playerMuted") { playback.player.volume = VolumeLevel(percent: 0) }
+                await playback.play(item, from: nil)
+            }
+            #endif
         }
     }
 
