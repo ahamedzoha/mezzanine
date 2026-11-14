@@ -22,6 +22,8 @@ final class SessionStore {
     private(set) var client: PlexServerClient?
 
     let identity: PlexIdentity
+    /// Every remote image in the app goes through this one pipeline.
+    let images = ImagePipeline(disk: .standard(limitMB: 512))
     private let keychain = Keychain(service: "com.mezzanine.mac.plex")
     private let tv: PlexTV
     private var signInTask: Task<Void, Never>?
@@ -142,6 +144,7 @@ final class SessionStore {
         client = PlexServerClient(baseURL: won.baseURL, token: server.accessToken ?? token,
                                   machineIdentifier: server.clientIdentifier, identity: identity)
         UserDefaults.standard.set(server.clientIdentifier, forKey: Self.serverDefaultsKey)
+        await images.setToken(server.accessToken ?? token, host: won.baseURL.host(), serverID: server.clientIdentifier)
         phase = .ready
     }
 
@@ -151,5 +154,27 @@ final class SessionStore {
         guard generation != lastPathGeneration, phase == .ready, let server = currentServer else { return }
         lastPathGeneration = generation
         Task { await select(server) }
+    }
+
+    // MARK: Artwork URLs
+
+    /// A poster at the pixel width it's drawn at (2:3), resized by the server.
+    func posterURL(_ path: String?, pixelWidth: Int) -> URL? {
+        guard let path, let client else { return nil }
+        let w = Downsampler.bucket(for: pixelWidth)
+        return client.urls.photo(path, width: w, height: w * 3 / 2)
+    }
+
+    /// A 16:9 still or backdrop at the pixel width it's drawn at.
+    func backdropURL(_ path: String?, pixelWidth: Int) -> URL? {
+        guard let path, let client else { return nil }
+        let w = Downsampler.bucket(for: pixelWidth)
+        return client.urls.photo(path, width: w, height: w * 9 / 16)
+    }
+
+    /// Clear logos stay originals: they're transparent PNGs, and a resize could flatten them.
+    func logoURL(_ path: String?) -> URL? {
+        guard let path, let client else { return nil }
+        return client.urls.asset(path)
     }
 }

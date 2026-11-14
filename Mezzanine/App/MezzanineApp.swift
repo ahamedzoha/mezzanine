@@ -4,59 +4,50 @@ import MezzaninePlayback
 
 @main
 struct MezzanineApp: App {
-    @State private var session = SessionStore()
-    @State private var player = MezzaninePlayer.makeShared()
+    @State private var session: SessionStore
+    @State private var player: MezzaninePlayer
+    @State private var playback: PlaybackCoordinator
+
+    init() {
+        TitleFont.register()
+        let session = SessionStore()
+        let player = MezzaninePlayer.makeShared()
+        _session = State(initialValue: session)
+        _player = State(initialValue: player)
+        _playback = State(initialValue: PlaybackCoordinator(player: player, session: session))
+    }
 
     var body: some Scene {
         Window("Mezzanine", id: "main") {
-            RootView()
+            AppShell()
                 .environment(session)
                 .environment(player)
+                .environment(playback)
                 .task { await session.restore() }
+                #if DEBUG
+                .modifier(LabLauncher())
+                #endif
         }
-        .defaultSize(width: 1360, height: 860)
+        .defaultSize(width: 1440, height: 900)
 
         #if DEBUG
         Window("Lab", id: "lab") {
             LabView()
                 .environment(session)
                 .environment(player)
+                .environment(playback)
         }
         .defaultSize(width: 1200, height: 800)
         #endif
     }
 }
 
-/// Placeholder shell until the M1 design round lands.
-struct RootView: View {
-    @Environment(SessionStore.self) private var session
+#if DEBUG
+/// Opens the Lab window for the scripted matrix (`-LabAutoMatrix YES`).
+private struct LabLauncher: ViewModifier {
     @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("Mezzanine").font(.largeTitle.bold())
-            switch session.phase {
-            case .signedOut:
-                Button("Sign in with Plex") { session.signIn() }
-            case .awaitingApproval(let code):
-                Text("Approve Mezzanine in your browser (code \(code)).")
-                Button("Cancel") { session.cancelSignIn() }
-            case .connecting:
-                ProgressView("Connecting…")
-            case .ready:
-                Text("Connected to \(session.currentServer?.name ?? "server") via \(session.connection?.connection.route.rawValue ?? "?").")
-            case .failed(let message):
-                Text(message).foregroundStyle(.red)
-                Button("Try Again") { Task { await session.restore() } }
-            }
-            #if DEBUG
-            Button("Open Lab") { openWindow(id: "lab") }
-            #endif
-        }
-        .padding(40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        #if DEBUG
-        .task { if LabAutoRunner.isEnabled { openWindow(id: "lab") } }
-        #endif
+    func body(content: Content) -> some View {
+        content.task { if LabAutoRunner.isEnabled { openWindow(id: "lab") } }
     }
 }
+#endif
