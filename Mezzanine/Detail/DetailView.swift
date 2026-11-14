@@ -46,7 +46,8 @@ struct DetailView: View {
                         DetailHero(item: item, nextEpisode: nextEpisode, play: { play(nextEpisode ?? item, from: heroFrame) },
                                    playTrailer: trailer.map { t in { play(t, from: heroFrame) } },
                                    toggleWatched: { requestToggleWatched(item) },
-                                   playVersion: { i in Task { await playback.play(item, from: heroFrame, mediaIndex: i) } })
+                                   playVersion: { i in Task { await playback.play(item, from: heroFrame, mediaIndex: i) } },
+                                   chooseArtwork: { kind in commands.artworkRequest = ArtworkRequest(item: item, kind: kind) })
                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { heroFrame = $0 }
                             .id("hero")
                         about(item).padding(.top, Self.sectionLead).id("about")

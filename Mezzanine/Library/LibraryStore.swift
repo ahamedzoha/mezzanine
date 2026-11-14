@@ -33,6 +33,9 @@ final class LibraryStore {
     private var sync: LibrarySync?
     private var client: PlexServerClient?
     private var sections: [PlexLibrarySection] = []
+    /// Artwork chosen for Mezzanine only (never written to Plex): owner ratingKey → kind → path.
+    private(set) var artworkOverrides: [String: [String: String]] = [:]
+    private var overridesKey: String?
     private var timer: Task<Void, Never>?
     private var resolving = Set<String>()
     private var openedFor: String?
@@ -48,6 +51,8 @@ final class LibraryStore {
                 self.index = index
                 openedFor = key
                 cleanPosters = [:]
+                overridesKey = "artworkOverrides.v1.\(key)"
+                artworkOverrides = (UserDefaults.standard.dictionary(forKey: overridesKey!) as? [String: [String: String]]) ?? [:]
             } catch {
                 syncState = .failed("The local library couldn’t open: \(error.localizedDescription)")
                 return
@@ -154,11 +159,36 @@ final class LibraryStore {
 
     // MARK: Posters
 
-    /// The poster path to draw for an item, honouring the clean-poster setting.
+    /// The poster path to draw for an item: a Mezzanine-only choice first, then the
+    /// clean-poster setting, then Plex's.
     func posterPath(for item: PlexMetadata) -> String? {
+        let key = Self.artworkOwner(item)
+        if let chosen = artworkOverrides[key]?[ArtworkKind.poster.rawValue] { return chosen }
         guard prefersCleanPosters else { return item.posterPath }
-        let key = item.kind == .episode ? (item.grandparentRatingKey ?? item.ratingKey) : item.ratingKey
         return cleanPosters[key] ?? item.posterPath
+    }
+
+    /// The background to draw for an item: a Mezzanine-only choice first, then Plex's.
+    func backdropPath(for item: PlexMetadata) -> String? {
+        let key = Self.artworkOwner(item)
+        return artworkOverrides[key]?[ArtworkKind.background.rawValue] ?? item.backdropPath
+    }
+
+    /// Whose artwork an item shows: an episode's show, else the item itself.
+    static func artworkOwner(_ item: PlexMetadata) -> String {
+        item.kind == .episode ? (item.grandparentRatingKey ?? item.ratingKey) : item.ratingKey
+    }
+
+    func artworkOverride(_ kind: ArtworkKind, for ratingKey: String) -> String? {
+        artworkOverrides[ratingKey]?[kind.rawValue]
+    }
+
+    /// Sets (or with nil, clears) a Mezzanine-only poster or background.
+    func setArtworkOverride(_ kind: ArtworkKind, for ratingKey: String, path: String?) {
+        var entry = artworkOverrides[ratingKey] ?? [:]
+        entry[kind.rawValue] = path
+        artworkOverrides[ratingKey] = entry.isEmpty ? nil : entry
+        if let overridesKey { UserDefaults.standard.set(artworkOverrides, forKey: overridesKey) }
     }
 
     /// Looks up (once) and caches the clean poster for an item's poster owner.

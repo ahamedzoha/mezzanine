@@ -363,3 +363,10 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - The failure panel offers Convert on the Server while the original was playing.
 - Multi-version titles (rare here): Version menu beside Play on movie pages; Play Version in an episode's context menu.
 - Plex has no transcode profile for platform "macOS": transcode URLs carry `X-Plex-Client-Profile-Name=Generic` plus Mezzanine's target (HLS/MPEG-TS, H.264/HEVC, AAC/AC-3/E-AC-3), and a decision request precedes `start.m3u8`. Closing (or quitting) stops the session.
+
+## Artwork picker (M8)
+
+- Choose Poster… / Choose Background… from a poster's context menu (films, shows, seasons) and the ⋯ button beside the detail hero's actions. One sheet, 860 × 640, solid graphite; Poster | Background segmented control top-right.
+- A grid of every picture Plex offers (agents such as TMDB and Fanart.tv, uploads such as Kometa's, the title's own folder): 132 pt posters or 236 pt backgrounds, each with its source as card meta. The picture in use carries the hueless check; the selection lifts (1.04, poster-focus shadow) and its caption turns lilac. Arrows move, Return or a double-click uses it, Esc cancels.
+- Use it: **In Mezzanine only** (default; a local choice per server and profile, nothing on the server changes) or **On the Plex server** (every app; tools like Kometa may replace it on their next run). "Use Plex’s Poster" removes a Mezzanine-only choice.
+- Provider pictures load from Plex's own small renditions; server files go through the server's photo transcoder. The token never leaves the server's host.

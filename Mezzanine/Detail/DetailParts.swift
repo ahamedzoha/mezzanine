@@ -11,8 +11,10 @@ struct DetailHero: View {
     let toggleWatched: () -> Void
     /// Plays one file of a multi-version title (shown only when there's a choice).
     var playVersion: ((Int) -> Void)? = nil
+    var chooseArtwork: ((ArtworkKind) -> Void)? = nil
 
     @Environment(SessionStore.self) private var session
+    @Environment(LibraryStore.self) private var library
     @State private var width: CGFloat = 1200
 
     var body: some View {
@@ -68,6 +70,21 @@ struct DetailHero: View {
                 .buttonStyle(SecondaryButtonStyle())
                 .focusEffectDisabled(false)
                 .help(watchedHelp)
+                if let chooseArtwork {
+                    Menu {
+                        Button("Choose Poster…") { chooseArtwork(.poster) }
+                        Button("Choose Background…") { chooseArtwork(.background) }
+                    } label: {
+                        Image(systemName: "ellipsis").frame(width: 14)
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(SecondaryButtonStyle())
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .focusEffectDisabled(false)
+                    .help("More: choose the poster or background")
+                    .accessibilityLabel("More for \(Format.displayTitle(item))")
+                }
             }
             if let target = Optional(nextEpisode ?? item), let progress = target.progress, progress > 0 {
                 HStack(spacing: Theme.Space.s) {
@@ -85,7 +102,7 @@ struct DetailHero: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(alignment: .top) {
             GeometryReader { geo in
-                RemoteImage(url: session.backdropURL(item.backdropPath, pixelWidth: Int(geo.size.width * 2)),
+                RemoteImage(url: session.backdropURL(library.backdropPath(for: item), pixelWidth: Int(geo.size.width * 2)),
                             pixelWidth: Int(geo.size.width * 2), placeholder: .clear, alignment: .top)
                     .frame(width: geo.size.width, height: geo.size.height + 80)
                     .mask(LinearGradient(stops: [

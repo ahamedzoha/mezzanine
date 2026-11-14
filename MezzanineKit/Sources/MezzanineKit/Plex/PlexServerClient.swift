@@ -275,6 +275,29 @@ public actor PlexServerClient {
         return (agentStored ?? firstProvider)?.key
     }
 
+    // MARK: Artwork
+
+    /// Every poster or background Plex offers for a title; the one in use has `selected`.
+    public func artwork(_ kind: ArtworkKind, ratingKey: String) async throws -> [ArtworkCandidate] {
+        struct Container: Decodable {
+            let items: [ArtworkCandidate]
+            enum CodingKeys: String, CodingKey { case items = "Metadata" }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                items = c.list(ArtworkCandidate.self, .items)
+            }
+        }
+        let c: Container = try await get("/library/metadata/\(ratingKey)/\(kind.listPath)")
+        return c.items
+    }
+
+    /// Makes a candidate the title's poster or background on the server, for every app.
+    /// Kometa (or any tool that manages artwork) may replace it on its next run.
+    public func setArtwork(_ kind: ArtworkKind, ratingKey: String, to candidate: ArtworkCandidate) async throws {
+        try await write("PUT", "/library/metadata/\(ratingKey)/\(kind.setPath)",
+                        query: [URLQueryItem(name: "url", value: candidate.ratingKey)])
+    }
+
     // MARK: Folders (personal-media libraries such as Courses)
 
     public struct FolderListing: Sendable {

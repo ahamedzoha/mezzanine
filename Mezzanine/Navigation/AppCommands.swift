@@ -87,6 +87,9 @@ final class AppCommandCenter {
     func shelf(_ action: ShelfAction) { shelfRequests = (shelfRequests.count + 1, action) }
     func toggleEditShelves() { shelf(.toggleEditing) }
 
+    /// Choose Poster / Choose Background, presented by the window.
+    var artworkRequest: ArtworkRequest?
+
     /// The visible library's layouts (the Layout menu enables only these).
     var availableLayouts: [String] = []
 

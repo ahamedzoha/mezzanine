@@ -333,7 +333,7 @@ struct HomeView: View {
         let items = model.shelves.flatMap { $0.items.prefix(16) }
         await withTaskGroup(of: Void.self) { group in
             for item in items {
-                if let url = session.backdropURL(item.backdropPath, pixelWidth: width) {
+                if let url = session.backdropURL(library.backdropPath(for: item), pixelWidth: width) {
                     group.addTask(priority: .utility) { [images = session.images] in _ = try? await images.image(for: url, pixelSize: width) }
                 }
                 if let url = session.logoURL(item.clearLogoPath) {

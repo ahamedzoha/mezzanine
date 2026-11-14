@@ -498,6 +498,7 @@ private struct WideCard: View {
     let index: Int
     let actions: CardActions
 
+    @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovering = false
@@ -510,7 +511,7 @@ private struct WideCard: View {
             GeometryReader { geo in
                 let px = Int(geo.size.width * 2)
                 ZStack(alignment: .bottomLeading) {
-                    RemoteImage(url: session.backdropURL(item.backdropPath, pixelWidth: px), pixelWidth: px)
+                    RemoteImage(url: session.backdropURL(library.backdropPath(for: item), pixelWidth: px), pixelWidth: px)
                     LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
                     LogoImage(url: session.logoURL(item.clearLogoPath), pixelWidth: 600) { EmptyView() }
                         .frame(maxWidth: geo.size.width * 0.55, maxHeight: geo.size.height * 0.32, alignment: .bottomLeading)
@@ -638,6 +639,7 @@ private struct TitleRow: View {
 /// Single click focuses, double click opens, the play disc (or VoiceOver's
 /// default action) plays.
 struct CardInteraction: ViewModifier {
+    @Environment(AppCommandCenter.self) private var commands
     let item: PlexMetadata
     let frame: CGRect
     let isFocused: Bool
@@ -670,6 +672,11 @@ struct CardInteraction: ViewModifier {
             .contextMenu {
                 Button("Play") { onPlay(frame) }
                 Button("Open") { onOpen() }
+                if item.kind != .episode {
+                    Divider()
+                    Button("Choose Poster…") { commands.artworkRequest = ArtworkRequest(item: item, kind: .poster) }
+                    Button("Choose Background…") { commands.artworkRequest = ArtworkRequest(item: item, kind: .background) }
+                }
             }
     }
 }

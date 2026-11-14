@@ -123,8 +123,22 @@ private struct LabLauncher: ViewModifier {
 private struct SheetPreview: View {
     @Environment(AppCommandCenter.self) private var commands
     @Environment(SessionStore.self) private var session
+    @Environment(LibraryStore.self) private var library
+    @State private var artworkItem: PlexMetadata?
     var body: some View {
-        if UserDefaults.standard.string(forKey: "SheetPreviewKind") == "picker" {
+        let kind = UserDefaults.standard.string(forKey: "SheetPreviewKind")
+        if kind == "artwork" {
+            ZStack {
+                Color.clear
+                if let artworkItem, session.client != nil {
+                    ArtworkPicker(request: ArtworkRequest(item: artworkItem, kind: .poster))
+                }
+            }
+            .task(id: library.revision) {
+                let key = UserDefaults.standard.string(forKey: "ArtworkKey") ?? "52003"
+                artworkItem = try? library.index?.item(key)?.metadata()
+            }
+        } else if kind == "picker" {
             if session.client != nil && !commands.sections.isEmpty {
                 CollectionPicker(sections: commands.sections, existing: []) { _, _ in }
             }

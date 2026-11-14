@@ -121,6 +121,10 @@ struct AppShell: View {
             }
             .animation(Theme.Motion.quick, value: commands.isQuickOpenShown)
         }
+        .sheet(item: $commands.artworkRequest) { request in
+            ArtworkPicker(request: request)
+        }
+        .onChange(of: commands.artworkRequest == nil) { _, closed in commands.isModalShown = !closed }
         .searchable(text: $commands.query, placement: .toolbar, prompt: "Titles, people, collections")
         .searchFocused($searchFocused)
         .onChange(of: searchFocused) { _, focused in commands.isSearchFieldFocused = focused }

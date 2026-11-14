@@ -10,6 +10,7 @@ struct HeroView: View {
     var open: (() -> Void)? = nil
 
     @Environment(SessionStore.self) private var session
+    @Environment(LibraryStore.self) private var library
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var width: CGFloat = 1200
 
@@ -45,7 +46,7 @@ struct HeroView: View {
     // MARK: Parts
 
     private func backdrop(width: CGFloat) -> some View {
-        RemoteImage(url: session.backdropURL(item.backdropPath, pixelWidth: Int(width * 0.74 * 2)),
+        RemoteImage(url: session.backdropURL(library.backdropPath(for: item), pixelWidth: Int(width * 0.74 * 2)),
                     pixelWidth: Int(width * 0.74 * 2), placeholder: .clear, alignment: .top)
     }
 
