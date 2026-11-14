@@ -70,7 +70,11 @@ struct AppShell: View {
         }
         // Sections and the local library follow the connection, onboarding included.
         .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(session.account?.uuid ?? "")") { await loadSections() }
-        .onChange(of: isOffline, initial: true) { _, offline in if offline { commands.selection = .downloads } }
+        .onChange(of: isOffline, initial: true) { _, offline in
+            guard offline else { return }
+            commands.selection = .downloads
+            AccessibilityNotification.Announcement("Offline. Showing downloads.").post()
+        }
         .onChange(of: playback.isPresented, initial: true) { _, presented in
             commands.isPlayerOpen = presented
             if !presented { contentFocused = true }
@@ -103,6 +107,7 @@ struct AppShell: View {
                     Section {
                         Text("Plex can’t be reached. Downloads still play.")
                             .font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary)
+                            .lineLimit(3)
                             .fixedSize(horizontal: false, vertical: true)
                         Button("Try Again") { Task { await session.restore() } }
                     } header: {
@@ -157,8 +162,22 @@ struct AppShell: View {
         .sheet(item: $commands.pinRequest) { user in
             ProfilePINSheet(user: user)
         }
+        .confirmationDialog(commands.downloadRemoval?.question ?? "",
+                            isPresented: Binding(get: { commands.downloadRemoval != nil }, set: { if !$0 { commands.downloadRemoval = nil } }),
+                            presenting: commands.downloadRemoval) { removal in
+            Button(removal.confirm, role: .destructive) {
+                for id in removal.ids { downloads.remove(id) }
+                AccessibilityNotification.Announcement("Removed. The files are in the Trash.").post()
+                commands.downloadRemoval = nil
+            }
+            Button("Cancel", role: .cancel) { commands.downloadRemoval = nil }
+        } message: { _ in
+            Text("The files go to the Trash. Nothing changes on the Plex server.")
+        }
+        .onChange(of: commands.downloadRemoval == nil) { _, closed in commands.isModalShown = !closed }
         .onChange(of: commands.artworkRequest == nil) { _, closed in commands.isModalShown = !closed }
-        .searchable(text: $commands.query, placement: .toolbar, prompt: "Titles, people, collections")
+        // Offline there's nothing to search: the field goes rather than sitting dead.
+        .modifier(LibrarySearch(enabled: !isOffline, query: $commands.query))
         .searchFocused($searchFocused)
         .onChange(of: searchFocused) { _, focused in commands.isSearchFieldFocused = focused }
         .onChange(of: commands.searchRequests) { _, _ in searchFocused = true }
@@ -224,6 +243,8 @@ struct AppShell: View {
                 downloads.use(client: client, images: session.images, serverID: server.clientIdentifier,
                               userID: session.account?.uuid ?? "owner")
                 downloads.applyKeepRules()
+                // Back online: positions watched offline go to Plex now.
+                Task { await OfflineProgress.replay(client: client, serverID: server.clientIdentifier) }
                 #if DEBUG
                 // -DownloadKey <ratingKey> queues a download; -OpenDownloads YES opens the page (tests).
                 if let key = UserDefaults.standard.string(forKey: "DownloadKey"), let meta = try? await client.metadata(key) {
@@ -256,5 +277,18 @@ struct AppShell: View {
     private func icon(for section: PlexLibrarySection) -> String {
         if section.isPersonalMedia { return "folder" }
         return section.kind == .show ? "tv" : "film"
+    }
+}
+
+/// The toolbar search field, present only when there's a library to search.
+private struct LibrarySearch: ViewModifier {
+    let enabled: Bool
+    @Binding var query: String
+    func body(content: Content) -> some View {
+        if enabled {
+            content.searchable(text: $query, placement: .toolbar, prompt: "Titles, people, collections")
+        } else {
+            content
+        }
     }
 }

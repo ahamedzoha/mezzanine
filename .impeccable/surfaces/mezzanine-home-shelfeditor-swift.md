@@ -53,7 +53,7 @@ Settings), Actions (Edit Home, New Smart Shelf, Resume <first Continue Watching>
 Episode of <matching show>). ↑/↓ select (selected row title lilac, raised-hover fill), Return
 runs, ⌘Return plays a title, Esc closes. Empty query shows Continue Watching and Go To.
 
-FORM: Edit in Place (owner's pick of three dealt structures; surface roll seed:513785686e6ce27882b2a0155c30b32d, deal 7·1·5, lead "Say It" declined). Signature move = the fold: shelves collapse from poster rows into strips and back with
+FORM: Edit in Place (owner's pick of three dealt structures; surface roll roll key withheld; seed: none (unavailable), deal 7·1·5, lead "Say It" declined). Signature move = the fold: shelves collapse from poster rows into strips and back with
 matched geometry (each strip's poster peek is literally the shelf's first posters shrinking),
 spring 0.26, no bounce; Reduce Motion → 0.2 s crossfade. Everything else is standard native
 controls (pop-ups, switches, text fields, menus).

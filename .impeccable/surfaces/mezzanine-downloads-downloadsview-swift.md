@@ -10,7 +10,7 @@ related_targets: ["Mezzanine/Downloads/DownloadStore.swift", "Mezzanine/Detail/D
 M11: offline downloads inside the settled Bias Light world. The Downloads page (a sidebar
 item), the Download control on title pages and episode rows, and playback from downloaded
 files (online or offline). Mode: Operate. The owner picked "By Title" (surface roll
-seed:a090b4aa8c5f2ce441cd151fddbd6ad8, deal 3·1·6) over "Queue and Shelf" and "Storage First".
+roll key withheld; seed: none (unavailable), deal 3·1·6) over "Queue and Shelf" and "Storage First".
 Code-led; the wireframe card rides at the finish review.
 
 Audience/job: the owner before a trip or a night in bed away from the LAN: pick a few films

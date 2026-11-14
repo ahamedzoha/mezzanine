@@ -91,6 +91,10 @@ final class AppCommandCenter {
     var artworkRequest: ArtworkRequest?
     /// The movie, show or season whose page is showing (for View ▸ Choose Poster…).
     var currentDetailItem: PlexMetadata?
+    /// A download removal waiting for confirmation (asked once, app-wide).
+    var downloadRemoval: DownloadRemoval?
+    /// The title chosen on the Downloads page (File ▸ Remove Download acts on it).
+    var downloadsSelection: String?
     /// A protected Plex Home profile waiting for its PIN.
     var pinRequest: PlexHomeUser?
 
@@ -160,11 +164,35 @@ struct MezzanineCommands: Commands {
 
     private var downloadTitle: String {
         switch center.currentDetailItem?.kind {
-        case .show: "Download Next 3 Episodes"
+        case .show: "Download Next 3 Unwatched Episodes"
         case .season: "Download Season"
-        default: "Download"
+        default: DownloadWords.download
         }
     }
+
+    private var canDownload: Bool {
+        guard let item = center.currentDetailItem, !center.isBlocked else { return false }
+        switch item.kind {
+        case .movie, .episode: return downloads.record(item.ratingKey) == nil
+        case .show, .season: return true
+        default: return false
+        }
+    }
+
+    /// What File ▸ Remove Download acts on: the Downloads page's chosen title, else the open film.
+    private var removableDownload: DownloadRemoval? {
+        if center.selection == .downloads, let key = center.downloadsSelection {
+            let records = downloads.visible.filter { $0.groupKey == key }
+            guard let first = records.first else { return nil }
+            return DownloadRemoval(ids: records.map(\.id), title: first.showTitle ?? first.title, isShow: first.showKey != nil)
+        }
+        if let item = center.currentDetailItem, let r = downloads.record(item.ratingKey) {
+            return DownloadRemoval(ids: [r.id], title: r.title, isShow: false)
+        }
+        return nil
+    }
+
+    private func removeCurrentDownload() { center.downloadRemoval = removableDownload }
     @Environment(\.openWindow) private var openWindow
 
     private var shortcuts: PlayerShortcuts { .shared }
@@ -205,12 +233,18 @@ struct MezzanineCommands: Commands {
             Divider()
             Button(downloadTitle) {
                 guard let item = center.currentDetailItem else { return }
-                if item.kind == .movie { downloads.download(item) } else if item.kind == .show { downloads.downloadNext(3, of: item) }
-                else if item.kind == .season { downloads.downloadSeason(item) }
+                switch item.kind {
+                case .movie, .episode: downloads.download(item)
+                case .show: downloads.downloadNext(3, of: item)
+                case .season: downloads.downloadSeason(item)
+                default: break
+                }
             }
-            .keyboardShortcut("d", modifiers: [.command, .option])
-            .disabled(center.currentDetailItem == nil || center.isBlocked
-                      || (center.currentDetailItem?.kind == .movie && downloads.record(center.currentDetailItem!.ratingKey) != nil))
+            .keyboardShortcut("d", modifiers: [.command, .shift])
+            .disabled(!canDownload)
+            Button(DownloadWords.removeEllipsis) { removeCurrentDownload() }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(removableDownload == nil || center.isBlocked)
         }
         CommandGroup(after: .toolbar) {
             Button(center.isEditingShelves ? "Done Editing Shelves" : "Edit Shelves") { center.toggleEditShelves() }

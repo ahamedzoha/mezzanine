@@ -10,6 +10,7 @@ struct DownloadButton: View {
     var season: PlexMetadata? = nil
 
     @Environment(DownloadStore.self) private var downloads
+    @Environment(AppCommandCenter.self) private var commands
 
     var body: some View {
         switch item.kind {
@@ -26,10 +27,17 @@ struct DownloadButton: View {
             Menu {
                 switch record.state {
                 case .downloading, .queued: Button("Pause Download") { downloads.pause(record.id) }
-                case .paused, .failed: Button("Resume Download") { downloads.resume(record.id) }
+                case .paused: Button("Resume Download") { downloads.resume(record.id) }
+                case .failed: Button("Retry Download") { downloads.resume(record.id) }
                 case .done: EmptyView()
                 }
-                Button(record.isDone ? "Remove Download" : "Cancel Download", role: .destructive) { downloads.remove(record.id) }
+                if record.isDone {
+                    Button(DownloadWords.removeEllipsis, role: .destructive) {
+                        commands.downloadRemoval = DownloadRemoval(ids: [record.id], title: record.title, isShow: false)
+                    }
+                } else {
+                    Button(DownloadWords.cancel, role: .destructive) { downloads.remove(record.id) }
+                }
             } label: {
                 Label(Self.status(record), systemImage: record.isDone ? "arrow.down.circle.fill" : "arrow.down.circle")
                     .contentTransition(.numericText())
@@ -41,13 +49,14 @@ struct DownloadButton: View {
             .focusEffectDisabled(false)
             .help(record.isDone ? "Downloaded to this Mac. Plays without the server." : "Downloading for offline viewing")
             .accessibilityLabel(Self.status(record))
+            .accessibilityHint(record.isDone ? "Opens a menu to remove the download" : "Opens a menu to pause, resume or cancel")
         } else {
             Button { downloads.download(item) } label: {
-                Label("Download", systemImage: "arrow.down.circle")
+                Label(DownloadWords.download, systemImage: "arrow.down.circle")
             }
             .buttonStyle(SecondaryButtonStyle())
             .focusEffectDisabled(false)
-            .help("Download to watch offline (⌥⌘D)")
+            .help("Download to watch offline (⇧⌘D)")
         }
     }
 
@@ -55,8 +64,8 @@ struct DownloadButton: View {
         switch r.state {
         case .done: "Downloaded"
         case .queued: "Waiting to Download"
-        case .downloading: "Downloading \(Int(r.progress * 100)) %"
-        case .paused: "Paused \(Int(r.progress * 100)) %"
+        case .downloading: "Downloading \(DownloadWords.percent(r.progress))"
+        case .paused: "Paused \(DownloadWords.percent(r.progress))"
         case .failed: "Download Failed"
         }
     }
@@ -78,10 +87,9 @@ struct DownloadButton: View {
             }
             if item.kind == .show {
                 Divider()
-                Picker("Keep Downloaded", selection: Binding(get: { downloads.keepRule(for: item.ratingKey) ?? 0 },
+                Picker(DownloadWords.keepDownloaded, selection: Binding(get: { downloads.keepRule(for: item.ratingKey) ?? 0 },
                                                              set: { downloads.setKeepRule($0 == 0 ? nil : $0, showKey: item.ratingKey) })) {
-                    Text("Off").tag(0)
-                    ForEach([1, 3, 5, 10], id: \.self) { Text($0 == 1 ? "Next unwatched episode" : "Next \($0) unwatched episodes").tag($0) }
+                    ForEach(DownloadWords.keepCounts, id: \.self) { Text(DownloadWords.keepOption($0)).tag($0) }
                 }
             }
         } label: {
@@ -120,7 +128,48 @@ struct DownloadMark: View {
             }
             .foregroundStyle(Theme.inkTertiary)
             .help(DownloadButton.status(r))
-            .accessibilityLabel(DownloadButton.status(r))
+            .accessibilityLabel(r.isDone ? "Downloaded" : "Downloading")
+            .accessibilityValue(r.isDone ? "" : DownloadWords.percent(r.progress))
         }
     }
+}
+
+/// One set of words for downloads, everywhere (menus, buttons, pickers).
+enum DownloadWords {
+    static let download = "Download"
+    static let cancel = "Cancel Download"
+    static let removeEllipsis = "Remove Download…"
+    static let removeEpisodesEllipsis = "Remove Downloaded Episodes…"
+    static let keepDownloaded = "Keep Downloaded"
+    static func keepOption(_ n: Int) -> String {
+        n == 0 ? "Off" : (n == 1 ? "Next Unwatched Episode" : "Next \(n) Unwatched Episodes")
+    }
+    static let keepCounts = [0, 1, 3, 5, 10]
+
+    /// "42 %", locale-aware.
+    static func percent(_ p: Double) -> String { p.formatted(.percent.precision(.fractionLength(0))) }
+
+    /// "3 min left", "1 hr 20 min left".
+    static func timeLeft(seconds: Double) -> String {
+        if seconds < 60 { return "under a minute left" }
+        let f = DateComponentsFormatter()
+        f.allowedUnits = seconds >= 3600 ? [.hour, .minute] : [.minute]
+        f.unitsStyle = .short
+        return (f.string(from: seconds) ?? "") + " left"
+    }
+}
+
+/// Removing downloads: always asked, once, by the window. Finished files go to the Trash
+/// (recoverable in Finder); unfinished ones are simply cancelled.
+struct DownloadRemoval: Identifiable, Equatable {
+    let id = UUID()
+    let ids: [String]
+    let title: String
+    let isShow: Bool
+
+    var question: String {
+        isShow ? "Remove the \(ids.count == 1 ? "downloaded episode" : "\(ids.count) downloaded episodes") of \(title)?"
+               : "Remove \(title) from this Mac?"
+    }
+    var confirm: String { ids.count == 1 ? "Remove Download" : "Remove Downloads" }
 }

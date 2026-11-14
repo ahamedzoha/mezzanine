@@ -22,6 +22,7 @@ struct PlayerStage: View {
     @Environment(AppCommandCenter.self) private var commands
     @Environment(SoundSettings.self) private var sound
     @Environment(SessionStore.self) private var session
+    @Environment(DownloadStore.self) private var downloads
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var opened = false
     @State private var chromeVisible = true
@@ -267,7 +268,9 @@ struct PlayerStage: View {
     /// episode line under it; plain text when the title has no logo.
     private var titleMark: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
-            LogoImage(url: session.logoURL(item.clearLogoPath), pixelWidth: 640) {
+            // Offline, a download's saved logo stands in for the server's.
+            LogoImage(url: session.logoURL(item.clearLogoPath)
+                        ?? downloads.record(item.ratingKey).flatMap { downloads.url($0.logoFile) }, pixelWidth: 640) {
                 Text(Format.displayTitle(item)).font(.system(.title, weight: .semibold)).foregroundStyle(Theme.ink)
             }
             .frame(maxWidth: 300, maxHeight: 84, alignment: .topLeading)

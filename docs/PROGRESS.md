@@ -24,8 +24,12 @@
 - Fixed before shipping: menu-bar commands have no environment objects (the profile menu
   crashed at launch in Debug); stores are passed in.
 - M6 leftover: post-play for films (suggestions at the credits, no autoplay); setting in Playback.
-- Next: M10 Trakt (needs the owner's Trakt API app), M11 offline downloads (new page: needs a
-  design pick), M12 AI subtitles, new-episode notifications (asks macOS permission).
+- M11 offline downloads (owner picked By Title): original-quality downloads, resumable, keep
+  rules, local playback, offline mode, offline progress sent on reconnect. Design review (fix)
+  and HIG review (Needs Work) applied: removals ask and go to the Trash, VoiceOver progress and
+  actions, ⇧⌘D / ⌘⌫ / ⌥⌘L, one vocabulary, dissolve and arrival line fixed.
+- M10 Trakt skipped for now (owner). Next: M12 AI subtitles; new-episode notifications need the
+  owner's OK for the macOS permission prompt.
 
 ## 2026-11-15 (night) — player keys, previews, fallback
 

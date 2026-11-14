@@ -383,3 +383,13 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - At a film's credits (the final credits marker, else 30 s before the end) the picture shrinks exactly as for Up Next and a 380 pt card offers what to watch next: Plex's first related row's name as the heading (card meta), six films on a 3 × 2 grid of 116 pt posters (unwatched first), then Watch Again and Keep Watching Credits (secondary). No countdown: films never autoplay.
 - Arrows choose (3 per row), Return or a click plays, Esc keeps the credits; the selection lifts with a lilac title. Only a moving pointer selects. At the end of the film the card stays until you choose or close.
 - Settings ▸ Playback ▸ Films: "Suggest what to watch next at the credits" (on by default).
+
+## Downloads (M11)
+
+- Sidebar ▸ On This Mac ▸ Downloads (Go ▸ Downloads ⌥⌘L). By Title (owner's pick): a 320 pt column of downloaded titles (32 × 48 poster, name, one meta line: "6 episodes · 4.2 GB", "Downloading · 2 files · 1.1 of 2.3 GB · 3 min left", "Paused · 42 %") and the selected title on the right.
+- The arrival line: while anything downloads, a 2 pt ink line runs the row's width at its progress; when everything is here it shrinks into the app's 48 pt hairline. No colour, no checkmark. File rows use the same ink line.
+- Selected title: a 200 pt backdrop dissolving down and left into the room with the clear logo (or the title), the ruled caption ("1 episode · 62.3 MB · Original quality"), Keep Downloaded (Off, Next Unwatched Episode, Next 3/5/10 Unwatched Episodes) for shows, file rows (one click plays a finished file; Play / Pause / Resume / Retry and Remove as 34 pt raised circles), and Remove Downloaded Episodes… / Remove Download….
+- Title pages: Download (films and episodes) becomes "Downloading 42 %" then "Downloaded", each a menu (pause, resume, retry, cancel, Remove Download…); shows offer Next Unwatched Episode / Next 3 / Next 5, All of the season on screen, and Keep Downloaded. Episode rows carry a hueless download mark. File ▸ Download ⇧⌘D, File ▸ Remove Download… ⌘⌫.
+- Removing a finished download always asks, once, app-wide; the files go to the Trash. Cancelling an unfinished one is immediate.
+- Files: Movies ▸ Mezzanine ▸ "Show/Show S05E03 Title.mkv" or "Title (Year).mkv", with poster, backdrop, clear logo and sidecar subtitles beside each. A downloaded copy always plays instead of the server's ("Downloaded copy" in Playback info).
+- Offline (Plex unreachable, something downloaded): the sidebar shows only Downloads with a quiet Offline note and Try Again; search goes away; downloads play from their saved details. Positions watched offline are sent to Plex when it's back.

@@ -37,6 +37,8 @@ nonisolated struct DownloadRecord: Codable, Identifiable, Hashable, Sendable {
     var videoFile: String
     var posterFile: String?
     var backdropFile: String?
+    /// The title's clear logo (the player's title mark, offline too).
+    var logoFile: String?
     var subtitles: [Subtitle] = []
     var totalBytes: Int64 = 0
     var receivedBytes: Int64 = 0
@@ -254,14 +256,25 @@ final class DownloadStore {
         pump()
     }
 
-    /// Removes a download and its files (cancelling it first if it's in flight).
+    /// Removes a download (cancelling it first if it's in flight). A finished file goes to the
+    /// Trash, so a mistake is recoverable in Finder; partial files are simply deleted.
     func remove(_ id: String) {
         tasks[id]?.cancel()
         tasks[id] = nil
         guard let i = records.firstIndex(where: { $0.id == id }) else { return }
         let r = records.remove(at: i)
-        for file in [r.videoFile, r.posterFile, r.backdropFile].compactMap({ $0 }) + r.subtitles.map(\.file) {
-            if let url = url(file) { try? FileManager.default.removeItem(at: url) }
+        for file in [r.videoFile, r.posterFile, r.backdropFile, r.logoFile].compactMap({ $0 }) + r.subtitles.map(\.file) {
+            guard let url = url(file), FileManager.default.fileExists(atPath: url.path) else { continue }
+            if r.isDone && file == r.videoFile {
+                if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) == nil { try? FileManager.default.removeItem(at: url) }
+            } else {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        // An emptied show folder goes too.
+        if r.showKey != nil, let folder = url(r.videoFile)?.deletingLastPathComponent(),
+           (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?.isEmpty == true {
+            try? FileManager.default.removeItem(at: folder)
         }
         try? FileManager.default.removeItem(at: Self.resumeData(id))
         save()
@@ -359,6 +372,7 @@ final class DownloadStore {
             records[i].state = .paused
         } else {
             records[i].state = .failed((error as? PlexError)?.userMessage ?? error.localizedDescription)
+            AccessibilityNotification.Announcement("\(records[i].title) didn’t download").post()
         }
         save()
         pump()
@@ -380,6 +394,15 @@ final class DownloadStore {
                let image = try? await images.image(for: url, pixelSize: 300), Self.writeJPEG(image, to: folder.appendingPathComponent("\(base).poster.jpg")) {
                 updated.posterFile = "\(base).poster.jpg"
             }
+            if let logo = meta.clearLogoPath, let url = client.urls.asset(logo) {
+                var request = URLRequest(url: url)
+                for (k, v) in client.requestHeaders { request.setValue(v, forHTTPHeaderField: k) }
+                if let (data, response) = try? await URLSession.shared.data(for: request),
+                   (response as? HTTPURLResponse)?.statusCode == 200,
+                   (try? data.write(to: folder.appendingPathComponent("\(base).logo.png"))) != nil {
+                    updated.logoFile = "\(base).logo.png"
+                }
+            }
             let artPath = meta.kind == .episode ? (meta.grandparentArt ?? meta.art) : meta.art
             if let path = artPath, let url = client.urls.photo(path, width: 1600, height: 900),
                let image = try? await images.image(for: url, pixelSize: 1600), Self.writeJPEG(image, to: folder.appendingPathComponent("\(base).backdrop.jpg")) {
@@ -398,6 +421,7 @@ final class DownloadStore {
         guard let i = records.firstIndex(where: { $0.id == record.id }) else { return }
         records[i].posterFile = updated.posterFile
         records[i].backdropFile = updated.backdropFile
+        records[i].logoFile = updated.logoFile
         save()
     }
 

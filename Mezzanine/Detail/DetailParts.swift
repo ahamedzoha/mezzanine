@@ -165,6 +165,7 @@ struct EpisodeRow: View {
     let onToggleWatched: () -> Void
     var onPlayVersion: ((Int) -> Void)? = nil
 
+    @Environment(AppCommandCenter.self) private var commands
     @Environment(DownloadStore.self) private var downloads
     @Environment(SessionStore.self) private var session
     @State private var hovering = false
@@ -236,9 +237,15 @@ struct EpisodeRow: View {
             Button(episode.isWatched ? "Mark as Unwatched" : "Mark as Watched", action: onToggleWatched)
             Divider()
             if let record = downloads.record(episode.ratingKey) {
-                Button(record.isDone ? "Remove Download" : "Cancel Download", role: .destructive) { downloads.remove(record.id) }
+                if record.isDone {
+                    Button(DownloadWords.removeEllipsis, role: .destructive) {
+                        commands.downloadRemoval = DownloadRemoval(ids: [record.id], title: record.title, isShow: false)
+                    }
+                } else {
+                    Button(DownloadWords.cancel, role: .destructive) { downloads.remove(record.id) }
+                }
             } else {
-                Button("Download Episode") { downloads.download(episode) }
+                Button(DownloadWords.download) { downloads.download(episode) }
             }
         }
     }

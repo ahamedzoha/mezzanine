@@ -314,6 +314,11 @@ final class PlaybackCoordinator {
         let time = player.currentTime, duration = player.duration
         let reporter = self.reporter
         self.reporter = nil
+        // Played offline: nothing could reach Plex; keep the position to send later.
+        if reporter == nil, playingDownload, session.client == nil, let item,
+           let serverID = downloads?.record(item.ratingKey)?.serverID, !ActivityReporter.isDisabled {
+            OfflineProgress.record(ratingKey: item.ratingKey, serverID: serverID, time: time, duration: duration)
+        }
         Task {
             await reporter?.stop(at: time, duration: duration)
             if let item { onStopped?(item, time, duration) }
