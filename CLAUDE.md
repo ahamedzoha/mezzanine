@@ -49,7 +49,13 @@ Build output goes to `build.noindex/` (Spotlight skips it).
 ## Manual testing aids (DEBUG)
 
 `-MezzanineNoActivity YES` · `-ApplePersistenceIgnoreState YES` · Lab window: Window ▸ Lab
-(or the Open Lab button on the placeholder root).
+(or the Open Lab button on the placeholder root). Player: `-MezzanineAutoplay <ratingKey>`
+`-MezzanineAutoSeek <s>` `-MezzanineAutoClose <s>` `-PlayerChromePinned YES`
+`-PlayerOptionsOpen YES` `-PlayerFullScreen YES`; detail: `-MezzanineOpen <ratingKey>`
+`-DetailSection cast`.
+
+Full screen: AppKit keeps the title/toolbar strip as an opaque band over the content even with
+the toolbar hidden; `WindowChrome` sets `.autoHideToolbar` while the player owns the window.
 
 ## Server
 

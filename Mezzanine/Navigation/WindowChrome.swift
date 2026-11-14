@@ -21,9 +21,17 @@ struct WindowChrome: NSViewRepresentable {
     final class ChromeView: NSView {
         var hidesToolbar = false
         var chromeHidden = false { didSet { if chromeHidden != oldValue { apply() } } }
+        private var observers: [NSObjectProtocol] = []
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            observers.forEach { NotificationCenter.default.removeObserver($0) }
+            observers = []
+            if let window {
+                observers.append(NotificationCenter.default.addObserver(
+                    forName: NSWindow.didEnterFullScreenNotification, object: window, queue: .main
+                ) { [weak self] _ in MainActor.assumeIsolated { self?.apply() } })
+            }
             apply()
         }
 
@@ -33,6 +41,22 @@ struct WindowChrome: NSViewRepresentable {
             window.titleVisibility = chromeHidden ? .hidden : .visible
             window.toolbar?.isVisible = !(chromeHidden && hidesToolbar)
             window.titlebarSeparatorStyle = chromeHidden ? .none : .automatic
+            applyFullScreenOptions(window)
+        }
+
+        /// In full screen AppKit keeps the title/toolbar strip as an opaque band over the
+        /// top of the content, even with the toolbar hidden. While the player owns the
+        /// window, let it slide away with the menu bar (pointer at the top edge shows both).
+        private func applyFullScreenOptions(_ window: NSWindow) {
+            guard window.styleMask.contains(.fullScreen) else { return }
+            var options = NSApp.presentationOptions
+            guard options.contains(.fullScreen) else { return }
+            if chromeHidden && hidesToolbar {
+                options.formUnion([.autoHideMenuBar, .autoHideToolbar])
+            } else {
+                options.remove(.autoHideToolbar)
+            }
+            if options != NSApp.presentationOptions { NSApp.presentationOptions = options }
         }
     }
 }

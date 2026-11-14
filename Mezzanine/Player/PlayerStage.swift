@@ -81,6 +81,9 @@ struct PlayerStage: View {
             scheduleHide()
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "PlayerOptionsOpen") { optionsOpen = true }
+            if UserDefaults.standard.bool(forKey: "PlayerFullScreen") {
+                Task { try? await Task.sleep(for: .seconds(1)); NSApp.windows.first { $0.isVisible && $0.canBecomeMain }?.toggleFullScreen(nil) }
+            }
             #endif
         }
         .onDisappear { NSCursor.unhide() }
