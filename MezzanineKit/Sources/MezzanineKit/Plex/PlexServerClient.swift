@@ -1,0 +1,209 @@
+import Foundation
+
+/// Sort orders the library listing understands (`sort=` values).
+public enum PlexSort: String, Sendable, CaseIterable {
+    case titleAscending = "titleSort"
+    case titleDescending = "titleSort:desc"
+    case addedNewest = "addedAt:desc"
+    case releasedNewest = "originallyAvailableAt:desc"
+    case releasedOldest = "originallyAvailableAt"
+    case rating = "rating:desc"
+    case audienceRating = "audienceRating:desc"
+    case lastViewed = "lastViewedAt:desc"
+    case duration = "duration:desc"
+}
+
+/// Talks to one Plex Media Server over one resolved address.
+///
+/// Reads retry transient failures twice; writes never retry, so a timed-out
+/// scrobble can't be applied twice.
+public actor PlexServerClient {
+    public nonisolated let baseURL: URL
+    public nonisolated let machineIdentifier: String
+    nonisolated let token: String
+    nonisolated let identity: PlexIdentity
+    private let session: URLSession
+
+    public init(baseURL: URL, token: String, machineIdentifier: String, identity: PlexIdentity,
+                session: URLSession = Transport.makeAPISession()) {
+        self.baseURL = baseURL
+        self.token = token
+        self.machineIdentifier = machineIdentifier
+        self.identity = identity
+        self.session = session
+    }
+
+    public nonisolated var urls: PlexURLs { PlexURLs(baseURL: baseURL, token: token) }
+
+    /// Headers for requests the app makes outside this client (the playback
+    /// engine fetching a part, the image pipeline). The token travels as a
+    /// header, never in a URL that could end up in a log.
+    public nonisolated var requestHeaders: [String: String] {
+        var h = identity.headers
+        h["X-Plex-Token"] = token
+        return h
+    }
+
+    // MARK: Library
+
+    public func sections() async throws -> [PlexLibrarySection] {
+        let c: DirectoryContainer<PlexLibrarySection> = try await get("/library/sections")
+        return c.directories
+    }
+
+    /// One page of a section. `type` picks the level for show libraries
+    /// (2 shows, 3 seasons, 4 episodes); nil lists the section's top level.
+    public func items(section: String, type: Int? = nil, sort: PlexSort? = nil,
+                      offset: Int = 0, limit: Int = 200, filters: [URLQueryItem] = []) async throws -> Page<PlexMetadata> {
+        var q = [URLQueryItem(name: "includeGuids", value: "1")]
+        if let type { q.append(URLQueryItem(name: "type", value: String(type))) }
+        if let sort { q.append(URLQueryItem(name: "sort", value: sort.rawValue)) }
+        q += filters
+        let c: MetadataContainer = try await get("/library/sections/\(section)/all", query: q, offset: offset, limit: limit)
+        return Page(items: c.metadata, offset: c.offset ?? offset, totalSize: c.totalSize)
+    }
+
+    /// Items changed since a moment, for incremental index sync.
+    public func itemsUpdated(section: String, type: Int? = nil, since: Date, offset: Int = 0, limit: Int = 200) async throws -> Page<PlexMetadata> {
+        try await items(section: section, type: type, offset: offset, limit: limit, filters: [
+            URLQueryItem(name: "updatedAt>", value: String(Int(since.timeIntervalSince1970))),
+        ])
+    }
+
+    /// Full detail: markers, chapters, extras, every stream.
+    public func metadata(_ ratingKey: String) async throws -> PlexMetadata {
+        let c: MetadataContainer = try await get("/library/metadata/\(ratingKey)", query: [
+            URLQueryItem(name: "includeMarkers", value: "1"),
+            URLQueryItem(name: "includeChapters", value: "1"),
+            URLQueryItem(name: "includeExtras", value: "1"),
+            URLQueryItem(name: "includeOnDeck", value: "1"),
+            URLQueryItem(name: "includeGuids", value: "1"),
+        ])
+        guard let item = c.metadata.first else { throw PlexError.notFound }
+        return item
+    }
+
+    public func children(_ ratingKey: String) async throws -> [PlexMetadata] {
+        let c: MetadataContainer = try await get("/library/metadata/\(ratingKey)/children")
+        return c.metadata
+    }
+
+    /// Every episode of a show, in order.
+    public func allLeaves(_ showRatingKey: String) async throws -> [PlexMetadata] {
+        let c: MetadataContainer = try await get("/library/metadata/\(showRatingKey)/allLeaves")
+        return c.metadata
+    }
+
+    public func collections(section: String) async throws -> [PlexMetadata] {
+        let c: MetadataContainer = try await get("/library/sections/\(section)/collections")
+        return c.metadata
+    }
+
+    public func playlists() async throws -> [PlexMetadata] {
+        let c: MetadataContainer = try await get("/playlists", query: [URLQueryItem(name: "playlistType", value: "video")])
+        return c.metadata
+    }
+
+    // MARK: Hubs & search
+
+    public func homeHubs(count: Int = 20) async throws -> [PlexHub] {
+        let c: HubContainer = try await get("/hubs", query: [URLQueryItem(name: "count", value: String(count))])
+        return c.hubs
+    }
+
+    public func sectionHubs(_ section: String, count: Int = 20) async throws -> [PlexHub] {
+        let c: HubContainer = try await get("/hubs/sections/\(section)", query: [URLQueryItem(name: "count", value: String(count))])
+        return c.hubs
+    }
+
+    public func search(_ query: String, limit: Int = 30) async throws -> [PlexHub] {
+        let c: HubContainer = try await get("/hubs/search", query: [
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "includeCollections", value: "1"),
+        ])
+        return c.hubs
+    }
+
+    // MARK: Subtitles
+
+    /// Plex's own on-demand subtitle search (OpenSubtitles through the server).
+    public func searchSubtitles(ratingKey: String, language: String, hearingImpaired: Bool = false,
+                                forced: Bool = false) async throws -> [PlexStream] {
+        let c: StreamContainer = try await get("/library/metadata/\(ratingKey)/subtitles", query: [
+            URLQueryItem(name: "language", value: language),
+            URLQueryItem(name: "hearingImpaired", value: hearingImpaired ? "1" : "0"),
+            URLQueryItem(name: "forced", value: forced ? "1" : "0"),
+        ])
+        return c.streams.sorted { ($0.score ?? 0) > ($1.score ?? 0) }
+    }
+
+    // MARK: Plumbing
+
+    func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], offset: Int? = nil, limit: Int? = nil) async throws -> T {
+        var request = makeRequest("GET", path, query: query)
+        if let offset { request.setValue(String(offset), forHTTPHeaderField: "X-Plex-Container-Start") }
+        if let limit { request.setValue(String(limit), forHTTPHeaderField: "X-Plex-Container-Size") }
+        var attempt = 0
+        while true {
+            do {
+                let data = try await perform(request)
+                do {
+                    return try JSONDecoder().decode(MediaContainerEnvelope<T>.self, from: data).container
+                } catch {
+                    throw PlexError.decoding("\(path): \(error)")
+                }
+            } catch let error as PlexError where error.isTransient && attempt < 2 {
+                attempt += 1
+                try await Task.sleep(for: .milliseconds(400 * attempt))
+            }
+        }
+    }
+
+    /// A write (PUT/POST/DELETE). Never retried.
+    @discardableResult
+    func write(_ method: String, _ path: String, query: [URLQueryItem] = []) async throws -> Data {
+        try await perform(makeRequest(method, path, query: query))
+    }
+
+    func makeRequest(_ method: String, _ path: String, query: [URLQueryItem]) -> URLRequest {
+        var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
+        // `appending(path:)` percent-encodes ":" in "/:/timeline"; Plex wants it literal.
+        components.percentEncodedPath = components.percentEncodedPath.replacingOccurrences(of: "%3A", with: ":")
+        if !query.isEmpty {
+            components.percentEncodedQueryItems = query.map {
+                URLQueryItem(name: $0.name.addingPercentEncoding(withAllowedCharacters: .plexQueryAllowed) ?? $0.name,
+                             value: $0.value?.addingPercentEncoding(withAllowedCharacters: .plexQueryAllowed))
+            }
+        }
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = method
+        for (k, v) in requestHeaders { request.setValue(v, forHTTPHeaderField: k) }
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        return request
+    }
+
+    private func perform(_ request: URLRequest) async throws -> Data {
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw PlexError.from(error, localNetworkSuspected: NetworkPath.shared.isSatisfied)
+        }
+        let http = response as? HTTPURLResponse
+        if let failure = PlexError.from(status: http?.statusCode ?? 0, location: http?.value(forHTTPHeaderField: "Location")) {
+            throw failure
+        }
+        return data
+    }
+}
+
+extension CharacterSet {
+    /// Query-value characters left unescaped. Excludes `&`, `=`, `+`, `?` and
+    /// `#` so filter values (`updatedAt>`) and URLs passed as values survive.
+    static let plexQueryAllowed: CharacterSet = {
+        var set = CharacterSet.urlQueryAllowed
+        set.remove(charactersIn: "&=+?#")
+        return set
+    }()
+}

@@ -1,0 +1,19 @@
+# Xcode (build.noindex keeps Spotlight from listing extra copies of Mezzanine.app)
+build/
+build.noindex/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Local secrets for live tests — never commit
+.mezzanine-live.env
+
+# Claude Code local config
+.claude/

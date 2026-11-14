@@ -1,0 +1,60 @@
+# Mezzanine — notes for agents
+
+Private native macOS 26 client for the owner's Plex Media Server (replaces Infuse). Read
+`docs/PROGRESS.md` first (status and open items), then the approved plan
+`~/.claude/plans/eventual-plotting-storm.md`, `docs/ARCHITECTURE.md` (once written),
+`PRODUCT.md`, `DESIGN.md`.
+
+**UI/UX is the top priority.** Every UI surface gets an `/impeccable` round before it's built
+and an `apple:hig-reviewer` pass before its milestone closes. Every player action gets a
+rebindable key and a menu item. Binge flow (skip intro/credits, Up Next autoplay) is a
+first-class feature.
+
+## Commands
+
+```bash
+cd MezzanineKit && swift test             # core unit tests
+Scripts/live-test.sh                      # read-only checks vs the real server (.mezzanine-live.env)
+Scripts/plex.sh pms /library/sections     # read-only Plex API helper (GET only, token never printed)
+xcodebuild -project Mezzanine.xcodeproj -scheme Mezzanine -destination 'platform=macOS' \
+  -derivedDataPath build.noindex/DerivedData build
+Scripts/install.sh                        # Release build → /Applications/Mezzanine.app
+```
+
+Build output goes to `build.noindex/` (Spotlight skips it).
+
+## Layout
+
+- `MezzanineKit/` local SPM package, non-isolated code:
+  - `MezzanineKit` — Plex client (plex.tv auth/resources, `ConnectionRacer`, `PlexServerClient`,
+    models with lenient decoding), `AudioProfile`/`VolumeLevel`, later the GRDB index.
+  - `MezzaninePlayback` — `MezzaninePlayer`, the **only** code that imports AetherEngine.
+    The app uses Mezzanine's own types (`PlayerStatus`, `PlayerTrack`, `PlayerCue`).
+- `Mezzanine/` app target, MainActor by default. `Lab/` is DEBUG-only (the M0 spike harness).
+
+## Rules
+
+- **Never write play history while testing.** Timeline/scrobble/rating calls reach Plex,
+  Tautulli, Trakt and the owner's Playbill newsletters. Launch Debug builds with
+  `-MezzanineNoActivity YES`; the Lab window never reports activity. Live tests are read-only.
+- The dev token lives in `.mezzanine-live.env` (mode 600, gitignored); the app's token lives in
+  the Keychain. Never print, log or commit either. Tokens travel as the `X-Plex-Token` header,
+  not in URLs; `PlexURLs.redacted` strips them from anything logged.
+- AetherEngine is pinned to an exact version (it releases almost daily). Bump it deliberately,
+  then re-run the Lab matrix (`Lab ▸` every row) before committing.
+- Plex JSON is loose about types: decode through the `lenient*` helpers in `Lenient.swift`.
+- Commit as the owner, with no Claude attribution (no `Co-Authored-By` trailer); push to the
+  private `origin` (github.com/ahamedzoha/mezzanine).
+
+## Manual testing aids (DEBUG)
+
+`-MezzanineNoActivity YES` · `-ApplePersistenceIgnoreState YES` · Lab window: Window ▸ Lab
+(or the Open Lab button on the placeholder root).
+
+## Server
+
+Owner's server "Example Plex Server" (PMS 1.43.5, a homelab container): LAN
+`https://192-168-1-20.<hash>.plex.direct:32400` (resolves fine through Pi-hole) and
+`https://plex.example.com` (NPM, HTTP/2). The account also sees a friend's shared server, so
+multi-server must keep working. Library facts and read-only DB query recipes:
+`the owner's private homelab notes`. Homelab rules: the `homelab` skill.

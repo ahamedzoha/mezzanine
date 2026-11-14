@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- AetherEngine serves remuxed HLS to AVPlayer from a loopback server
+	     inside the app; the sandbox needs this to accept those connections. -->
+	<key>com.apple.security.network.server</key>
+	<true/>
+</dict>
+</plist>
