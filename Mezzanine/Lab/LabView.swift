@@ -35,6 +35,9 @@ struct LabView: View {
             guard let entry else { return }
             Task { await open(entry) }
         }
+        .task {
+            if LabAutoRunner.isEnabled { await LabAutoRunner.run(session: session, player: player) }
+        }
     }
 
     private var connectionHeader: some View {

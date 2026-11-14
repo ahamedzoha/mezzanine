@@ -54,6 +54,14 @@ final class SessionStore {
     // MARK: Lifecycle
 
     func restore() async {
+        #if DEBUG
+        // Dev seeding (Scripts/dev-run.sh): a fresh Debug build signs in with the dev token
+        // from .mezzanine-live.env instead of the browser flow. The env var only exists when
+        // the binary is launched from that script.
+        if token == nil, let seeded = ProcessInfo.processInfo.environment["MEZZANINE_DEV_TOKEN"], !seeded.isEmpty {
+            try? keychain.write(seeded, for: Self.accountKey)
+        }
+        #endif
         guard let token else { phase = .signedOut; return }
         await connect(token: token)
     }

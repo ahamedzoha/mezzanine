@@ -17,3 +17,6 @@ xcuserdata/
 
 # Claude Code local config
 .claude/
+
+# Machine-local SwiftPM mirrors (Scripts/spm-mirrors.sh)
+Mezzanine.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/

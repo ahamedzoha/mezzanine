@@ -18,10 +18,11 @@ struct LiveTests {
         let tv = PlexTV(identity: identity())
         let servers = try await tv.resources(token: token)
         let owned = try #require(servers.first { $0.owned })
+        let raceStart = ContinuousClock.now
         let won = await ConnectionRacer().race(owned.candidates,
             probe: ConnectionRacer.identityProbe(expectedMachineIdentifier: owned.clientIdentifier))
         let resolved = try #require(won)
-        print("raced \(owned.name): \(resolved.connection.route) \(resolved.connection.protocolName) in \(resolved.latency)")
+        print("raced \(owned.name): \(resolved.connection.route) \(resolved.connection.protocolName) in \(resolved.latency); race returned after \(ContinuousClock.now - raceStart)")
 
         let client = PlexServerClient(baseURL: resolved.baseURL, token: owned.accessToken ?? token,
                                       machineIdentifier: owned.clientIdentifier, identity: identity())

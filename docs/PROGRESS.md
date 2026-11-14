@@ -2,6 +2,14 @@
 
 Plan: `~/.claude/plans/eventual-plotting-storm.md` (M0 spikes → D design → M1–M13).
 
+## 2026-11-14 — Design direction chosen
+
+Impeccable direction round (Opus): the owner picked **Bias Light** — each film lights the
+room (UltraBlur four-corner wash over graphite, clearLogo titles, one lilac accent). Contract
+in `.impeccable/surfaces/mezzanine-home-homeview-swift.md`; PRODUCT.md written. DESIGN.md is
+written by the documenter after the Home surface is built and reviewed.
+Owner added: AirPlay is a must, Google Cast wanted (Miracast has no macOS support).
+
 ## 2026-11-14 — M0 started
 
 Done:
@@ -26,9 +34,19 @@ Findings:
 - Items carry `UltraBlurColors` (four corner colours) and `clearLogo` images: design material.
 - Account sees two servers (owned + a friend's shared one) → keep multi-server.
 
+- **Build:** GitHub git clones crawl at ~90 KB/s here (FFmpegBuild 380 MB), so
+  `Scripts/spm-mirrors.sh` builds local tagged mirrors from codeload tarballs (seconds) and
+  points SwiftPM and Xcode at them. Package.resolved still records the GitHub URLs.
+- **S2 engine matrix (scripted, `Scripts/dev-run.sh -LabAutoMatrix YES`, muted, LAN):** all
+  12 rows play. HW decode for H.264, HEVC (incl. 10-bit HDR10) and AV1 (M5); MPEG-4 ASP in AVI
+  on the software path. Audio: AAC/AC-3/E-AC-3 (incl. JOC Atmos) stream-copied; DTS, TrueHD,
+  Opus bridged to E-AC-3. Subtitles listed: dvdsub, pgssub, ass, srt. First frame 259–1949 ms
+  (first load includes warm-up), seeks 63–664 ms. App CPU avg 25 % / peak 54 % of one core
+  across constant loads and seeks, RSS ~320 MB. **Server transcode sessions: 0.**
+  DV P10 AV1 presented as SDR on the SDR monitor (expected tone-map); HDR10 reported hdr10.
+
 Open (M0):
-- [ ] First package build (FFmpegBuild is a 380 MB clone).
-- [ ] S2 engine matrix on all 12 Lab rows; compare against Infuse.
+- [ ] S2 follow-up: steady-state energy on a 2-hour film vs Infuse (Activity Monitor).
 - [ ] S3 audio on each output.
 - [ ] S4 endpoint captures (subtitle download/upload, poster select, timeline on a test item).
 - [ ] S5 grid perf, S6 seamless next episode.

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Mezzanine · House Lights (sketch)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;outline:none;cursor:default}
+html,body{width:1440px;height:900px;overflow:hidden;background:#000;font-family:-apple-system,"SF Pro Text","Helvetica Neue",sans-serif;color:#EDE4D3}
+.win{position:relative;width:1440px;height:900px;background:#1C1117;overflow:hidden;border-radius:16px}
+/* sidebar: glass, the dark side aisle */
+.side{position:absolute;left:0;top:0;bottom:0;width:220px;background:rgba(20,11,16,.82);backdrop-filter:blur(30px) saturate(1.2);padding:16px 12px;border-right:1px solid rgba(237,228,211,.08);z-index:3}
+.lights{display:flex;gap:8px;padding:2px 6px 28px}.lights i{width:12px;height:12px;border-radius:50%;display:block}
+.side h6{font:600 12px/1 -apple-system,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(237,228,211,.68);padding:0 12px 10px}
+.side li{list-style:none;display:flex;align-items:center;gap:12px;height:32px;padding:0 12px;border-radius:8px;font-size:14px;color:rgba(237,228,211,.85)}
+.side li b{width:6px;height:6px;border-radius:50%;background:transparent;flex:none}
+.side li.on{color:#EDE4D3;background:#2B1B23;font-weight:600}.side li.on b{background:#1E8C86}
+.side .gap{height:22px}
+/* toolbar: glass */
+.tool{position:absolute;left:220px;right:0;top:0;height:52px;background:rgba(28,17,23,.8);backdrop-filter:blur(30px);display:flex;align-items:center;padding:0 24px;gap:16px;z-index:2;border-bottom:1px solid rgba(237,228,211,.08)}
+.tool h1{font-size:15px;font-weight:600;flex:1}
+.search{width:220px;height:28px;border-radius:14px;background:#2B1B23;color:rgba(237,228,211,.72);font-size:13px;display:flex;align-items:center;padding:0 12px}
+.btn{height:28px;padding:0 12px;border-radius:14px;background:#2B1B23;font-size:13px;display:flex;align-items:center}
+/* content */
+.main{position:absolute;left:220px;right:0;top:52px;bottom:0;padding:28px 40px 0 36px}
+.arch{position:relative;height:262px;border:1px solid #EDE4D3;border-bottom:0;border-radius:300px 300px 0 0/120px 120px 0 0;background:radial-gradient(ellipse 60% 90% at 70% 75%,rgba(237,228,211,.16),rgba(237,228,211,0) 70%),#241520;overflow:hidden;display:flex}
+.still{position:absolute;right:0;top:0;bottom:0;width:56%;background:linear-gradient(100deg,#241520 0%,rgba(36,21,32,0) 40%),linear-gradient(180deg,#8a8d8c 0%,#3d4040 55%,#1e2020 100%);opacity:.55}
+.info{position:relative;padding:52px 0 0 90px;width:62%}
+.board{display:inline-flex;gap:3px;padding:7px;background:#14090E;border:1px solid #2B1B23;border-radius:4px}
+.board span{width:21px;height:32px;background:#2B1B23;border-radius:2px;display:grid;place-items:center;font:700 22px/1 "Arial Narrow","Helvetica Neue Condensed Bold",Impact,sans-serif;font-stretch:condensed;color:#EDE4D3}
+.board span.s{background:transparent}.board span.d{color:#1E8C86}
+.info p{margin-top:16px;font-size:14px;line-height:1.5;max-width:420px;color:rgba(237,228,211,.88)}
+.meta{margin-top:8px;font-size:12px;color:rgba(237,228,211,.72);letter-spacing:.04em}
+.play{margin-top:14px;display:inline-flex;height:32px;padding:0 20px;border-radius:16px;background:#1E8C86;color:#fff;font-size:13px;font-weight:600;align-items:center}
+.row{margin-top:20px}
+.row h2{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(237,228,211,.85);margin-bottom:10px;display:flex;gap:10px}
+.row h2 em{font-style:normal;color:rgba(237,228,211,.62)}
+.shelf{display:flex;gap:18px}
+.p{position:relative;flex:none}
+.art{position:relative;aspect-ratio:2/3;border-radius:4px;background:linear-gradient(160deg,var(--a),var(--b));padding:10px;display:flex;align-items:flex-end;font:700 15px/1.05 "Arial Narrow",Impact,sans-serif;text-transform:uppercase;color:rgba(255,255,255,.92);overflow:hidden}
+.art u{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(0,0,0,.45)}.art u i{display:block;height:3px;background:#1E8C86}
+.cap{margin-top:6px;border-top:1px solid rgba(237,228,211,.28);padding-top:4px;font-size:11px;letter-spacing:.02em;color:rgba(237,228,211,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cap b{display:block;font-size:12px;color:#EDE4D3;font-weight:600;margin-bottom:1px;overflow:hidden;text-overflow:ellipsis}
+.r1 .p{width:136px}.r2 .p{width:116px}.r3 .p{width:98px}
+.r2 .art{font-size:13px}.r3 .art{font-size:11px}
+/* usher's torch: warm pool of light under the focused poster (not a ring) */
+.p.f::before{content:"";position:absolute;left:-22px;right:-22px;bottom:-26px;height:76px;background:radial-gradient(ellipse 50% 50% at 50% 50%,rgba(255,206,140,.5),rgba(255,206,140,0) 100%);z-index:0}
+.p.f .art,.p.f .cap{position:relative;z-index:1}.p.f .cap b{color:#fff}
+</style></head><body>
+<div class="win">
+<aside class="side">
+ <div class="lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+ <h6>Library</h6>
+ <ul>
+  <li class="on"><b></b>Home</li><li><b></b>Movies</li><li><b></b>TV Shows</li><li><b></b>Courses</li>
+  <li class="gap"></li>
+  <li><b></b>Collections</li><li><b></b>Playlists</li><li><b></b>Downloads</li>
+ </ul>
+</aside>
+<div class="tool"><h1>Home</h1><div class="search">Search</div><div class="btn">Server</div></div>
+<main class="main">
+ <section class="arch">
+  <div class="still"></div>
+  <div class="info">
+   <div class="board" aria-label="Now showing 12 Angry Men">
+    <span>N</span><span>O</span><span>W</span><span class="s"></span><span>S</span><span>H</span><span>O</span><span>W</span><span>I</span><span>N</span><span>G</span><span class="s"></span><span class="d">·</span><span class="s"></span><span>1</span><span>2</span><span class="s"></span><span>A</span><span>N</span><span>G</span><span>R</span><span>Y</span><span class="s"></span><span>M</span><span>E</span><span>N</span>
+   </div>
+   <p>One holdout in a jury room. 1957 · 96 min · Sidney Lumet.</p>
+   <div class="meta">1080p · AVC · AAC 2.0 · 41 min left</div>
+   <div class="play">Resume</div>
+  </div>
+ </section>
+ <section class="row r1"><h2>Continue Watching <em>5</em></h2>
+  <div class="shelf">
+   <div class="p f"><div class="art" style="--a:#5b5f5e;--b:#1f2222">12 Angry Men<u><i style="width:58%"></i></u></div><div class="cap"><b>12 Angry Men</b>1080p · AVC · AAC 2.0</div></div>
+   <div class="p"><div class="art" style="--a:#c28a3d;--b:#4a2a18">After Life<u><i style="width:32%"></i></u></div><div class="cap"><b>After Life · S2E3</b>1080p · HEVC · E-AC-3 5.1</div></div>
+   <div class="p"><div class="art" style="--a:#3f6c8a;--b:#16262f">The Long Tide<u><i style="width:76%"></i></u></div><div class="cap"><b>The Long Tide</b>2160p · HEVC · TrueHD 7.1</div></div>
+   <div class="p"><div class="art" style="--a:#8a3f4c;--b:#2b1016">Paper Moon Hotel<u><i style="width:12%"></i></u></div><div class="cap"><b>Paper Moon Hotel</b>1080p · HEVC · AC-3 5.1</div></div>
+   <div class="p"><div class="art" style="--a:#6c8a3f;--b:#1c2a12">Field Notes<u><i style="width:90%"></i></u></div><div class="cap"><b>Field Notes · Ep 14</b>720p · AVC · AAC 2.0</div></div>
+   <div class="p"><div class="art" style="--a:#7a5ba0;--b:#221631">Quiet Harbour<u><i style="width:45%"></i></u></div><div class="cap"><b>Quiet Harbour</b>1080p · HEVC · E-AC-3 5.1</div></div>
+   <div class="p"><div class="art" style="--a:#a0745b;--b:#31200f">Salt Road</div><div class="cap"><b>Salt Road</b>1080p · AVC · AAC 2.0</div></div>
+  </div></section>
+ <section class="row r2"><h2>Recently Added <em>12</em></h2>
+  <div class="shelf">
+   <div class="p"><div class="art" style="--a:#3d8a7a;--b:#10282a">Lantern Row</div><div class="cap"><b>Lantern Row</b>1080p · HEVC · E-AC-3 5.1</div></div>
+   <div class="p"><div class="art" style="--a:#8a7a3d;--b:#2a2410">Ash and Oak</div><div class="cap"><b>Ash and Oak</b>2160p · HEVC · Atmos</div></div>
+   <div class="p"><div class="art" style="--a:#5b6fa0;--b:#141a31">Night Ferry</div><div class="cap"><b>Night Ferry</b>1080p · AVC · AAC 5.1</div></div>
+   <div class="p"><div class="art" style="--a:#a05b6f;--b:#311420">Marlowe</div><div class="cap"><b>Marlowe</b>1080p · HEVC · DTS 5.1</div></div>
+   <div class="p"><div class="art" style="--a:#7a8a8a;--b:#1e2424">Glass Orchard</div><div class="cap"><b>Glass Orchard</b>1080p · HEVC · AC-3 5.1</div></div>
+   <div class="p"><div class="art" style="--a:#a08a3d;--b:#2d1e0c">Third Floor</div><div class="cap"><b>Third Floor</b>720p · AVC · AAC 2.0</div></div>
+   <div class="p"><div class="art" style="--a:#3d5b8a;--b:#101a2d">Low Season</div><div class="cap"><b>Low Season</b>1080p · HEVC · E-AC-3 5.1</div></div>
+   <div class="p"><div class="art" style="--a:#8a4f3d;--b:#2a120c">Rue Verte</div><div class="cap"><b>Rue Verte</b>1080p · AVC · AAC 2.0</div></div>
+  </div></section>
+ <section class="row r3"><h2>Courses <em>sketch titles</em></h2>
+  <div class="shelf">
+   <div class="p"><div class="art" style="--a:#6b3d8a;--b:#1c1029">Film Grammar</div><div class="cap"><b>Film Grammar</b>1080p · AVC · AAC</div></div>
+   <div class="p"><div class="art" style="--a:#3d8a5b;--b:#10291a">Darkroom 101</div><div class="cap"><b>Darkroom 101</b>1080p · AVC · AAC</div></div>
+  </div></section>
+</main>
+</div>
+</body></html>

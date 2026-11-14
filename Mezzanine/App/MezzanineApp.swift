@@ -55,5 +55,8 @@ struct RootView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if DEBUG
+        .task { if LabAutoRunner.isEnabled { openWindow(id: "lab") } }
+        #endif
     }
 }
