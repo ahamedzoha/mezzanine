@@ -73,8 +73,11 @@ Debug builds open onboarding unless launched with `-onboardingComplete YES`.
 SwiftUI gotcha: never mutate a `@Binding` array twice in one transaction (remove, then insert):
 the second read sees the stale array and duplicates the element. Build the new array, assign once.
 
-Full screen: AppKit keeps the title/toolbar strip as an opaque band over the content even with
-the toolbar hidden; `WindowChrome` sets `.autoHideToolbar` while the player owns the window.
+Full screen: AppKit moves the title bar into a separate window and keeps it as an opaque band over
+the content even with the toolbar hidden (pinned, or revealed with the menu bar). While the player
+owns the window, `WindowChrome` sets `.autoHideToolbar` and also hides that strip window outright,
+re-applying on full-screen, key, screen and app-activation changes. Verify with full-display
+captures (`screencapture -D 1`): window captures (`-l`) never include the strip.
 
 ## Server
 

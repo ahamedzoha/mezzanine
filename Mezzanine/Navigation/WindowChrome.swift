@@ -28,9 +28,18 @@ struct WindowChrome: NSViewRepresentable {
             observers.forEach { NotificationCenter.default.removeObserver($0) }
             observers = []
             if let window {
-                observers.append(NotificationCenter.default.addObserver(
-                    forName: NSWindow.didEnterFullScreenNotification, object: window, queue: .main
-                ) { [weak self] _ in MainActor.assumeIsolated { self?.apply() } })
+                // Full screen moves the title bar into a window of its own, and AppKit resets
+                // presentation options on its own schedule: re-apply whenever either can change.
+                let names: [(Notification.Name, AnyObject?)] = [
+                    (NSWindow.didEnterFullScreenNotification, window), (NSWindow.didExitFullScreenNotification, window),
+                    (NSWindow.didBecomeKeyNotification, window), (NSWindow.didChangeScreenNotification, window),
+                    (NSApplication.didBecomeActiveNotification, NSApp),
+                ]
+                for (name, object) in names {
+                    observers.append(NotificationCenter.default.addObserver(forName: name, object: object, queue: .main) { [weak self] _ in
+                        MainActor.assumeIsolated { self?.apply() }
+                    })
+                }
             }
             apply()
         }
@@ -42,6 +51,23 @@ struct WindowChrome: NSViewRepresentable {
             window.toolbar?.isVisible = !(chromeHidden && hidesToolbar)
             window.titlebarSeparatorStyle = chromeHidden ? .none : .automatic
             applyFullScreenOptions(window)
+            hideFullScreenTitleBar(window)
+        }
+
+        /// In full screen the title bar lives in a separate AppKit window over the top of the
+        /// screen. With the toolbar hidden it's an empty strip (from the sidebar's edge
+        /// across), shown whenever AppKit pins it or the pointer reveals the menu bar. While
+        /// the player owns the window it's hidden outright; the menu bar still slides in alone.
+        private func hideFullScreenTitleBar(_ window: NSWindow) {
+            let hide = chromeHidden && hidesToolbar && window.styleMask.contains(.fullScreen)
+            guard let button = window.standardWindowButton(.closeButton) else { return }
+            if let strip = button.window, strip !== window {
+                strip.alphaValue = hide ? 0 : 1
+                strip.ignoresMouseEvents = hide
+            }
+            if let container = button.superview?.superview, container.isHidden != hide, window.styleMask.contains(.fullScreen) || !hide {
+                container.isHidden = hide
+            }
         }
 
         /// In full screen AppKit keeps the title/toolbar strip as an opaque band over the
