@@ -86,6 +86,7 @@ struct LibraryView: View {
         .toolbar(id: "library") { toolbar }
         .task(id: "\(section.key)|\(sortRaw)|\(filters.hashValue)|\(library.revision)") { await load() }
         .onChange(of: layoutRaw, initial: true) { _, raw in
+            commands.currentLibraryKey = section.key
             commands.currentLayout = raw
             commands.availableLayouts = layouts.map(\.rawValue)
             commands.isFolderBrowserVisible = raw == LibraryLayout.folders.rawValue
@@ -97,6 +98,7 @@ struct LibraryView: View {
         }
         .onChange(of: commands.sortRequest.count) { _, _ in sortRaw = commands.sortRequest.sort }
         .onDisappear {
+            if commands.currentLibraryKey == section.key { commands.currentLibraryKey = nil }
             commands.currentLayout = nil
             commands.availableLayouts = []
             commands.isFolderBrowserVisible = false
@@ -208,19 +210,25 @@ struct LibraryView: View {
             .disabled(layout == .folders || layout == .shelves)
         }
         ToolbarItem(id: "posterSize") {
-            HStack(spacing: 4) {
+            // Small control and ink fill: a toolbar slider at regular size grows a glass knob
+            // taller than its neighbours, and lilac is for selection and the primary action only.
+            HStack(spacing: 6) {
                 Image(systemName: "photo").font(.system(size: 9)).foregroundStyle(.secondary)
                 Slider(value: $density, in: Self.densityRange) { Text("Poster Size") }
                     .labelsHidden()
-                    .frame(width: 88)
+                    .controlSize(.mini)
+                    .tint(Theme.inkSecondary)
+                    .frame(width: 96)
                 Image(systemName: "photo").font(.system(size: 13)).foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 4)
             .help("Poster size (View ▸ Larger Posters ⌘=, Smaller Posters ⌘−)")
             .disabled(layout == .list || layout == .folders || layout == .shelves)
         }
         ToolbarItem(id: "editShelves") {
-            EditShelvesButton(editing: commands.isEditingShelves && layout == .shelves) { commands.toggleEditShelves() }
-                .disabled(layout != .shelves)
+            // Works from every layout: elsewhere it switches to Shelves and opens the editor.
+            EditShelvesButton(editing: commands.isEditingShelves && layout == .shelves) { commands.editShelves() }
+                .disabled(!layouts.contains(.shelves))
         }
     }
 

@@ -284,6 +284,7 @@ struct QuickOpen: View {
         if commands.isHomeVisible && commands.path.isEmpty {
             commands.shelf(action)
         } else {
+            commands.pendingShelfScope = HomeLayout.mainScope
             commands.pendingHomeAction = action
             commands.go(to: .home)
         }

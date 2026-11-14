@@ -83,9 +83,28 @@ final class AppCommandCenter {
     private(set) var shelfRequests: (count: Int, action: ShelfAction) = (0, .toggleEditing)
     /// An action for Home that waits until Home is on screen (Quick Open from another page).
     var pendingHomeAction: ShelfAction?
+    /// Which shelves page `pendingHomeAction` is for: Home, or a library's Shelves layout.
+    var pendingShelfScope = HomeLayout.mainScope
+    /// The library on screen (its key), for Edit Shelves from another layout.
+    var currentLibraryKey: String?
 
     func shelf(_ action: ShelfAction) { shelfRequests = (shelfRequests.count + 1, action) }
     func toggleEditShelves() { shelf(.toggleEditing) }
+
+    /// A library in Posters, Wide or List can't edit shelves yet: Edit Shelves switches it to
+    /// Shelves and opens the editor there.
+    var canSwitchToLibraryShelves: Bool {
+        currentLibraryKey != nil && currentLayout != LibraryLayout.shelves.rawValue
+            && availableLayouts.contains(LibraryLayout.shelves.rawValue)
+    }
+
+    func editShelves() {
+        if isShelvesPageVisible { toggleEditShelves(); return }
+        guard canSwitchToLibraryShelves, let key = currentLibraryKey else { return }
+        pendingShelfScope = key
+        pendingHomeAction = .startEditing
+        setLayout(LibraryLayout.shelves.rawValue)
+    }
 
     /// Choose Poster / Choose Background, presented by the window.
     var artworkRequest: ArtworkRequest?
@@ -247,9 +266,9 @@ struct MezzanineCommands: Commands {
                 .disabled(removableDownload == nil || center.isBlocked)
         }
         CommandGroup(after: .toolbar) {
-            Button(center.isEditingShelves ? "Done Editing Shelves" : "Edit Shelves") { center.toggleEditShelves() }
+            Button(center.isEditingShelves ? "Done Editing Shelves" : "Edit Shelves") { center.editShelves() }
                 .keyboardShortcut("e", modifiers: .command)
-                .disabled(!center.isShelvesPageVisible || center.isBlocked)
+                .disabled(!(center.isShelvesPageVisible || center.canSwitchToLibraryShelves) || center.isBlocked)
             if center.isEditingShelves {
                 Button("Move Shelf Up") { center.shelf(.moveUp) }
                     .keyboardShortcut(.upArrow, modifiers: .option)

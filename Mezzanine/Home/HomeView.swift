@@ -150,9 +150,11 @@ struct HomeView: View {
         }
     }
 
-    /// Quick Open asked for something on Home before Home was on screen.
+    /// Quick Open (or Edit Shelves from a library's other layout) asked for something on this
+    /// page before it was on screen.
     private func consumePendingAction() {
-        guard isMain, layouts.isReady, let action = commands.pendingHomeAction else { return }
+        guard commands.pendingShelfScope == scope, layouts.isReady, !model.specs.isEmpty,
+              let action = commands.pendingHomeAction else { return }
         commands.pendingHomeAction = nil
         handle(action)
     }
@@ -291,6 +293,7 @@ struct HomeView: View {
         loadedSaved = .some(saved)
         if editing { return }
         if !editing { updateRoom() }
+        consumePendingAction()
         #if DEBUG
         // -HomeSeedShelves YES: a layout with a smart shelf, a collection and a hidden row (captures).
         if isMain, layouts.isReady, layouts.saved(scope) == nil, UserDefaults.standard.bool(forKey: "HomeSeedShelves") {
