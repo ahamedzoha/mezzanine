@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SoundSettings.self) private var sound
     @Environment(PlaybackCoordinator.self) private var playback
+    @State private var confirmSignOut = false
 
     var body: some View {
         TabView {
@@ -19,7 +20,12 @@ struct SettingsView: View {
                         LabeledContent("Connection", value: "\(c.connection.route.rawValue) · \(c.connection.protocolName)")
                     }
                     if session.account != nil {
-                        Button("Sign Out") { session.signOut() }
+                        Button("Sign Out…", role: .destructive) { confirmSignOut = true }
+                            .confirmationDialog("Sign out of Plex?", isPresented: $confirmSignOut) {
+                                Button("Sign Out", role: .destructive) { session.signOut() }
+                            } message: {
+                                Text("Mezzanine forgets this account on this Mac. Your library on the server isn’t touched.")
+                            }
                     }
                 }
                 .formStyle(.grouped)
@@ -62,11 +68,13 @@ struct SettingsView: View {
                     } footer: {
                         Text(sound.current.kind.summary + ". Mezzanine remembers this for each output and switches when you change outputs.")
                     }
-                    Section("Adjust") {
+                    Section {
                         LabeledContent("Volume") {
                             HStack {
                                 Slider(value: Binding(get: { sound.current.volumePercent }, set: { sound.setVolume($0) }), in: 0...400, step: 10)
                                     .frame(width: 200)
+                                    .accessibilityLabel("Volume")
+                                    .accessibilityValue("\(Int(sound.current.volumePercent)) percent")
                                 Text("\(Int(sound.current.volumePercent)) %").monospacedDigit().frame(width: 52, alignment: .trailing)
                             }
                         }
@@ -74,6 +82,8 @@ struct SettingsView: View {
                             HStack {
                                 Slider(value: Binding(get: { sound.current.profile.dialogueGainDB }, set: { sound.setDialogue($0) }), in: 0...12, step: 1)
                                     .frame(width: 200)
+                                    .accessibilityLabel("Dialogue boost")
+                                    .accessibilityValue("plus \(Int(sound.current.profile.dialogueGainDB)) decibels")
                                 Text("+\(Int(sound.current.profile.dialogueGainDB)) dB").monospacedDigit().frame(width: 52, alignment: .trailing)
                             }
                         }
@@ -84,6 +94,12 @@ struct SettingsView: View {
                             Text("A lot").tag(Double?.some(-16))
                         }
                         Toggle("Night mode (softer explosions, clearer whispers)", isOn: Binding(get: { sound.current.profile.nightMode }, set: { _ in sound.toggleNight() }))
+                    } header: {
+                        Text("Adjust")
+                    } footer: {
+                        if sound.current.volumePercent > 100 {
+                            Text("Above 100 % is boost: a limiter keeps peaks from clipping, but very quiet films raised a lot can sound compressed.")
+                        }
                     }
                     .disabled(sound.current.kind == .hdmi || sound.current.kind == .airPods)
                 }

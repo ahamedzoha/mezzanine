@@ -50,6 +50,13 @@ struct AppShell: View {
         .toolbarBackgroundVisibility(chromeHidden ? .hidden : .automatic, for: .windowToolbar)
         .background(WindowChrome(hidden: chromeHidden, hidesToolbar: playback.isPresented))
         .frame(minWidth: 900, minHeight: 600)
+        .alert("Couldn’t play this", isPresented: Binding(get: { playback.error != nil && !playback.isPresented },
+                                                          set: { if !$0 { playback.clearError() } })) {
+            Button("Try Again") { Task { await playback.retry() } }
+            Button("OK", role: .cancel) { playback.clearError() }
+        } message: {
+            Text(playback.error ?? "")
+        }
         .containerBackground(Theme.graphite, for: .window)
         .preferredColorScheme(.dark)
         .onChange(of: session.phase, initial: true) { old, phase in

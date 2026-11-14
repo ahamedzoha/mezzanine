@@ -66,6 +66,7 @@ final class PlaybackCoordinator {
     private func play(_ item: PlexMetadata, from origin: CGRect?, autoplayed: Bool) async {
         guard let client = session.client else { return }
         if self.item == nil { sessionStart = Date(); episodesThisSession = 0 }
+        lastRequest = item
         autoplayedInARow = autoplayed ? autoplayedInARow + 1 : 0
         error = nil
         do {
@@ -98,6 +99,7 @@ final class PlaybackCoordinator {
             let reporter = ActivityReporter(client: client, item: detail, player: player)
             self.reporter = reporter
             reporter.start()
+            publishNowPlaying(detail)
             if detail.kind == .episode { episodesThisSession += 1 }
             nextEpisode = nil
             await resolveNext(after: detail, client: client)
@@ -157,6 +159,29 @@ final class PlaybackCoordinator {
         await reporter?.stop()
         reporter = nil
     }
+
+    /// Control Centre / media-key title, with the poster as artwork.
+    private func publishNowPlaying(_ detail: PlexMetadata) {
+        let title = Format.displayTitle(detail)
+        let subtitle = detail.kind == .episode ? [Format.episodeCode(detail), detail.title].compactMap { $0 }.joined(separator: " · ") : detail.year.map(String.init)
+        player.setNowPlaying(title: title, subtitle: subtitle, artwork: nil)
+        guard let url = session.posterURL(detail.posterPath, pixelWidth: 600) else { return }
+        Task { [session, player] in
+            guard let cg = try? await session.images.image(for: url, pixelSize: 600) else { return }
+            player.setNowPlaying(title: title, subtitle: subtitle, artwork: NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height)))
+        }
+    }
+
+    /// The last item the user tried to play, for Retry.
+    private var lastRequest: PlexMetadata?
+
+    func retry() async {
+        guard let lastRequest else { return }
+        error = nil
+        await play(lastRequest, from: nil)
+    }
+
+    func clearError() { error = nil }
 
     /// Finds the next episode, and warms its first bytes so it starts at once.
     private func resolveNext(after episode: PlexMetadata, client: PlexServerClient) async {

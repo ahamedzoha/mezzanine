@@ -44,9 +44,6 @@ struct UpNextCard: View {
                 .contentTransition(.numericText(countsDown: true))
         }
         .frame(width: 380, alignment: .leading)
-        .padding(.trailing, Theme.Space.xxl)
-        .padding(.bottom, Theme.Space.xxl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Up Next: \(next.title), starts in \(seconds) seconds")
     }
@@ -55,12 +52,13 @@ struct UpNextCard: View {
 /// A small ring that empties as the countdown runs.
 private struct CountdownRing: View {
     let fraction: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         ZStack {
             Circle().stroke(Theme.onLilac.opacity(0.25), lineWidth: 2)
             Circle().trim(from: 0, to: fraction).stroke(Theme.onLilac, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.linear(duration: 1), value: fraction)
+                .animation(reduceMotion ? nil : .linear(duration: 1), value: fraction)
         }
         .frame(width: 14, height: 14)
         .accessibilityHidden(true)
@@ -71,6 +69,7 @@ private struct CountdownRing: View {
 struct StillWatchingCard: View {
     let resume: () -> Void
     let stop: () -> Void
+    @AccessibilityFocusState private var focusResume: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
@@ -82,6 +81,7 @@ struct StillWatchingCard: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.defaultAction)
                     .focusEffectDisabled(false)
+                    .accessibilityFocused($focusResume)
                 Button("Stop", action: stop)
                     .buttonStyle(SecondaryButtonStyle())
                     .focusEffectDisabled(false)
@@ -89,6 +89,7 @@ struct StillWatchingCard: View {
         }
         .padding(Theme.Space.xl)
         .background(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).fill(Theme.raised))
+        .onAppear { focusResume = true }
         .padding(Theme.Space.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }

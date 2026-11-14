@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-11-15 (later) — M2 detail + M3/M6 player reviewed and fixed
+
+- Design finish review (**fix**) and HIG review (**Needs Work**) of the detail page and the Bare
+  Picture player; every material item applied:
+  - Up Next: picture sized to the video's aspect on the 48 pt gutter, rounded, never overlapping
+    the card; card shares its top edge; other chrome hidden except close; Reduce Motion handled.
+  - ⋯ panel: solid graphite body over the glass rim, hairline border, scrolling track lists, clear
+    of the Skip button. Skip no longer covers the AirPlay / PiP buttons.
+  - Paused label in the time row; tighter time stack.
+  - Detail: one-click episode play; ↑/↓ section scrolling (movies too); W on a show targets the
+    episode in hand, never the series; "Mark Show Watched" + confirmation; captioned progress;
+    episode progress no longer under the play disc.
+  - HIG: Now Playing, PiP, AirPlay, retry on failure, Esc leaves full screen first, Playback menu
+    (Next Episode, PiP, Speed), Settings accessibility, Sign Out confirmation.
+- Fixed a crash on every play: the Now Playing artwork handler was main-actor isolated but
+  MediaPlayer calls it on its own queue (built in a `nonisolated` helper now).
+- Still owed from HIG: ⌘] forward navigation, semantic (Dynamic Type style) fonts.
+
 ## 2026-11-15 — M1 done, M2/M3 underway
 
 - **M1 index:** GRDB mirror + FTS5 of every library (Movies 275, TV 65 shows / 4,352 episodes,

@@ -47,7 +47,12 @@ final class AppCommandCenter {
     var currentSort: String?
     var isFolderBrowserVisible = false
 
-    enum PlayerAction { case togglePlay, back, forward, skipMarker, close }
+    enum PlayerAction: Equatable { case togglePlay, back, forward, skipMarker, close, nextEpisode, pictureInPicture, speed(Double) }
+    // Player state the Playback menu enables items from.
+    var hasActiveMarker = false
+    var hasNextEpisode = false
+    var canPictureInPicture = false
+    var playbackRate: Double = 1
 
     func requestSearch() { searchRequests += 1 }
     func focusContent() { contentFocusRequests += 1 }
@@ -148,6 +153,19 @@ struct MezzanineCommands: Commands {
                     .keyboardShortcut(.rightArrow, modifiers: [])
                 Button("Skip Intro or Credits") { center.player(.skipMarker) }
                     .keyboardShortcut("s", modifiers: [])
+                    .disabled(!center.hasActiveMarker)
+                Button("Next Episode") { center.player(.nextEpisode) }
+                    .keyboardShortcut("n", modifiers: [])
+                    .disabled(!center.hasNextEpisode)
+                Button("Picture in Picture") { center.player(.pictureInPicture) }
+                    .keyboardShortcut("p", modifiers: .option)
+                    .disabled(!center.canPictureInPicture)
+                Menu("Speed") {
+                    ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
+                        Toggle(rate == 1 ? "Normal" : String(format: "%g×", rate),
+                               isOn: Binding(get: { abs(center.playbackRate - rate) < 0.01 }, set: { _ in center.player(.speed(rate)) }))
+                    }
+                }
                 Divider()
                 Button("Volume Up") { sound.stepVolume(10) }
                     .keyboardShortcut(.upArrow, modifiers: [])

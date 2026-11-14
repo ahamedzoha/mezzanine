@@ -37,8 +37,16 @@ struct PlayerOptions: View {
         }
         .padding(Theme.Space.s)
         .frame(width: 360)
-        .glassEffect(.regular.tint(.black.opacity(0.62)), in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
+        // A solid graphite body over the glass rim: a bright frame never shows through the rows.
+        .background(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).fill(Theme.graphite.opacity(0.95)))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.rule, lineWidth: 1))
         .animation(Theme.Motion.quick, value: page)
+        .onKeyPress(.escape) {
+            guard page != .root else { return .ignored }
+            page = page == .search ? .subtitles : .root
+            return .handled
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Playback options")
     }
@@ -57,9 +65,11 @@ struct PlayerOptions: View {
     private var audio: some View {
         Group {
             header("Audio")
-            ForEach(player.audioTracks) { track in
-                choice(trackLabel(track), detail: trackDetail(track), selected: track.id == player.selectedAudioID) {
-                    playback.selectAudio(trackID: track.id)
+            boundedList {
+                ForEach(player.audioTracks) { track in
+                    choice(trackLabel(track), detail: trackDetail(track), selected: track.id == player.selectedAudioID) {
+                        playback.selectAudio(trackID: track.id)
+                    }
                 }
             }
         }
@@ -68,10 +78,12 @@ struct PlayerOptions: View {
     private var subtitles: some View {
         Group {
             header("Subtitles")
-            choice("Off", detail: nil, selected: player.selectedSubtitleID == nil) { playback.selectSubtitle(trackID: nil) }
-            ForEach(player.subtitleTracks) { track in
-                choice(trackLabel(track), detail: subtitleDetail(track), selected: track.id == player.selectedSubtitleID) {
-                    playback.selectSubtitle(trackID: track.id)
+            boundedList {
+                choice("Off", detail: nil, selected: player.selectedSubtitleID == nil) { playback.selectSubtitle(trackID: nil) }
+                ForEach(player.subtitleTracks) { track in
+                    choice(trackLabel(track), detail: subtitleDetail(track), selected: track.id == player.selectedSubtitleID) {
+                        playback.selectSubtitle(trackID: track.id)
+                    }
                 }
             }
             Divider().overlay(Theme.rule).padding(.vertical, 4)
@@ -146,6 +158,13 @@ struct PlayerOptions: View {
 
     // MARK: Rows
 
+    /// Long track lists scroll inside the panel instead of running off the window.
+    private func boundedList<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        ScrollView { VStack(spacing: 2) { content() } }
+            .frame(maxHeight: 260)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     private func row(_ title: String, value: String?, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: Theme.Space.m) {
@@ -176,8 +195,7 @@ struct PlayerOptions: View {
         }
         .buttonStyle(.plain)
         .focusEffectDisabled(false)
-        .accessibilityLabel("Back")
-        .accessibilityHint(title)
+        .accessibilityLabel("Back to playback options")
     }
 
     private func choice(_ title: String, detail: String?, selected: Bool, action: @escaping () -> Void) -> some View {

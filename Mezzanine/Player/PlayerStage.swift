@@ -33,6 +33,7 @@ struct PlayerStage: View {
     @State private var upNext: UpNextState = .hidden
     @State private var autoSkipped = Set<String>()
     @State private var upNextTrigger: TimeInterval?
+    @State private var pendingToggle: Task<Void, Never>?
     @FocusState private var focused: Bool
 
     enum UpNextState: Equatable { case hidden, counting(Int), dismissed, stillWatching }
@@ -47,16 +48,27 @@ struct PlayerStage: View {
         ZStack {
             Color.black
             picture
-            if chromeVisible || optionsOpen || player.status == .paused { chrome.transition(.opacity) }
+            if upNextShown {
+                GlassIconButton(symbol: "xmark", label: "Close Player", help: "Close (Esc)") { _ = perform(.close) }
+                    .padding(.top, Theme.Space.xl).padding(.trailing, Theme.Space.gutter)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            } else if chromeVisible || optionsOpen || player.status == .paused {
+                chrome.transition(.opacity)
+            }
             if !upNextShown { skipButton }
             if optionsOpen {
                 PlayerOptions(item: item, close: { withAnimation(Theme.Motion.quick) { optionsOpen = false } })
                     .padding(.trailing, Theme.Space.gutter)
-                    .padding(.bottom, 96)
+                    .padding(.bottom, 112)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .bottomTrailing)))
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97, anchor: .bottomTrailing)))
             }
             if let flash { FlashGlyph(symbol: flash).transition(.opacity) }
+            if let message = failure {
+                PlaybackFailure(message: message,
+                                retry: { Task { await playback.retry() } },
+                                close: { playback.clearError(); _ = perform(.close) })
+            }
             if let toast { SoundToast(text: toast, volume: sound.current.volumePercent).transition(.opacity) }
             upNextLayer
         }
@@ -79,6 +91,8 @@ struct PlayerStage: View {
         .onKeyPress(.escape) {
             if optionsOpen { withAnimation(Theme.Motion.quick) { optionsOpen = false }; return .handled }
             if upNextShown { dismissUpNext(); return .handled }
+            // In full screen, Esc leaves full screen first (macOS convention); the next Esc closes.
+            if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil); return .handled }
             return perform(.close)
         }
         .onKeyPress(.space) { perform(.togglePlay) }
@@ -100,6 +114,21 @@ struct PlayerStage: View {
             return .handled
         }
         .onChange(of: commands.playerRequests.count) { _, _ in _ = perform(commands.playerRequests.action) }
+        .onChange(of: activeMarker != nil, initial: true) { _, v in commands.hasActiveMarker = v }
+        .onChange(of: playback.nextEpisode?.ratingKey, initial: true) { _, k in commands.hasNextEpisode = k != nil }
+        .onChange(of: player.canPictureInPicture, initial: true) { _, v in commands.canPictureInPicture = v }
+        .onChange(of: player.rate, initial: true) { _, r in commands.playbackRate = r }
+        .onChange(of: upNext) { _, state in
+            switch state {
+            case .counting(let s) where s == playback.binge.upNextCountdown:
+                if let next = playback.nextEpisode {
+                    AccessibilityNotification.Announcement("Up next, \(next.title), plays in \(s) seconds. Return plays now, Escape hides.").post()
+                }
+            case .stillWatching:
+                AccessibilityNotification.Announcement("Still watching? Playback paused.").post()
+            default: break
+            }
+        }
         .onChange(of: player.status) { _, status in
             playback.reporter?.statusChanged()
             if status == .ended { handleEnded() }
@@ -119,27 +148,41 @@ struct PlayerStage: View {
 
     // MARK: Picture
 
-    /// The film; it shrinks into the top-left corner while Up Next shows.
+    /// The film; during Up Next it shrinks to its own shape beside the card.
     private var picture: some View {
         GeometryReader { geo in
-            let shrink = upNextShown && !reduceMotion
+            let rect = upNextShown ? UpNextLayout(size: geo.size, aspect: videoAspect).picture : CGRect(origin: .zero, size: geo.size)
             ZStack {
                 PlayerSurface(player: player)
                 SubtitleOverlay(player: player)
+                // The video is an AppKit layer, so its rounding is painted in the stage's black
+                // rather than left to SwiftUI clipping of a hosted view.
+                PictureCorners(radius: upNextShown ? Theme.Radius.panel : 0)
+                    .fill(Color.black, style: FillStyle(eoFill: true))
+                    .allowsHitTesting(false)
             }
-            .frame(width: geo.size.width * (shrink ? 0.52 : 1), height: geo.size.height * (shrink ? 0.52 : 1))
-            .clipShape(RoundedRectangle(cornerRadius: shrink ? Theme.Radius.panel : 0, style: .continuous))
-            .shadow(color: .black.opacity(shrink ? 0.6 : 0), radius: 30, y: 14)
-            .offset(x: shrink ? Theme.Space.xxl : 0, y: shrink ? Theme.Space.xxl : 0)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .animation(.spring(response: 0.5, dampingFraction: 1), value: shrink)
+            .frame(width: rect.width, height: rect.height)
+            .clipShape(RoundedRectangle(cornerRadius: upNextShown ? Theme.Radius.panel : 0, style: .continuous))
+            .shadow(color: .black.opacity(upNextShown ? 0.6 : 0), radius: 30, y: 14)
+            .position(x: rect.midX, y: rect.midY)
+            .animation(reduceMotion ? .easeOut(duration: 0.25) : .spring(response: 0.5, dampingFraction: 1), value: upNextShown)
         }
         .contentShape(Rectangle())
         // Click toggles play; a double click (two toggles) leaves play as it was and goes full screen.
         .simultaneousGesture(TapGesture().onEnded {
-            if optionsOpen { withAnimation(Theme.Motion.quick) { optionsOpen = false } } else { _ = perform(.togglePlay) }
+            if optionsOpen { withAnimation(Theme.Motion.quick) { optionsOpen = false }; return }
+            // Wait out the double-click interval so a double click doesn't pause and resume.
+            pendingToggle?.cancel()
+            pendingToggle = Task {
+                try? await Task.sleep(for: .seconds(NSEvent.doubleClickInterval))
+                guard !Task.isCancelled else { return }
+                _ = perform(.togglePlay)
+            }
         })
-        .simultaneousGesture(TapGesture(count: 2).onEnded { NSApp.keyWindow?.toggleFullScreen(nil) })
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
+            pendingToggle?.cancel()
+            NSApp.keyWindow?.toggleFullScreen(nil)
+        })
     }
 
     // MARK: Chrome
@@ -163,15 +206,31 @@ struct PlayerStage: View {
                 .padding(.horizontal, Theme.Space.gutter)
                 .padding(.top, Theme.Space.xl)
                 Spacer()
-                HStack(alignment: .bottom) {
+                HStack(alignment: .bottom, spacing: Theme.Space.s) {
                     Spacer()
+                    if player.avPlayer != nil {
+                        AirPlayButton(player: player)
+                            .frame(width: 40, height: 40)
+                            .glassEffect(.regular.tint(.black.opacity(0.55)), in: Circle())
+                            .help("AirPlay")
+                            .accessibilityLabel("AirPlay")
+                    }
+                    if player.canPictureInPicture {
+                        GlassIconButton(symbol: player.isPictureInPicture ? "pip.exit" : "pip.enter",
+                                        label: "Picture in Picture", help: "Picture in Picture (⌥P)") { _ = perform(.pictureInPicture) }
+                    }
                     GlassIconButton(symbol: "ellipsis", label: "Audio, subtitles, sound and speed", help: "Audio, subtitles, sound, speed") {
                         withAnimation(Theme.Motion.quick) { optionsOpen.toggle() }
                     }
                 }
                 .padding(.horizontal, Theme.Space.gutter)
                 .padding(.bottom, Theme.Space.m)
-                HStack {
+                HStack(spacing: Theme.Space.s) {
+                    if player.status == .paused {
+                        Label("Paused", systemImage: "pause.fill")
+                            .font(Theme.Typeface.cardMeta.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                    }
                     Text(clock(player.currentTime))
                     Spacer()
                     Text("−" + clock(max(0, player.duration - player.currentTime)))
@@ -179,7 +238,7 @@ struct PlayerStage: View {
                 .font(Theme.Typeface.cardMeta)
                 .foregroundStyle(Theme.inkSecondary)
                 .padding(.horizontal, Theme.Space.gutter)
-                .padding(.bottom, 6)
+                .padding(.bottom, -4)
                 HairlineScrub(current: player.currentTime, duration: player.duration, markers: item.markers) { t in
                     Task { await player.seek(to: t) }
                 }
@@ -206,6 +265,12 @@ struct PlayerStage: View {
         .accessibilityLabel([Format.displayTitle(item), item.kind == .episode ? item.title : nil].compactMap { $0 }.joined(separator: ", "))
     }
 
+    /// Width of the bottom-right icon row (AirPlay, PiP, options), so Skip sits beside it, never on it.
+    private var iconRowWidth: CGFloat {
+        let count = 1 + (player.avPlayer != nil ? 1 : 0) + (player.canPictureInPicture ? 1 : 0)
+        return CGFloat(count) * 40 + CGFloat(count - 1) * Theme.Space.s
+    }
+
     /// Skip Intro / Skip Credits: the only full button. Its fill drains as the marker plays.
     @ViewBuilder private var skipButton: some View {
         if let marker = activeMarker {
@@ -225,7 +290,7 @@ struct PlayerStage: View {
             }
             .focusEffectDisabled(false)
             .help("Skip (S or Return)")
-            .padding(.trailing, Theme.Space.gutter + 52)
+            .padding(.trailing, Theme.Space.gutter + iconRowWidth + Theme.Space.m)
             .padding(.bottom, 64)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
@@ -237,10 +302,15 @@ struct PlayerStage: View {
         switch upNext {
         case .counting(let seconds):
             if let next = playback.nextEpisode {
-                UpNextCard(next: next, seconds: seconds, total: playback.binge.upNextCountdown,
-                           playNow: { Task { await playback.playNext(autoplayed: false) } },
-                           hide: { dismissUpNext() })
-                    .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
+                GeometryReader { geo in
+                    let layout = UpNextLayout(size: geo.size, aspect: videoAspect)
+                    UpNextCard(next: next, seconds: seconds, total: playback.binge.upNextCountdown,
+                               playNow: { Task { await playback.playNext(autoplayed: false) } },
+                               hide: { dismissUpNext() })
+                        .frame(width: UpNextLayout.cardWidth, alignment: .topLeading)
+                        .offset(x: layout.cardOrigin.x, y: layout.cardOrigin.y)
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
             }
         case .stillWatching:
             StillWatchingCard(resume: { Task { await playback.playNext(autoplayed: false) } },
@@ -252,6 +322,23 @@ struct PlayerStage: View {
     }
 
     // MARK: Behaviour
+
+    /// The video's shape, from Plex's media facts (16:9 when unknown).
+    private var videoAspect: CGFloat {
+        if let media = item.media.first {
+            // Exact pixels first; Plex rounds `aspectRatio` to the nearest standard ratio.
+            if let w = media.width, let h = media.height, w > 0, h > 0 { return CGFloat(w) / CGFloat(h) }
+            if let a = media.aspectRatio, a > 0.5 { return CGFloat(a) }
+        }
+        return 16 / 9
+    }
+
+    /// A playback failure to show over the stage.
+    private var failure: String? {
+        if let error = playback.error { return error }
+        if case .failed = player.status { return "This file couldn’t be played." }
+        return nil
+    }
 
     private var activeMarker: PlexMarker? {
         let t = player.currentTime
@@ -334,6 +421,11 @@ struct PlayerStage: View {
         case .forward: Task { await player.seek(by: 10) }; flashGlyph("goforward.10")
         case .skipMarker: return skip() ? .handled : .ignored
         case .close: close()
+        case .nextEpisode:
+            guard playback.nextEpisode != nil else { return .ignored }
+            Task { await playback.playNext(autoplayed: false) }
+        case .pictureInPicture: player.togglePictureInPicture()
+        case .speed(let rate): player.setRate(rate); showToast(rate == 1 ? "Normal speed" : String(format: "%g× speed", rate))
         }
         return .handled
     }
@@ -367,7 +459,8 @@ struct PlayerStage: View {
         hideChrome?.cancel()
         hideChrome = Task {
             try? await Task.sleep(for: .seconds(2.5))
-            guard !Task.isCancelled, player.status == .playing, !optionsOpen, !NSWorkspace.shared.isVoiceOverEnabled else { return }
+            guard !Task.isCancelled, player.status == .playing, !optionsOpen, !NSWorkspace.shared.isVoiceOverEnabled,
+                  !NSApp.isFullKeyboardAccessEnabled else { return }
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "PlayerChromePinned") { return }
             #endif
@@ -493,8 +586,9 @@ struct HairlineScrub: View {
         .frame(height: 24)
         .accessibilityElement()
         .accessibilityLabel("Playback position")
-        .accessibilityValue("\(clock(current)) of \(clock(duration))")
+        .accessibilityValue("\(spoken(current)) of \(spoken(duration))")
         .accessibilityAddTraits(.updatesFrequently)
+        .focusable()
         .accessibilityAdjustableAction { direction in
             switch direction {
             case .increment: seek(min(duration, current + 10))
@@ -509,6 +603,15 @@ struct HairlineScrub: View {
         let t = Int(s)
         return t >= 3600 ? String(format: "%d:%02d:%02d", t / 3600, (t / 60) % 60, t % 60)
                          : String(format: "%d:%02d", t / 60, t % 60)
+    }
+
+    /// "1 hour 12 minutes 4 seconds", for VoiceOver.
+    private func spoken(_ s: Double) -> String {
+        guard s.isFinite, s >= 0 else { return "0 seconds" }
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .full
+        f.allowedUnits = [.hour, .minute, .second]
+        return f.string(from: s) ?? ""
     }
 }
 
@@ -583,5 +686,58 @@ private struct SoundToast: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// A playback failure over the stage, with Retry and Close.
+private struct PlaybackFailure: View {
+    let message: String
+    let retry: () -> Void
+    let close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.m) {
+            Label("Playback stopped", systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.ink)
+                .accessibilityAddTraits(.isHeader)
+            Text(message).font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary).frame(maxWidth: 420, alignment: .leading)
+            HStack(spacing: Theme.Space.m) {
+                Button("Try Again", action: retry).buttonStyle(PrimaryButtonStyle()).keyboardShortcut(.defaultAction).focusEffectDisabled(false)
+                Button("Close", action: close).buttonStyle(SecondaryButtonStyle()).focusEffectDisabled(false)
+            }
+        }
+        .padding(Theme.Space.xl)
+        .background(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).fill(Theme.raised))
+        .onAppear { AccessibilityNotification.Announcement("Playback stopped. \(message)").post() }
+    }
+}
+
+/// Where the shrunk picture and the Up Next card sit: side by side on the
+/// 48 pt gutter, tops aligned, the pair centred vertically, the picture in its
+/// own aspect ratio and never overlapping the card.
+struct UpNextLayout {
+    static let cardWidth: CGFloat = 380
+    static let cardHeight: CGFloat = 440
+    let size: CGSize
+    let aspect: CGFloat
+
+    private var gutter: CGFloat { Theme.Space.xxl }
+
+    var picture: CGRect {
+        let maxW = max(200, size.width - Self.cardWidth - gutter * 3)
+        var w = min(maxW, size.width * 0.58)
+        var h = w / aspect
+        let maxH = size.height - gutter * 2
+        if h > maxH { h = maxH; w = h * aspect }
+        return CGRect(x: gutter, y: top(for: h), width: w, height: h)
+    }
+
+    var cardOrigin: CGPoint {
+        let p = picture
+        return CGPoint(x: p.maxX + gutter, y: p.minY)
+    }
+
+    private func top(for pictureHeight: CGFloat) -> CGFloat {
+        max(gutter, (size.height - max(pictureHeight, Self.cardHeight)) / 2)
     }
 }

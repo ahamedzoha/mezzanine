@@ -44,17 +44,23 @@ struct DetailHero: View {
                     Button("Trailer", action: playTrailer)
                         .buttonStyle(SecondaryButtonStyle())
                         .focusEffectDisabled(false)
+                        .accessibilityLabel("Play trailer")
                 }
                 Button(action: toggleWatched) {
-                    Label(item.isWatched ? "Watched" : "Mark Watched", systemImage: item.isWatched ? "checkmark.circle.fill" : "checkmark.circle")
+                    Label(watchedLabel, systemImage: item.isWatched ? "checkmark.circle.fill" : "checkmark.circle")
                 }
                 .buttonStyle(SecondaryButtonStyle())
                 .focusEffectDisabled(false)
-                .help(item.isWatched ? "Mark as unwatched (W)" : "Mark as watched (W)")
+                .help(watchedHelp)
             }
-            if let progress = (nextEpisode ?? item).progress, progress > 0 {
-                ProgressView(value: progress).tint(Theme.ink).frame(width: 220)
-                    .accessibilityLabel("\(Int(progress * 100)) percent watched")
+            if let target = Optional(nextEpisode ?? item), let progress = target.progress, progress > 0 {
+                HStack(spacing: Theme.Space.s) {
+                    ProgressView(value: progress).tint(Theme.ink).frame(width: 160)
+                    Text(progressCaption(target)).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(progressCaption(target))
+                .accessibilityValue("\(Int(progress * 100)) percent watched")
             }
         }
         .padding(.leading, Theme.Space.gutter)
@@ -88,6 +94,25 @@ struct DetailHero: View {
         return (item.viewOffset ?? 0) > 0 ? "Resume" : "Play"
     }
 
+    /// Shows and seasons say what they cover; the button marks every episode in them.
+    private var watchedLabel: String {
+        let scope = item.kind == .show ? " Show" : (item.kind == .season ? " Season" : "")
+        return (item.isWatched ? "Mark\(scope) Unwatched" : "Mark\(scope) Watched")
+    }
+
+    private var watchedHelp: String {
+        switch item.kind {
+        case .show, .season: return item.isWatched ? "Mark every episode as unwatched" : "Mark every episode as watched"
+        default: return item.isWatched ? "Mark as unwatched (W)" : "Mark as watched (W)"
+        }
+    }
+
+    /// "S2 E4 · 26 min left" for a show, "26 min left" for a film.
+    private func progressCaption(_ target: PlexMetadata) -> String {
+        [target.kind == .episode ? Format.episodeCode(target) : nil, Format.timeLeft(target)]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
     private var caption: String {
         var parts = [Format.heroCaption(item)]
         if item.kind == .show, let left = item.unwatchedLeafCount, left > 0 { parts.append("\(left) unwatched") }
@@ -113,12 +138,16 @@ struct EpisodeRow: View {
                 .frame(width: 220, height: 124)
                 .overlay(alignment: .bottom) {
                     if let p = episode.progress {
-                        Capsule().fill(Theme.ink).frame(width: max(4, 200 * p), height: 3)
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.bottom, 8)
+                        // Flush along the bottom edge so the play disc never sits on it.
+                        ZStack(alignment: .leading) {
+                            Rectangle().fill(.black.opacity(0.45))
+                            Rectangle().fill(Theme.ink).frame(width: max(4, 220 * p))
+                        }
+                        .frame(height: 3)
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    if hovering || isFocused { PlayDisc { onPlay(frame) }.padding(8) }
+                    if hovering || isFocused { PlayDisc { onPlay(frame) }.padding(.trailing, 8).padding(.bottom, 12) }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.still, style: .continuous))
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
@@ -149,12 +178,13 @@ struct EpisodeRow: View {
             .fill(isFocused || hovering ? Theme.raised : .clear))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
-        .simultaneousGesture(TapGesture().onEnded { onFocus() })
-        .simultaneousGesture(TapGesture(count: 2).onEnded { onPlay(frame) })
+        // One click plays, like the rest of the app's titles; focus follows so the keys pick up from here.
+        .onTapGesture { onFocus(); onPlay(frame) }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityValue(episode.isWatched ? "Watched" : (episode.progress.map { "\(Int($0 * 100)) percent watched" } ?? ""))
         .accessibilityAction { onPlay(frame) }
+        .accessibilityAction(named: episode.isWatched ? "Mark as unwatched" : "Mark as watched") { onToggleWatched() }
         .contextMenu {
             Button("Play") { onPlay(frame) }
             Button(episode.isWatched ? "Mark as Unwatched" : "Mark as Watched", action: onToggleWatched)

@@ -1,6 +1,8 @@
 import Foundation
 import Combine
 import SwiftUI
+import AVKit
+import MediaPlayer
 import AetherEngine
 import MezzanineKit
 
@@ -30,6 +32,13 @@ public final class MezzaninePlayer {
     public private(set) var cues: [PlayerCue] = []
     public private(set) var diagnostics = PlayerDiagnostics()
     public private(set) var rate: Double = 1
+    /// Picture in Picture can start (the route has a layer for it).
+    public private(set) var canPictureInPicture = false
+    public private(set) var isPictureInPicture = false
+    /// The AVPlayer on the native route (for the AirPlay picker); nil on the software route.
+    public private(set) var avPlayer: AVPlayer?
+    /// Scrub thumbnails are available from data the session already holds.
+    public var supportsScrubThumbnails: Bool { engine.supportsCacheBackedStills }
 
     /// 0…400 %. Above 100 % becomes gain in front of the engine's limiter.
     public var volume = VolumeLevel(percent: 100) {
@@ -47,10 +56,64 @@ public final class MezzaninePlayer {
     @ObservationIgnored private var bag = Set<AnyCancellable>()
     @ObservationIgnored private var loadStartedAt: ContinuousClock.Instant?
     @ObservationIgnored private var seekStartedAt: ContinuousClock.Instant?
+    @ObservationIgnored private var pip: AVPictureInPictureController?
+    @ObservationIgnored private var pipDelegate: PiPDelegate?
 
     public init() throws {
         engine = try AetherEngine()
+        // Mezzanine draws its own transport, so the engine owns system Now Playing and
+        // answers media keys / Control Centre itself.
+        engine.ownsVideoNowPlayingSession = true
+        engine.ownsVideoNowPlayingCommands = true
+        engine.ownsSoftwareNowPlaying = true
         bind()
+    }
+
+    // MARK: Now Playing, PiP, AirPlay, scrub thumbnails
+
+    /// The title shown in Control Centre and on media-key HUDs.
+    public func setNowPlaying(title: String, subtitle: String?, artwork: NSImage?) {
+        var info: [String: Any] = [MPMediaItemPropertyTitle: title, MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue]
+        if let subtitle { info[MPMediaItemPropertyArtist] = subtitle }
+        if let artwork {
+            info[MPMediaItemPropertyArtwork] = Self.nowPlayingArtwork(artwork)
+        }
+        engine.setNowPlayingInfo(info)
+    }
+
+    /// MediaPlayer calls the artwork handler on its own queue. Built here, outside the
+    /// main actor, the closure carries no actor isolation (a main-actor closure traps there).
+    nonisolated private static func nowPlayingArtwork(_ image: NSImage) -> MPMediaItemArtwork {
+        MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+    }
+
+    public func togglePictureInPicture() {
+        guard let pip else { return }
+        if pip.isPictureInPictureActive { pip.stopPictureInPicture() } else { pip.startPictureInPicture() }
+    }
+
+    /// A frame near `seconds` for the scrub tooltip; nil means show the time only.
+    public func scrubThumbnail(at seconds: Double) async -> CGImage? {
+        guard engine.supportsCacheBackedStills else { return nil }
+        return await engine.scrubThumbnail(atSeconds: seconds)
+    }
+
+    private func rebuildPiP() {
+        pip?.delegate = nil
+        if engine.videoRoute == .software {
+            pip = engine.softwarePiPSource?.makePictureInPictureController()
+        } else if let layer = engine.nativePlayerLayer {
+            pip = AVPictureInPictureController(playerLayer: layer)
+        } else {
+            pip = nil
+        }
+        let delegate = PiPDelegate { [weak self] active in
+            self?.isPictureInPicture = active
+            self?.engine.pictureInPictureActive = active
+        }
+        pipDelegate = delegate
+        pip?.delegate = delegate
+        canPictureInPicture = pip != nil && AVPictureInPictureController.isPictureInPictureSupported()
     }
 
     /// The app's one player. Falls back to a crash with a clear message: an
@@ -216,6 +279,11 @@ public final class MezzaninePlayer {
         engine.$sourceVideoCodecName.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.videoCodec = $0 }.store(in: &bag)
         engine.$sourceContainerFormat.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.container = $0 }.store(in: &bag)
         engine.$sourceVideoBitrate.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.videoBitrate = $0 }.store(in: &bag)
+        engine.$currentAVPlayer.receive(on: DispatchQueue.main).sink { [weak self] in self?.avPlayer = $0 }.store(in: &bag)
+        engine.$hasFirstFrameReadyForDisplay.receive(on: DispatchQueue.main).sink { [weak self] ready in
+            if ready { self?.rebuildPiP() }
+        }.store(in: &bag)
+        engine.$softwarePiPSource.receive(on: DispatchQueue.main).sink { [weak self] _ in self?.rebuildPiP() }.store(in: &bag)
     }
 }
 
@@ -349,4 +417,37 @@ public struct PlayerDiagnostics: Sendable, Equatable {
     public var videoBitrate: Int64 = 0
     public var timeToFirstFrame: Duration?
     public var lastSeekLatency: Duration?
+}
+
+/// Reports PiP start/stop back to the player.
+@MainActor
+private final class PiPDelegate: NSObject, AVPictureInPictureControllerDelegate {
+    let changed: (Bool) -> Void
+    init(changed: @escaping (Bool) -> Void) { self.changed = changed }
+    // AVKit calls these on the main thread.
+    nonisolated func pictureInPictureControllerWillStartPictureInPicture(_ c: AVPictureInPictureController) {
+        MainActor.assumeIsolated { changed(true) }
+    }
+    nonisolated func pictureInPictureControllerDidStopPictureInPicture(_ c: AVPictureInPictureController) {
+        MainActor.assumeIsolated { changed(false) }
+    }
+}
+
+/// The system AirPlay picker, attached to the native route's AVPlayer.
+public struct AirPlayButton: NSViewRepresentable {
+    let player: MezzaninePlayer
+    public init(player: MezzaninePlayer) { self.player = player }
+
+    public func makeNSView(context: Context) -> AVRoutePickerView {
+        let view = AVRoutePickerView()
+        view.isRoutePickerButtonBordered = false
+        view.setRoutePickerButtonColor(.white, for: .normal)
+        view.setRoutePickerButtonColor(NSColor(red: 0.63, green: 0.55, blue: 1, alpha: 1), for: .active)
+        view.player = player.avPlayer
+        return view
+    }
+
+    public func updateNSView(_ view: AVRoutePickerView, context: Context) {
+        view.player = player.avPlayer
+    }
 }

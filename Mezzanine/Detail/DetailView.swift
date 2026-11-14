@@ -29,31 +29,48 @@ struct DetailView: View {
     @State private var focusedEpisode: Int?
     @State private var error: String?
     @State private var heroFrame: CGRect = .zero
+    /// A show or season waiting for "Mark all as watched?" confirmation.
+    @State private var confirmWatched: PlexMetadata?
+    @State private var actionError: String?
+    /// Which page section ↑/↓ last scrolled to (index into `sectionIDs`).
+    @State private var section = 0
+    private static let sectionLead: CGFloat = 24
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 if let item {
-                    VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                    // Each section after the hero carries its own lead-in, so ↑/↓ land it
+                    // with clear space under the toolbar instead of flush against it.
+                    VStack(alignment: .leading, spacing: Theme.Space.xl - Self.sectionLead) {
                         DetailHero(item: item, nextEpisode: nextEpisode, play: { play(nextEpisode ?? item, from: heroFrame) },
                                    playTrailer: trailer.map { t in { play(t, from: heroFrame) } },
-                                   toggleWatched: { Task { await toggleWatched(item) } })
+                                   toggleWatched: { requestToggleWatched(item) })
                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { heroFrame = $0 }
-                        about(item)
-                        if item.kind == .show || item.kind == .season { seasonsAndEpisodes(proxy: proxy) }
-                        if !item.roles.isEmpty { CastStrip(roles: Array(item.roles.prefix(20))) }
-                        if !item.extras.isEmpty { extrasRow(item.extras) }
-                        ForEach(related.filter { !$0.items.isEmpty }) { hub in
+                            .id("hero")
+                        about(item).padding(.top, Self.sectionLead).id("about")
+                        if item.kind == .show || item.kind == .season {
+                            seasonsAndEpisodes(proxy: proxy).padding(.top, Self.sectionLead).id("episodes")
+                        }
+                        if !item.roles.isEmpty { CastStrip(roles: Array(item.roles.prefix(20))).padding(.top, Self.sectionLead).id("cast") }
+                        if !item.extras.isEmpty { extrasRow(item.extras).padding(.top, Self.sectionLead).id("extras") }
+                        ForEach(relatedHubs) { hub in
                             ShelfView(shelf: Shelf(id: hub.hubIdentifier, title: hub.title, items: hub.items), row: 0,
                                       focusedColumn: nil, scrollsToFocus: false,
                                       onFocus: { _ in }, onPlay: { item, frame in play(item, from: frame) },
                                       onOpen: { commands.open($0) })
+                                .padding(.top, Self.sectionLead)
+                                .id("related-\(hub.hubIdentifier)")
                         }
                     }
                     .padding(.bottom, Theme.Space.xxl)
                 }
             }
             .scrollIndicators(.never)
+            .onChange(of: section) { _, i in
+                guard sectionIDs.indices.contains(i), sectionIDs[i] != "episodes" || focusedEpisode == nil else { return }
+                withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo(sectionIDs[i], anchor: .top) }
+            }
         }
         .overlay {
             if item == nil {
@@ -69,11 +86,28 @@ struct DetailView: View {
         .onKeyPress(.escape) { commands.goBack(); return .handled }
         .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { _ in
             guard let item else { return .ignored }
-            Task { await toggleWatched(focusedEpisode.flatMap { episodes.indices.contains($0) ? episodes[$0] : nil } ?? item) }
+            // On a show, W means the episode in hand (focused, else the one Play would start),
+            // never the whole series on a stray key; the hero button covers that, with a confirmation.
+            let focused = focusedEpisode.flatMap { episodes.indices.contains($0) ? episodes[$0] : nil }
+            guard let target = focused ?? (episodes.isEmpty ? item : nextEpisode) else { return .ignored }
+            requestToggleWatched(target)
             return .handled
         }
         .onMoveCommand(perform: move)
         .navigationTitle(item.map(Format.displayTitle) ?? "")
+        .confirmationDialog(confirmTitle, isPresented: Binding(get: { confirmWatched != nil }, set: { if !$0 { confirmWatched = nil } }),
+                            titleVisibility: .visible) {
+            Button(confirmWatched?.isWatched == true ? "Mark as Unwatched" : "Mark as Watched") {
+                if let target = confirmWatched { Task { await toggleWatched(target) } }
+                confirmWatched = nil
+            }
+            Button("Cancel", role: .cancel) { confirmWatched = nil }
+        } message: {
+            Text("This changes your watch history on the server, which Plex apps, Tautulli and Trakt all read.")
+        }
+        .alert("Couldn’t change watched state", isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
+            Button("OK", role: .cancel) { actionError = nil }
+        } message: { Text(actionError ?? "") }
         .task(id: route) { await load() }
         .onChange(of: library.revision) { _, _ in Task { await refreshEpisodes() } }
     }
@@ -137,19 +171,19 @@ struct DetailView: View {
                             .buttonStyle(.plain)
                             .focusEffectDisabled(false)
                             .accessibilityAddTraits(selected ? .isSelected : [])
-                            .help("⌥← / ⌥→ switch season")
                         }
                     }
                     .padding(.horizontal, Theme.Space.gutter)
                 }
                 .scrollIndicators(.never)
+                .help("Seasons (⌥← / ⌥→)")
             }
             LazyVStack(alignment: .leading, spacing: 2) {
                 ForEach(Array(episodes.enumerated()), id: \.element.ratingKey) { i, episode in
                     EpisodeRow(episode: episode, isFocused: focusedEpisode == i,
-                               onFocus: { focusedEpisode = i },
+                               onFocus: { focusedEpisode = i; if let e = sectionIDs.firstIndex(of: "episodes") { section = e } },
                                onPlay: { frame in play(episode, from: frame) },
-                               onToggleWatched: { Task { await toggleWatched(episode) } })
+                               onToggleWatched: { requestToggleWatched(episode) })
                         .id("ep-\(i)")
                 }
             }
@@ -188,6 +222,7 @@ struct DetailView: View {
                         .buttonStyle(.plain)
                         .focusEffectDisabled(false)
                         .accessibilityLabel("Play \(extra.title)")
+                        .accessibilityValue([extra.subtype?.capitalized, extra.duration.map(Format.duration)].compactMap { $0 }.joined(separator: ", "))
                     }
                 }
                 .padding(.horizontal, Theme.Space.gutter)
@@ -197,6 +232,19 @@ struct DetailView: View {
     }
 
     // MARK: Data
+
+    private var relatedHubs: [PlexHub] { related.filter { !$0.items.isEmpty } }
+
+    /// The page's sections in scroll order, for ↑/↓.
+    private var sectionIDs: [String] {
+        guard let item else { return [] }
+        var ids = ["hero", "about"]
+        if (item.kind == .show || item.kind == .season) && !episodes.isEmpty { ids.append("episodes") }
+        if !item.roles.isEmpty { ids.append("cast") }
+        if !item.extras.isEmpty { ids.append("extras") }
+        ids += relatedHubs.map { "related-\($0.hubIdentifier)" }
+        return ids
+    }
 
     private var trailer: PlexMetadata? { item?.extras.first { $0.subtype == "trailer" } }
 
@@ -209,6 +257,7 @@ struct DetailView: View {
     private func load() async {
         guard let client = session.client else { return }
         error = nil
+        section = 0
         do {
             let detail = try await client.metadata(route.ratingKey)
             item = detail
@@ -222,6 +271,13 @@ struct DetailView: View {
                 await choose(season: detail)
             }
             related = (try? await client.related(detail.ratingKey)) ?? []
+            #if DEBUG
+            // -DetailSection cast: land scrolled to a section, for review captures.
+            if let id = UserDefaults.standard.string(forKey: "DetailSection"), let i = sectionIDs.firstIndex(of: id) {
+                try? await Task.sleep(for: .milliseconds(600))
+                section = i
+            }
+            #endif
         } catch is CancellationError {
         } catch {
             self.error = (error as? PlexError)?.userMessage ?? "\(error)"
@@ -231,6 +287,7 @@ struct DetailView: View {
     private func choose(season s: PlexMetadata) async {
         season = s
         focusedEpisode = nil
+        if let e = sectionIDs.firstIndex(of: "episodes"), section > e { section = e }
         guard let client = session.client else { return }
         episodes = (try? await client.children(s.ratingKey)) ?? []
     }
@@ -238,6 +295,19 @@ struct DetailView: View {
     private func refreshEpisodes() async {
         guard let s = season, let client = session.client else { return }
         episodes = (try? await client.children(s.ratingKey)) ?? episodes
+    }
+
+    private var confirmTitle: String {
+        guard let t = confirmWatched else { return "" }
+        let n = t.leafCount ?? 0
+        let what = t.kind == .show ? "all \(n) episodes of \(t.title)" : "all \(n) episodes of \(t.title)"
+        return t.isWatched ? "Mark \(what) as unwatched?" : "Mark \(what) as watched?"
+    }
+
+    /// Shows and seasons ask first (they change many episodes); single titles don't.
+    private func requestToggleWatched(_ target: PlexMetadata) {
+        if target.kind == .show || target.kind == .season { confirmWatched = target }
+        else { Task { await toggleWatched(target) } }
     }
 
     private func toggleWatched(_ target: PlexMetadata) async {
@@ -250,7 +320,7 @@ struct DetailView: View {
             item = fresh
             await refreshEpisodes()
         } catch {
-            self.error = (error as? PlexError)?.userMessage
+            actionError = (error as? PlexError)?.userMessage ?? "The server didn’t accept the change."
         }
     }
 
@@ -261,10 +331,30 @@ struct DetailView: View {
         switch direction {
         case .left where optionDown || episodes.isEmpty: stepSeason(-1)
         case .right where optionDown || episodes.isEmpty: stepSeason(1)
-        case .up: if !episodes.isEmpty { focusedEpisode = max(0, (focusedEpisode ?? 0) - 1) }
-        case .down: if !episodes.isEmpty { focusedEpisode = min(episodes.count - 1, (focusedEpisode ?? -1) + 1) }
+        case .up: stepVertical(-1)
+        case .down: stepVertical(1)
         default: break
         }
+    }
+
+    /// ↑/↓ walk the page: section by section, and episode by episode inside the episode list.
+    private func stepVertical(_ delta: Int) {
+        let ids = sectionIDs
+        guard !ids.isEmpty else { return }
+        let episodesAt = ids.firstIndex(of: "episodes")
+        if let i = focusedEpisode {
+            let next = i + delta
+            if episodes.indices.contains(next) { focusedEpisode = next; return }
+            focusedEpisode = nil
+            if delta < 0 { section = 0 }
+            else if let e = episodesAt, ids.indices.contains(e + 1) { section = e + 1 }
+            return
+        }
+        // A show's first ↓ goes straight to its episodes; the summary is already on screen.
+        if delta > 0, let e = episodesAt, section < e { section = e; focusedEpisode = 0; return }
+        let next = min(max(0, section + delta), ids.count - 1)
+        if let e = episodesAt, next == e, delta < 0 { section = e; focusedEpisode = episodes.count - 1; return }
+        section = next
     }
 
     private func stepSeason(_ delta: Int) {

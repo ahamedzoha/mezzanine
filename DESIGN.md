@@ -254,9 +254,19 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 
 - The film fills the window; chrome shows on pointer movement or any key and hides after 2.5 s (never while paused, a panel is open, or VoiceOver runs). The cursor hides with it.
 - Top-left: the title's clear logo (≤ 300 × 84 pt, soft shadow) with the episode line (S3 E10 · Title) under it; text title when there is no logo. Top-right: round dark-glass close (40 pt).
-- Bottom: elapsed and remaining times (card meta, tabular) above a 2 pt edge scrub (ink 30 %, played ink, intro/credits ink 50 %); it thickens to 6 pt under the pointer with a glass time tooltip.
-- One ⋯ glass button bottom-right opens a 360 pt glass panel (black 62 %): Audio, Subtitles, Sound, Speed rows with current values; each opens in place with a back header. Subtitles include Find Subtitles… (Plex's OpenSubtitles search, saved to the server), size 60–200 %, background box, timing ±0.1 s.
+- Bottom: elapsed and remaining times (card meta, tabular) sitting just above a 2 pt edge scrub (ink 30 %, played ink, intro/credits ink 50 %); it thickens to 6 pt under the pointer with a glass time tooltip. While paused, a small "Paused" label leads the time row (bottom-left, never centred).
+- Bottom-right icon row (40 pt dark-glass circles): AirPlay (native path), Picture in Picture, ⋯. Skip sits to the left of the row, never on it.
+- ⋯ opens a 360 pt panel: a solid graphite body (95 %) over a glass rim with a 1 pt rule border, so a bright frame never shows through the rows. Audio, Subtitles, Sound, Speed rows with current values; each opens in place with a back header (Esc steps back). Long track lists scroll inside the panel (≤ 260 pt). Subtitles include Find Subtitles… (Plex's OpenSubtitles search, saved to the server), size 60–200 %, background box, timing ±0.1 s.
 - Skip Intro / Next Episode / Skip Credits: the only full button, lilac, with a fill that drains as the marker plays. Auto-skip rules can skip silently (a "Skipped intro" readout confirms).
-- Up Next: at the final credits marker (else 30 s before the end) the picture shrinks to 52 % into the top-left corner with a 16 pt radius; the card at right carries the next episode's still (380 × 214), title, three lines of synopsis, Play Now (lilac, countdown ring) and Hide, and "Starts in N s". Still Watching? replaces it after N episodes or H hours.
+- Up Next: at the final credits marker (else 30 s before the end) the picture shrinks to its own aspect ratio (Plex width × height) on the 48 pt gutter, rounded 16 pt, width capped so it never meets the card (window − 380 − 3 × 48). The card (380 pt: still 380 × 214, title, three lines of synopsis, Play Now with countdown ring, Hide, "Starts in N s") shares the picture's top edge on the same 48 pt inset; the pair is centred vertically. All other chrome hides while it shows, except close. Reduce Motion: the same layout, reached by a 0.25 s ease instead of the spring. Still Watching? replaces it after N episodes or H hours.
+- The video is an AppKit layer: rounding is painted over it in the stage black (`PictureCorners`), not clipped. Files with letterboxing baked into a 16:9 frame show their bars inside the rounded picture.
 - Transient glyphs (play, pause, ±10) flash centred in a 70 pt glass circle for 0.65 s; sound changes show a corner readout with a volume bar to 400 % and a tick at 100 %.
 - Click toggles play; double click toggles full screen.
+
+## Detail page
+
+- Hero: full-width backdrop dissolving into the room, clear logo (≤ 620 × 170 pt), ruled caption, tagline, then Play/Resume (lilac; on shows "Resume S2 E4"), Trailer, and Mark Watched. On shows and seasons the button names its scope ("Mark Show Watched") and confirms first, because it changes every episode.
+- Progress under the hero buttons always carries its caption: "S2 E4 · 26 min left" (shows) or "26 min left" (films).
+- Episode rows: one click plays (pointer-first), focus follows the click; the still's progress runs flush along its bottom edge (3 pt on a dark track) so the hover play disc never sits on it.
+- Keys: ↑/↓ walk the page section by section (hero, about, episodes, cast, extras, related) and episode by episode inside the list; ↑ from the first episode returns to the hero. ⌥←/⌥→ change season. Return plays the focused episode, Space plays the primary title. W toggles the focused episode, else the episode Play would start; never the whole series from a key.
+- Scrolled-to sections land with a 24 pt lead under the toolbar.
