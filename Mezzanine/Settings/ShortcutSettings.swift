@@ -268,6 +268,7 @@ enum ShortcutReference {
             .init(keys: "Space", action: "Play or resume"),
             .init(keys: "Return", action: "Play the focused episode"),
             .init(keys: "W", action: "Watched (the focused or next episode)"),
+            .init(keys: "⌥⌘P  ⌥⌘B", action: "Choose poster / background"),
             .init(keys: "Esc or ⌘[", action: "Back"),
         ]),
     ]

@@ -137,3 +137,13 @@ import Testing
         #expect(try decode(#"{"s": 15461}"#).s == "15461")
     }
 }
+
+@Suite struct HomeUserDecodingTests {
+    @Test func homeUsersWrappedOrBare() throws {
+        let user = #"{"id":1,"uuid":"abc","title":"Owner","admin":true,"guest":false,"restricted":false,"protected":true}"#
+        let wrapped = try JSONDecoder().decode(HomeUserList.self, from: Data(#"{"id":9,"name":"Home","users":[\#(user)]}"#.utf8))
+        let bare = try JSONDecoder().decode(HomeUserList.self, from: Data("[\(user)]".utf8))
+        #expect(wrapped.users.map(\.title) == ["Owner"])
+        #expect(bare.users.first?.protected == true)
+    }
+}

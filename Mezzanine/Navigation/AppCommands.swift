@@ -89,6 +89,10 @@ final class AppCommandCenter {
 
     /// Choose Poster / Choose Background, presented by the window.
     var artworkRequest: ArtworkRequest?
+    /// The movie, show or season whose page is showing (for View ▸ Choose Poster…).
+    var currentDetailItem: PlexMetadata?
+    /// A protected Plex Home profile waiting for its PIN.
+    var pinRequest: PlexHomeUser?
 
     /// The visible library's layouts (the Layout menu enables only these).
     var availableLayouts: [String] = []
@@ -151,6 +155,7 @@ final class AppCommandCenter {
 struct MezzanineCommands: Commands {
     let center: AppCommandCenter
     let sound: SoundSettings
+    let session: SessionStore
     @Environment(\.openWindow) private var openWindow
 
     private var shortcuts: PlayerShortcuts { .shared }
@@ -169,6 +174,10 @@ struct MezzanineCommands: Commands {
     }
 
     var body: some Commands {
+        CommandGroup(after: .appSettings) {
+            Menu("Switch Profile") { ProfileMenuItems(session: session, commands: center) }
+                .disabled(center.isPlayerOpen || center.isModalShown)
+        }
         CommandGroup(replacing: .help) {
             Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
                 .keyboardShortcut("/", modifiers: .command)
@@ -203,6 +212,17 @@ struct MezzanineCommands: Commands {
                 Button("Remove Shelf (Delete)") { center.shelf(.remove) }
                     .disabled(center.isBlocked)
             }
+            Divider()
+            Button("Choose Poster…") {
+                if let item = center.currentDetailItem { center.artworkRequest = ArtworkRequest(item: item, kind: .poster) }
+            }
+            .keyboardShortcut("p", modifiers: [.command, .option])
+            .disabled(center.currentDetailItem == nil || center.isBlocked)
+            Button("Choose Background…") {
+                if let item = center.currentDetailItem { center.artworkRequest = ArtworkRequest(item: item, kind: .background) }
+            }
+            .keyboardShortcut("b", modifiers: [.command, .option])
+            .disabled(center.currentDetailItem == nil || center.isBlocked)
             Divider()
             Button("Show Details") { center.toggleDetails() }
                 .keyboardShortcut("i", modifiers: .command)

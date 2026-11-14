@@ -17,7 +17,13 @@
   Motion crossfade, unfold in the new order without a reload, picker keyboard and errors.
 - Bug found in testing: two mutations of a `@Binding` array in one transaction duplicated a
   moved shelf (now one assignment; layouts de-duplicated on load).
-- Next: M8 artwork picker, M9 Plex Home switching, then Trakt, downloads, AI subtitles.
+- M8 artwork picker: every poster and background Plex offers, used in Mezzanine only (default)
+  or on the Plex server (named button, stays open with what it replaced). HIG review applied.
+- M9 profiles: sidebar footer and Mezzanine ▸ Switch Profile, PIN sheet. Fixed: plex.tv's
+  `{"users": [...]}` reply never decoded, so profiles (and onboarding's profile step) were empty.
+- Fixed before shipping: menu-bar commands have no environment objects (the profile menu
+  crashed at launch in Debug); stores are passed in.
+- Next: M10 Trakt (needs the owner's Trakt API app), M11 offline downloads, M12 AI subtitles.
 
 ## 2026-11-15 (night) — player keys, previews, fallback
 

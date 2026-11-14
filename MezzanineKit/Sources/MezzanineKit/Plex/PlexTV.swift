@@ -131,7 +131,8 @@ public struct PlexTV: Sendable {
     }
 
     public func homeUsers(token: String) async throws -> [PlexHomeUser] {
-        try await send("GET", "/api/v2/home/users", token: token)
+        let list: HomeUserList = try await send("GET", "/api/v2/home/users", token: token)
+        return list.users
     }
 
     /// Switches to a Home user and returns that user's token.
@@ -166,6 +167,20 @@ public struct PlexTV: Sendable {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
             throw PlexError.decoding("\(path): \(error)")
+        }
+    }
+}
+
+/// plex.tv answers `/api/v2/home/users` as `{ "users": [...] }` (older answers were a bare
+/// array); accept both.
+struct HomeUserList: Decodable {
+    let users: [PlexHomeUser]
+    enum CodingKeys: String, CodingKey { case users }
+    init(from decoder: Decoder) throws {
+        if let keyed = try? decoder.container(keyedBy: CodingKeys.self), keyed.contains(.users) {
+            users = keyed.list(PlexHomeUser.self, .users)
+        } else {
+            users = try [PlexHomeUser](from: decoder)
         }
     }
 }

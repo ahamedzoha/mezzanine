@@ -111,6 +111,11 @@ struct DetailView: View {
             Button("OK", role: .cancel) { actionError = nil }
         } message: { Text(actionError ?? "") }
         .task(id: route) { await load() }
+        // View ▸ Choose Poster / Background act on this page's title.
+        .onChange(of: item?.ratingKey, initial: true) { _, _ in
+            commands.currentDetailItem = item.flatMap { [.movie, .show, .season].contains($0.kind) ? $0 : nil }
+        }
+        .onDisappear { if commands.currentDetailItem?.ratingKey == item?.ratingKey { commands.currentDetailItem = nil } }
         .onChange(of: library.revision) { _, _ in Task { await refreshEpisodes() } }
     }
 

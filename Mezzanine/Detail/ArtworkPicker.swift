@@ -27,6 +27,9 @@ struct ArtworkPicker: View {
     @State private var failed: String?
     @State private var target: Target = .mezzanine
     @State private var applying = false
+    /// After a server write: what changed and what it replaced (the sheet stays open so the
+    /// previous picture is one click away).
+    @State private var status: String?
     @State private var columns = 5
     @FocusState private var gridFocused: Bool
 
@@ -56,12 +59,14 @@ struct ArtworkPicker: View {
             grid
 
             VStack(alignment: .leading, spacing: Theme.Space.s) {
-                Picker("Use it", selection: $target) {
-                    Text("In Mezzanine only").tag(Target.mezzanine)
-                    Text("On the Plex server").tag(Target.server)
+                Picker("Apply to", selection: $target) {
+                    Text("Mezzanine only").tag(Target.mezzanine)
+                    Text("The Plex server").tag(Target.server)
+                        .accessibilityHint("Changes it for every Plex app")
                 }
                 .pickerStyle(.radioGroup)
                 .horizontalRadioGroupLayout()
+                .disabled(applying)
                 Text(target == .mezzanine
                      ? "Nothing on the server changes. Other Plex apps keep their artwork."
                      : "Every Plex app shows it. Tools that manage artwork, such as Kometa, may replace it on their next run.")
@@ -70,19 +75,25 @@ struct ArtworkPicker: View {
 
             HStack {
                 if library.artworkOverride(kind, for: owner) != nil {
-                    Button("Use Plex’s \(kind == .poster ? "Poster" : "Background")") {
+                    Button("Remove Mezzanine’s Choice") {
                         library.setArtworkOverride(kind, for: owner, path: nil)
-                        announce("Showing Plex’s \(kind.label.lowercased()) again")
+                        announce("Mezzanine shows Plex’s \(kind.label.lowercased()) again")
                     }
                     .buttonStyle(SecondaryButtonStyle()).focusEffectDisabled(false)
-                    .help("Remove Mezzanine’s own choice for this title")
+                    .disabled(applying)
+                    .help("Show the Plex server’s \(kind.label.lowercased()) again")
                 }
                 Spacer()
-                if let failed { Text(failed).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary) }
-                Button("Cancel") { dismiss() }
+                if applying { ProgressView().controlSize(.small).accessibilityLabel("Saving to the Plex server") }
+                if let line = failed ?? status {
+                    Text(line).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary).lineLimit(2)
+                }
+                Button(status == nil ? "Cancel" : "Done") { dismiss() }
                     .keyboardShortcut(.cancelAction)
                     .buttonStyle(SecondaryButtonStyle()).focusEffectDisabled(false)
-                Button(kind == .poster ? "Use Poster" : "Use Background") { Task { await apply() } }
+                    .disabled(applying)
+                // The default button names where it writes, so Return is never a surprise.
+                Button(target == .server ? "Use \(kind.label) on Plex Server" : "Use \(kind.label)") { Task { await apply() } }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(PrimaryButtonStyle()).focusEffectDisabled(false)
                     .disabled(selectedCandidate == nil || applying)
@@ -91,7 +102,9 @@ struct ArtworkPicker: View {
         .padding(Theme.Space.xl)
         .frame(width: 860, height: 640)
         .presentationBackground(Theme.graphite)
+        .interactiveDismissDisabled(applying)
         .task { await load() }
+        .onChange(of: failed) { _, message in if let message { announce(message) } }
         .onAppear { kind = request.kind; gridFocused = true }
     }
 
@@ -103,8 +116,8 @@ struct ArtworkPicker: View {
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: cellWidth, maximum: cellWidth + 20), spacing: Theme.Space.l)],
                               alignment: .leading, spacing: Theme.Space.l) {
-                        ForEach(list) { candidate in
-                            cell(candidate).id(candidate.id)
+                        ForEach(Array(list.enumerated()), id: \.element.id) { i, candidate in
+                            cell(candidate, index: i).id(candidate.id)
                         }
                     }
                     .padding(Theme.Space.m)
@@ -123,9 +136,12 @@ struct ArtworkPicker: View {
         }
         .background(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).fill(Theme.raised.opacity(0.6)))
         .overlay(alignment: .topLeading) { state }
+        // One Tab stop: the arrows drive the selection (lift + lilac caption, no ring).
         .focusable()
         .focusEffectDisabled()
         .focused($gridFocused)
+        .onKeyPress(.home) { step(-list.count); return .handled }
+        .onKeyPress(.end) { step(list.count); return .handled }
         .onMoveCommand { direction in
             switch direction {
             case .left: step(-1)
@@ -139,7 +155,7 @@ struct ArtworkPicker: View {
         .accessibilityLabel(kind == .poster ? "Posters" : "Backgrounds")
     }
 
-    private func cell(_ candidate: ArtworkCandidate) -> some View {
+    private func cell(_ candidate: ArtworkCandidate, index: Int) -> some View {
         let isSelected = selected[kind] == candidate.id
         let inUse = isInUse(candidate)
         return Button {
@@ -149,6 +165,7 @@ struct ArtworkPicker: View {
             VStack(alignment: .leading, spacing: Theme.Space.s) {
                 RemoteImage(url: thumbURL(candidate), pixelWidth: Int(cellWidth * 2))
                     .frame(width: cellWidth, height: cellHeight)
+                    .accessibilityHidden(true)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.still, style: .continuous))
                     .overlay(alignment: .topTrailing) {
                         if inUse {
@@ -171,11 +188,19 @@ struct ArtworkPicker: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .focusEffectDisabled()
-        .simultaneousGesture(TapGesture(count: 2).onEnded { selected[kind] = candidate.id; Task { await apply() } })
-        .accessibilityLabel("\(candidate.source) \(kind.label.lowercased())")
+        .focusable(false)
+        // A double-click uses it for Mezzanine; a server write always goes through the named button.
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
+            selected[kind] = candidate.id
+            if target == .mezzanine { Task { await apply() } }
+        })
+        .accessibilityLabel("\(candidate.source) \(kind.label.lowercased()), \(index + 1) of \(list.count)")
         .accessibilityValue(inUse ? "In use" : "")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityAction(named: target == .server ? "Use on Plex Server" : "Use \(kind.label)") {
+            selected[kind] = candidate.id
+            Task { await apply() }
+        }
     }
 
     @ViewBuilder private var state: some View {
@@ -247,7 +272,7 @@ struct ArtworkPicker: View {
     }
 
     private func apply() async {
-        guard let candidate = selectedCandidate else { return }
+        guard !applying, let candidate = selectedCandidate else { return }
         switch target {
         case .mezzanine:
             library.setArtworkOverride(kind, for: owner, path: candidate.key)
@@ -255,15 +280,19 @@ struct ArtworkPicker: View {
             dismiss()
         case .server:
             guard let client = session.client else { return }
+            let previous = list.first { $0.selected }
             applying = true
+            failed = nil
             defer { applying = false }
             do {
                 try await client.setArtwork(kind, ratingKey: owner, to: candidate)
                 // The server's choice now leads; drop any Mezzanine-only one and re-read the title.
                 library.setArtworkOverride(kind, for: owner, path: nil)
                 await library.syncAll()
-                announce("\(kind.label) set on the Plex server")
-                dismiss()
+                if let fresh = try? await client.artwork(kind, ratingKey: owner) { candidates[kind] = fresh }
+                // Stay open: the previous picture is one click away if this was a mistake.
+                status = "Set on the Plex server." + (previous.map { " Before: \($0.source)." } ?? "")
+                announce(status ?? "")
             } catch {
                 failed = (error as? PlexError)?.userMessage ?? "The server didn’t accept it."
             }

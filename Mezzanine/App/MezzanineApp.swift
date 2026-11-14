@@ -61,7 +61,7 @@ struct MezzanineApp: App {
         }
         .defaultSize(width: 1440, height: 900)
         .windowResizability(.contentMinSize)
-        .commands { MezzanineCommands(center: commands, sound: sound) }
+        .commands { MezzanineCommands(center: commands, sound: sound, session: session) }
 
         Settings {
             SettingsView()

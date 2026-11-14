@@ -97,6 +97,9 @@ struct AppShell: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                if session.homeUsers.count > 1 { SidebarProfileButton() }
+            }
             .focused($sidebarFocused)
             .onKeyPress(.rightArrow) { contentFocused = true; return .handled }
             .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
@@ -123,6 +126,9 @@ struct AppShell: View {
         }
         .sheet(item: $commands.artworkRequest) { request in
             ArtworkPicker(request: request)
+        }
+        .sheet(item: $commands.pinRequest) { user in
+            ProfilePINSheet(user: user)
         }
         .onChange(of: commands.artworkRequest == nil) { _, closed in commands.isModalShown = !closed }
         .searchable(text: $commands.query, placement: .toolbar, prompt: "Titles, people, collections")
@@ -186,6 +192,7 @@ struct AppShell: View {
                                 userID: session.account?.uuid ?? "owner", sections: commands.sections)
                 layouts.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
                 commands.layoutsReady = true
+                if session.homeUsers.isEmpty { await session.loadHomeUsers() }
             }
             #if DEBUG
             // -MezzanineSection "TV Shows" opens a library at launch (screenshots, manual tests).

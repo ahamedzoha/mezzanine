@@ -368,5 +368,12 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 
 - Choose Poster… / Choose Background… from a poster's context menu (films, shows, seasons) and the ⋯ button beside the detail hero's actions. One sheet, 860 × 640, solid graphite; Poster | Background segmented control top-right.
 - A grid of every picture Plex offers (agents such as TMDB and Fanart.tv, uploads such as Kometa's, the title's own folder): 132 pt posters or 236 pt backgrounds, each with its source as card meta. The picture in use carries the hueless check; the selection lifts (1.04, poster-focus shadow) and its caption turns lilac. Arrows move, Return or a double-click uses it, Esc cancels.
-- Use it: **In Mezzanine only** (default; a local choice per server and profile, nothing on the server changes) or **On the Plex server** (every app; tools like Kometa may replace it on their next run). "Use Plex’s Poster" removes a Mezzanine-only choice.
+- Apply to: **Mezzanine only** (default; a local choice per server and profile, nothing on the server changes) or **The Plex server** (every app; tools like Kometa may replace it on their next run). The default button names the destination ("Use Poster on Plex Server"); a double-click applies only for Mezzanine; after a server write the sheet stays open and says what it replaced ("Before: Uploaded."). "Remove Mezzanine’s Choice" shows the server's picture again.
+- The grid is one keyboard stop (arrows, Home/End); cells read "Fanart.tv poster, 3 of 109" with a Use action for VoiceOver. View ▸ Choose Poster… ⌥⌘P and Choose Background… ⌥⌘B act on the open title page.
 - Provider pictures load from Plex's own small renditions; server files go through the server's photo transcoder. The token never leaves the server's host.
+
+## Profiles (M9)
+
+- Plex Home profiles each keep their own index, Continue Watching, watched marks and shelves.
+- Sidebar footer: the current profile's avatar and name with a ⌃⌄ chevron; a click opens the profile menu (current one checked, "(PIN)" on protected ones). Mezzanine ▸ Switch Profile holds the same menu. Disabled while a film plays.
+- A protected profile asks for its PIN in a 400 pt sheet (avatar, "Switch to Name", secure field, Cancel / Switch); a wrong PIN says "That PIN didn’t match." and clears the field. Switching returns to Home.
