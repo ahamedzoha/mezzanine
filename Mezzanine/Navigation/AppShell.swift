@@ -7,11 +7,18 @@ enum SidebarItem: Hashable {
 }
 
 /// The window: sidebar (system glass), the room, and the player stage above both.
+///
+/// Keyboard: ⌘1…⌘9 (Go menu) switch sections and put focus in the content;
+/// → in the sidebar also moves focus into the content; ⌘F searches. Content
+/// takes focus once at launch and again when the player closes, never while
+/// the user is walking the sidebar.
 struct AppShell: View {
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
-    @State private var selection: SidebarItem? = .home
-    @State private var sections: [PlexLibrarySection] = []
+    @Environment(AppCommandCenter.self) private var commands
+    @State private var query = ""
+    @FocusState private var searchFocused: Bool
+    @FocusState private var contentFocused: Bool
 
     var body: some View {
         Group {
@@ -32,51 +39,61 @@ struct AppShell: View {
         }
         .containerBackground(Theme.graphite, for: .window)
         .preferredColorScheme(.dark)
-        .tint(Theme.lilac)
     }
 
     private var split: some View {
-        NavigationSplitView {
-            List(selection: $selection) {
+        @Bindable var commands = commands
+        return NavigationSplitView {
+            List(selection: $commands.selection) {
                 Label("Home", systemImage: "house").tag(SidebarItem.home)
                 Section("Libraries") {
-                    ForEach(videoSections) { section in
+                    ForEach(commands.sections) { section in
                         Label(section.title, systemImage: icon(for: section)).tag(SidebarItem.library(section.key))
                     }
                 }
             }
+            .onKeyPress(.rightArrow) { contentFocused = true; return .handled }
             .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
         } detail: {
             Group {
-                switch selection {
-                case .library(let key):
-                    if let section = sections.first(where: { $0.key == key }) {
-                        LibraryView(section: section).id(key)
+                if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    SearchView(query: query)
+                } else {
+                    switch commands.selection {
+                    case .library(let key):
+                        if let section = commands.sections.first(where: { $0.key == key }) {
+                            LibraryView(section: section, contentFocus: $contentFocused).id(key)
+                        }
+                    default:
+                        HomeView(contentFocus: $contentFocused)
                     }
-                default:
-                    HomeView()
                 }
             }
             .background {
                 RoomLight(palette: playback.roomPalette, intensity: playback.isPresented ? 0 : 1)
             }
         }
+        .searchable(text: $query, placement: .toolbar, prompt: "Titles, people, collections")
+        .searchFocused($searchFocused)
+        .onChange(of: commands.searchRequests) { _, _ in searchFocused = true }
+        .onChange(of: commands.contentFocusRequests) { _, _ in contentFocused = true }
+        .onChange(of: playback.isPresented) { _, presented in
+            if !presented { contentFocused = true }
+        }
         .task(id: session.currentServer?.clientIdentifier) {
             guard let client = session.client else { return }
-            sections = (try? await client.sections()) ?? []
+            let sections = (try? await client.sections()) ?? []
+            // Music stays with Plexamp; photos aren't part of Mezzanine.
+            commands.sections = sections.filter { $0.kind == .movie || $0.kind == .show }
             #if DEBUG
             // -MezzanineSection "TV Shows" opens a library at launch (screenshots, manual tests).
             if let title = UserDefaults.standard.string(forKey: "MezzanineSection"),
-               let match = sections.first(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }) {
-                selection = .library(match.key)
+               let match = commands.sections.first(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }) {
+                commands.selection = .library(match.key)
             }
             #endif
+            contentFocused = true
         }
-    }
-
-    /// Music stays with Plexamp; photos aren't part of Mezzanine.
-    private var videoSections: [PlexLibrarySection] {
-        sections.filter { $0.kind == .movie || $0.kind == .show }
     }
 
     private func icon(for section: PlexLibrarySection) -> String {

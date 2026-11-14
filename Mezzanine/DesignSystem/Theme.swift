@@ -69,6 +69,11 @@ enum Theme {
         static let quick = Animation.easeOut(duration: 0.16)
         /// How long the pointer rests on a poster before the room follows it.
         static let hoverDwell: Duration = .milliseconds(220)
+
+        /// Object motion, or a plain crossfade when Reduce Motion is on.
+        static func object(_ reduceMotion: Bool) -> Animation {
+            reduceMotion ? .easeOut(duration: 0.2) : object
+        }
     }
 }
 

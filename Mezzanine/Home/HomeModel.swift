@@ -25,7 +25,7 @@ final class HomeModel {
     var focus = ShelfFocus(row: 0, column: 0)
 
     /// Hubs Home shows, in order. Everything else stays on its library page.
-    private static let hubOrder = ["home.continue", "home.ondeck", "home.movies.recent", "home.television.recent"]
+    private static let hubOrder = ["home.continue", "home.movies.recent", "home.television.recent", "home.ondeck"]
 
     var focusedItem: PlexMetadata? {
         guard shelves.indices.contains(focus.row) else { return nil }

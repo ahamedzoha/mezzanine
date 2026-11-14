@@ -9,29 +9,35 @@ struct HeroView: View {
     let play: () -> Void
 
     @Environment(SessionStore.self) private var session
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var width: CGFloat = 1200
 
+    /// The text column sets the hero's height, so details grow it downwards
+    /// (pushing the shelves) instead of spilling up under the toolbar.
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .bottomLeading) {
+        VStack(alignment: .leading, spacing: Theme.Space.l) {
+            title
+                .frame(maxWidth: min(560, width * 0.5), maxHeight: 150, alignment: .bottomLeading)
+            caption
+            actions
+            if showsDetails { details.transition(.opacity.combined(with: .move(edge: .top))) }
+        }
+        .padding(.leading, Theme.Space.gutter)
+        .padding(.bottom, Theme.Space.s)
+        .padding(.top, Theme.Space.xl)
+        .frame(maxWidth: width * 0.62, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .background {
+            GeometryReader { geo in
                 backdrop(width: geo.size.width)
                     .frame(width: geo.size.width * 0.74, height: geo.size.height)
                     .mask(fade)
                     .frame(maxWidth: .infinity, alignment: .trailing)
-
-                VStack(alignment: .leading, spacing: Theme.Space.l) {
-                    title
-                        .frame(maxWidth: min(560, geo.size.width * 0.5), maxHeight: 150, alignment: .bottomLeading)
-                    caption
-                    actions
-                    if showsDetails { details.transition(.opacity.combined(with: .move(edge: .bottom))) }
-                }
-                .padding(.leading, Theme.Space.gutter)
-                .padding(.bottom, Theme.Space.s)
-                .frame(maxWidth: geo.size.width * 0.62, alignment: .leading)
+                    .id(item.ratingKey)
+                    .transition(.opacity)
             }
         }
-        .id(item.ratingKey)
-        .transition(.opacity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .animation(Theme.Motion.light, value: item.ratingKey)
     }
 
@@ -52,7 +58,8 @@ struct HeroView: View {
             ], startPoint: .leading, endPoint: .trailing)
         }
         .mask(LinearGradient(stops: [
-            .init(color: .black, location: 0),
+            .init(color: .clear, location: 0),
+            .init(color: .black, location: 0.16),
             .init(color: .black, location: 0.55),
             .init(color: .clear, location: 1),
         ], startPoint: .top, endPoint: .bottom))
@@ -93,7 +100,7 @@ struct HeroView: View {
             .help("Play (Return)")
 
             Button {
-                withAnimation(Theme.Motion.object) { showsDetails.toggle() }
+                withAnimation(Theme.Motion.object(reduceMotion)) { showsDetails.toggle() }
             } label: {
                 Text(showsDetails ? "Less" : "Details")
             }
@@ -121,7 +128,7 @@ struct HeroView: View {
                 Text(summary)
                     .font(Theme.Typeface.body)
                     .foregroundStyle(Theme.ink.opacity(0.86))
-                    .lineLimit(5)
+                    .lineLimit(4)
                     .frame(maxWidth: 560, alignment: .leading)
             }
             let facts = [

@@ -7,6 +7,7 @@ struct MezzanineApp: App {
     @State private var session: SessionStore
     @State private var player: MezzaninePlayer
     @State private var playback: PlaybackCoordinator
+    @State private var commands = AppCommandCenter()
 
     init() {
         TitleFont.register()
@@ -23,12 +24,14 @@ struct MezzanineApp: App {
                 .environment(session)
                 .environment(player)
                 .environment(playback)
+                .environment(commands)
                 .task { await session.restore() }
                 #if DEBUG
                 .modifier(LabLauncher())
                 #endif
         }
         .defaultSize(width: 1440, height: 900)
+        .commands { MezzanineCommands(center: commands) }
 
         #if DEBUG
         Window("Lab", id: "lab") {
@@ -36,6 +39,7 @@ struct MezzanineApp: App {
                 .environment(session)
                 .environment(player)
                 .environment(playback)
+                .environment(commands)
         }
         .defaultSize(width: 1200, height: 800)
         #endif

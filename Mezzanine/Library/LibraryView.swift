@@ -6,20 +6,26 @@ import MezzanineKit
 /// this is the first cut in the Bias Light world.
 struct LibraryView: View {
     let section: PlexLibrarySection
+    var contentFocus: FocusState<Bool>.Binding
 
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
+    @Environment(AppCommandCenter.self) private var commands
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var items: [PlexMetadata] = []
     @State private var loading = true
     @State private var error: String?
     @State private var focused: Int?
+    @State private var keyboardMoved = false
     @State private var columns = 1
     @AppStorage private var density: Double
     @AppStorage private var sortRaw: String
-    @FocusState private var keyboardFocus: Bool
 
-    init(section: PlexLibrarySection) {
+    static let densityRange: ClosedRange<Double> = 110...260
+
+    init(section: PlexLibrarySection, contentFocus: FocusState<Bool>.Binding) {
         self.section = section
+        self.contentFocus = contentFocus
         _density = AppStorage(wrappedValue: 160, "library.\(section.key).density")
         _sortRaw = AppStorage(wrappedValue: PlexSort.titleAscending.rawValue, "library.\(section.key).sort")
     }
@@ -30,33 +36,31 @@ struct LibraryView: View {
         GeometryReader { geo in
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: density, maximum: density * 1.25), spacing: Theme.Space.l, alignment: .top)],
-                              alignment: .leading, spacing: Theme.Space.xl) {
-                        ForEach(Array(items.enumerated()), id: \.element.ratingKey) { index, item in
-                            GridPoster(item: item, isFocused: focused == index,
-                                       onFocus: { setFocus(index) }, onPlay: { play(item) })
-                                .id(index)
-                        }
-                    }
-                    .padding(.horizontal, Theme.Space.gutter)
-                    .padding(.vertical, Theme.Space.xl)
+                    PosterGrid(items: items, density: density, focused: focused,
+                               onFocus: { setFocus($0, byKeyboard: false) },
+                               onPlay: { item, frame in play(item, from: frame) })
                 }
                 .scrollIndicators(.automatic)
                 .onChange(of: focused) { _, index in
-                    guard let index else { return }
-                    withAnimation(Theme.Motion.object) { proxy.scrollTo(index) }
+                    guard let index, keyboardMoved else { return }
+                    withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo(index) }
                 }
             }
-            .onChange(of: geo.size.width, initial: true) { _, w in columns = columnCount(width: w) }
-            .onChange(of: density) { _, _ in columns = columnCount(width: geo.size.width) }
+            .onChange(of: geo.size.width, initial: true) { _, w in columns = PosterGrid.columnCount(width: w, density: density) }
+            .onChange(of: density) { _, _ in columns = PosterGrid.columnCount(width: geo.size.width, density: density) }
         }
         .overlay { state }
         .focusable()
         .focusEffectDisabled()
-        .focused($keyboardFocus)
+        .focused(contentFocus)
         .onMoveCommand(perform: move)
         .onKeyPress(.return) { playFocused() }
         .onKeyPress(.space) { playFocused() }
+        .onChange(of: commands.densitySteps.count) { _, _ in
+            withAnimation(Theme.Motion.object(reduceMotion)) {
+                density = min(Self.densityRange.upperBound, max(Self.densityRange.lowerBound, density + commands.densitySteps.delta))
+            }
+        }
         .navigationTitle(section.title)
         .navigationSubtitle(items.isEmpty ? "" : "\(items.count) titles")
         .toolbar {
@@ -64,10 +68,10 @@ struct LibraryView: View {
                 Menu {
                     Picker("Sort", selection: $sortRaw) {
                         Text("Title").tag(PlexSort.titleAscending.rawValue)
-                        Text("Recently added").tag(PlexSort.addedNewest.rawValue)
-                        Text("Release date").tag(PlexSort.releasedNewest.rawValue)
+                        Text("Recently Added").tag(PlexSort.addedNewest.rawValue)
+                        Text("Release Date").tag(PlexSort.releasedNewest.rawValue)
                         Text("Rating").tag(PlexSort.audienceRating.rawValue)
-                        Text("Recently watched").tag(PlexSort.lastViewed.rawValue)
+                        Text("Recently Watched").tag(PlexSort.lastViewed.rawValue)
                     }
                     .pickerStyle(.inline)
                 } label: {
@@ -76,32 +80,21 @@ struct LibraryView: View {
                 .help("Sort")
             }
             ToolbarItem {
-                Slider(value: $density, in: 110...260)
+                Slider(value: $density, in: Self.densityRange)
                     .frame(width: 110)
-                    .help("Poster size (⌘+ / ⌘−)")
+                    .help("Poster size (View ▸ Larger Posters ⌘=, Smaller Posters ⌘−)")
                     .accessibilityLabel("Poster size")
             }
         }
-        .background {
-            // ⌘+ / ⌘− change density from the keyboard.
-            Group {
-                Button("") { withAnimation(Theme.Motion.object) { density = min(260, density + 20) } }
-                    .keyboardShortcut("+", modifiers: .command)
-                Button("") { withAnimation(Theme.Motion.object) { density = max(110, density - 20) } }
-                    .keyboardShortcut("-", modifiers: .command)
-            }
-            .opacity(0)
-            .accessibilityHidden(true)
-        }
+        .tint(Theme.ink)
         .task(id: "\(section.key)|\(sortRaw)") { await load() }
-        .onAppear { keyboardFocus = true }
     }
 
     @ViewBuilder private var state: some View {
         if items.isEmpty {
-            if loading { ProgressView().controlSize(.large) }
-            else if let error { ContentUnavailableView("Couldn’t load \(section.title)", systemImage: "exclamationmark.triangle", description: Text(error)) }
-            else { ContentUnavailableView("\(section.title) is empty", systemImage: "film") }
+            if loading { RoomMessage { ProgressView().controlSize(.small) } }
+            else if let error { RoomMessage(title: "Couldn’t load \(section.title)", detail: error) }
+            else { RoomMessage(title: "\(section.title) is empty", detail: "Add media to this library in Plex and it appears here.") }
         }
     }
 
@@ -126,12 +119,8 @@ struct LibraryView: View {
         }
     }
 
-    private func columnCount(width: CGFloat) -> Int {
-        let usable = width - Theme.Space.gutter * 2
-        return max(1, Int((usable + Theme.Space.l) / (density + Theme.Space.l)))
-    }
-
-    private func setFocus(_ index: Int) {
+    private func setFocus(_ index: Int, byKeyboard: Bool) {
+        keyboardMoved = byKeyboard
         focused = index
         playback.roomPalette = RoomPalette(items[index].ultraBlur) ?? .dark
     }
@@ -148,29 +137,58 @@ struct LibraryView: View {
         @unknown default: break
         }
         if focused == nil { next = 0 }
-        setFocus(min(max(0, next), items.count - 1))
+        setFocus(min(max(0, next), items.count - 1), byKeyboard: true)
     }
 
     private func playFocused() -> KeyPress.Result {
         guard let focused, items.indices.contains(focused) else { return .ignored }
-        play(items[focused])
+        play(items[focused], from: nil)
         return .handled
     }
 
-    private func play(_ item: PlexMetadata) {
-        Task { await playback.play(item, from: nil) }
+    private func play(_ item: PlexMetadata, from frame: CGRect?) {
+        Task { await playback.play(item, from: frame) }
+    }
+}
+
+/// The poster grid shared by libraries and search results.
+struct PosterGrid: View {
+    let items: [PlexMetadata]
+    let density: Double
+    let focused: Int?
+    let onFocus: (Int) -> Void
+    let onPlay: (PlexMetadata, CGRect) -> Void
+
+    static func columnCount(width: CGFloat, density: Double) -> Int {
+        let usable = width - Theme.Space.gutter * 2
+        return max(1, Int((usable + Theme.Space.l) / (density + Theme.Space.l)))
+    }
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: density, maximum: density * 1.25), spacing: Theme.Space.l, alignment: .top)],
+                  alignment: .leading, spacing: Theme.Space.xl) {
+            ForEach(Array(items.enumerated()), id: \.element.ratingKey) { index, item in
+                GridPoster(item: item, isFocused: focused == index,
+                           onFocus: { onFocus(index) }, onPlay: { frame in onPlay(item, frame) })
+                    .id(index)
+            }
+        }
+        .padding(.horizontal, Theme.Space.gutter)
+        .padding(.vertical, Theme.Space.xl)
     }
 }
 
 /// A grid cell: poster sized by the column, title below.
-private struct GridPoster: View {
+struct GridPoster: View {
     let item: PlexMetadata
     let isFocused: Bool
     let onFocus: () -> Void
-    let onPlay: () -> Void
+    let onPlay: (CGRect) -> Void
 
     @Environment(SessionStore.self) private var session
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dwell: Task<Void, Never>?
+    @State private var frame: CGRect = .zero
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
@@ -181,22 +199,22 @@ private struct GridPoster: View {
                         if let p = item.progress {
                             Capsule().fill(Theme.ink).frame(width: max(4, (geo.size.width - 20) * p), height: 3)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 10).padding(.bottom, 10)
+                                .padding(.horizontal, 10).padding(.bottom, isFocused ? 54 : 10)
                         }
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        if isFocused { PlayDisc { onPlay(frame) }.padding(10).transition(.opacity) }
                     }
             }
             .aspectRatio(2 / 3, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous)
-                    .strokeBorder(Theme.ink.opacity(isFocused ? 0.28 : 0.06), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(isFocused ? 0.55 : 0.25), radius: isFocused ? 22 : 8, y: isFocused ? 14 : 4)
-            .scaleEffect(isFocused ? 1.04 : 1, anchor: .bottom)
-            .animation(Theme.Motion.object, value: isFocused)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+            .shadow(color: .black.opacity(isFocused ? 0.6 : 0.3), radius: isFocused ? 22 : 8, y: isFocused ? 14 : 4)
+            .scaleEffect(isFocused && !reduceMotion ? 1.04 : 1, anchor: .bottom)
+            .animation(Theme.Motion.object(reduceMotion), value: isFocused)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title).font(Theme.Typeface.cardTitle)
+                Text(Format.displayTitle(item)).font(Theme.Typeface.cardTitle)
                     .foregroundStyle(isFocused ? Theme.lilac : Theme.ink).lineLimit(1)
                 Text(Format.cardSubtitle(item)).font(Theme.Typeface.cardMeta)
                     .foregroundStyle(Theme.inkSecondary).lineLimit(1)
@@ -211,11 +229,11 @@ private struct GridPoster: View {
                 if !Task.isCancelled { onFocus() }
             }
         }
-        .onTapGesture(count: 2) { onPlay() }
-        .onTapGesture { onFocus() }
+        .simultaneousGesture(TapGesture().onEnded { onFocus() })
+        .simultaneousGesture(TapGesture(count: 2).onEnded { onPlay(frame) })
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction(named: "Play") { onPlay() }
-        .contextMenu { Button("Play") { onPlay() } }
+        .accessibilityAction(named: "Play") { onPlay(frame) }
+        .contextMenu { Button("Play") { onPlay(frame) } }
     }
 }

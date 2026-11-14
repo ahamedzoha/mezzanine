@@ -13,6 +13,7 @@ struct PlayerStage: View {
     let window: CGSize
 
     @Environment(PlaybackCoordinator.self) private var playback
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var opened = false
     @State private var hudVisible = true
     @State private var hideHUD: Task<Void, Never>?
@@ -21,7 +22,7 @@ struct PlayerStage: View {
     private var player: MezzaninePlayer { playback.player }
 
     var body: some View {
-        let frame = opened || origin == nil ? CGRect(origin: .zero, size: window) : origin!
+        let frame = opened || origin == nil || reduceMotion ? CGRect(origin: .zero, size: window) : origin!
         ZStack {
             Color.black
             PlayerSurface(player: player)
@@ -67,7 +68,7 @@ struct PlayerStage: View {
                         .frame(width: 32, height: 32).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .glassEffect(.regular.tint(.black.opacity(0.4)), in: Circle())
+                .glassEffect(.regular.tint(.black.opacity(0.55)), in: Circle())
                 .help("Close (Esc)")
                 Spacer()
             }
@@ -92,7 +93,7 @@ struct PlayerStage: View {
             }
             .foregroundStyle(Theme.ink)
             .padding(Theme.Space.l)
-            .glassEffect(.regular.tint(.black.opacity(0.4)), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .glassEffect(.regular.tint(.black.opacity(0.55)), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .padding(Theme.Space.l)
         }
     }

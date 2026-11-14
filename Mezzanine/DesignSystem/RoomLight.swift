@@ -51,12 +51,12 @@ struct RoomLight: View {
             MeshGradient(width: 2, height: 2,
                          points: [[0, 0], [1, 0], [0, 1], [1, 1]],
                          colors: [palette.topLeft, palette.topRight, palette.bottomLeft, palette.bottomRight])
-                .opacity((reduceTransparency ? 0.28 : 0.48) * intensity)
+                .opacity((reduceTransparency ? 0.36 : 0.74) * intensity)
             // The floor of the room stays graphite: shelves read on a steady ground.
             LinearGradient(stops: [
                 .init(color: Theme.graphite.opacity(0), location: 0),
-                .init(color: Theme.graphite.opacity(0.35), location: 0.45),
-                .init(color: Theme.graphite.opacity(0.82), location: 1),
+                .init(color: Theme.graphite.opacity(0.12), location: 0.5),
+                .init(color: Theme.graphite.opacity(0.62), location: 1),
             ], startPoint: .top, endPoint: .bottom)
         }
         .animation(Theme.Motion.light, value: palette)

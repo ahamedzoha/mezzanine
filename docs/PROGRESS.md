@@ -9,6 +9,15 @@ room (UltraBlur four-corner wash over graphite, clearLogo titles, one lilac acce
 in `.impeccable/surfaces/mezzanine-home-homeview-swift.md`; PRODUCT.md written. DESIGN.md is
 written by the documenter after the Home surface is built and reviewed.
 Owner added: AirPlay is a must, Google Cast wanted (Miracast has no macOS support).
+Owner runs Kometa for covers (baked-in overlays) → M8 artwork: offer "clean posters"
+(the agent original from `/library/metadata/{id}/posters`) as a local display option.
+
+Home build (code-led) → finish review: **fix**. Applied in one batch: toolbar search (⌘F),
+Recently Added under Continue Watching, stronger room light, hover never scrolls, Reduce
+Motion honoured, top dissolve under the toolbar, left-aligned room messages, no focus ring
+(lift + lilac + play disc), toolbar controls no longer lilac, Go menu ⌘1…⌘9, poster size in
+View menu (⌘= / ⌘−), focus returns after the player, play grows from the played poster,
+hero grows for details. Verdict pass skipped per the cost budget.
 
 ## 2026-11-14 — M0 started
 
