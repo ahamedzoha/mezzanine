@@ -171,6 +171,43 @@ public actor PlexServerClient {
         try await rawItems(section: section, type: type, offset: 0, limit: 0).totalSize ?? 0
     }
 
+    // MARK: Activity (writes: resume points, watched state, "now playing")
+
+    public enum TimelineState: String, Sendable { case playing, paused, stopped, buffering }
+
+    /// Reports where playback is. Plex stores the resume point from it, shows the
+    /// session in Now Playing (and Tautulli), and marks the item watched when a
+    /// stop lands past ~90 %. `sessionID` identifies this playback session.
+    public func reportTimeline(ratingKey: String, state: TimelineState, time: TimeInterval,
+                               duration: TimeInterval, sessionID: String) async throws {
+        var request = makeRequest("GET", "/:/timeline", query: [
+            URLQueryItem(name: "ratingKey", value: ratingKey),
+            URLQueryItem(name: "key", value: "/library/metadata/\(ratingKey)"),
+            URLQueryItem(name: "state", value: state.rawValue),
+            URLQueryItem(name: "time", value: String(Int(time * 1000))),
+            URLQueryItem(name: "duration", value: String(Int(duration * 1000))),
+            URLQueryItem(name: "hasMDE", value: "1"),
+        ])
+        request.setValue(sessionID, forHTTPHeaderField: "X-Plex-Session-Identifier")
+        _ = try await perform(request)
+    }
+
+    /// Marks watched.
+    public func scrobble(ratingKey: String) async throws {
+        try await write("GET", "/:/scrobble", query: [
+            URLQueryItem(name: "key", value: ratingKey),
+            URLQueryItem(name: "identifier", value: "com.plexapp.plugins.library"),
+        ])
+    }
+
+    /// Marks unwatched (and clears the resume point).
+    public func unscrobble(ratingKey: String) async throws {
+        try await write("GET", "/:/unscrobble", query: [
+            URLQueryItem(name: "key", value: ratingKey),
+            URLQueryItem(name: "identifier", value: "com.plexapp.plugins.library"),
+        ])
+    }
+
     // MARK: Artwork
 
     /// The poster an agent chose, before any overlay tool (Kometa) replaced it

@@ -4,8 +4,7 @@ import MezzaninePlayback
 
 /// What's on screen in the player, and the room around it.
 ///
-/// Activity reporting (timeline, scrobble) arrives in M3 and will be gated
-/// by `-MezzanineNoActivity`; until then nothing here writes to the server.
+/// Reports activity through `ActivityReporter` (off under `-MezzanineNoActivity`).
 @MainActor
 @Observable
 final class PlaybackCoordinator {
@@ -23,6 +22,10 @@ final class PlaybackCoordinator {
 
     let player: MezzaninePlayer
     private let session: SessionStore
+    private(set) var reporter: ActivityReporter?
+    /// Called after a session ends with the item and where it stopped, so the
+    /// local library reflects the new resume point at once.
+    var onStopped: ((PlexMetadata, TimeInterval, TimeInterval) -> Void)?
 
     init(player: MezzaninePlayer, session: SessionStore) {
         self.player = player
@@ -43,9 +46,13 @@ final class PlaybackCoordinator {
             }
             self.origin = origin
             withAnimation(Theme.Motion.object) { self.item = detail }
+            if let reporter { await reporter.stop(at: player.currentTime, duration: player.duration) }
             let start = detail.viewOffset.map { Double($0) / 1000 }
             try await player.load(PlaybackRequest(url: url, headers: client.requestHeaders, startPosition: start,
                                                   preferredAudioLanguages: ["eng"], preferredSubtitleLanguages: ["eng"]))
+            let reporter = ActivityReporter(client: client, item: detail, player: player)
+            self.reporter = reporter
+            reporter.start()
         } catch is CancellationError {
         } catch {
             self.error = (error as? PlexError)?.userMessage ?? "Couldn’t start playback."
@@ -53,8 +60,22 @@ final class PlaybackCoordinator {
     }
 
     func close() {
+        let item = self.item
+        let time = player.currentTime, duration = player.duration
+        let reporter = self.reporter
+        self.reporter = nil
+        Task {
+            await reporter?.stop(at: time, duration: duration)
+            if let item { onStopped?(item, time, duration) }
+        }
         player.stop()
-        withAnimation(Theme.Motion.object) { item = nil }
+        withAnimation(Theme.Motion.object) { self.item = nil }
+    }
+
+    /// For app quit: the final report, waited for (at most ~2 s).
+    func finishForQuit() async {
+        await reporter?.stop()
+        reporter = nil
     }
 
     /// Seasons and shows play their next unwatched episode.

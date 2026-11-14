@@ -2,8 +2,24 @@ import SwiftUI
 import MezzanineKit
 import MezzaninePlayback
 
+/// Holds quit until the final timeline report is sent (≤ 2 s), so quitting
+/// mid-film still saves the resume point.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    var beforeQuit: (() async -> Void)?
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let beforeQuit else { return .terminateNow }
+        Task { @MainActor in
+            await beforeQuit()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+}
+
 @main
 struct MezzanineApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var session: SessionStore
     @State private var player: MezzaninePlayer
     @State private var playback: PlaybackCoordinator
@@ -27,7 +43,13 @@ struct MezzanineApp: App {
                 .environment(playback)
                 .environment(commands)
                 .environment(library)
-                .task { await session.restore() }
+                .task {
+                    appDelegate.beforeQuit = { [playback] in await playback.finishForQuit() }
+                    playback.onStopped = { [library] item, time, duration in
+                        library.recordStop(item, at: time, duration: duration)
+                    }
+                    await session.restore()
+                }
                 #if DEBUG
                 .modifier(LabLauncher())
                 #endif

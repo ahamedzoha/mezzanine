@@ -1,0 +1,60 @@
+{
+  "title": "Choose how Mezzanine's first run is laid out",
+  "question": "Three layouts for onboarding (sign in, server, profile, library warm-up). The world is set; this picks the composition.",
+  "options": [
+    {
+      "id": "express",
+      "kind": "assigned",
+      "label": "Express",
+      "kicker": "THE ROLL",
+      "thesis": "One button does it all: sign in, pick the fastest server, read the library — then shows what it chose, with Change links.",
+      "palette": ["#0E0F11", "#1A1C20", "#F2F2F0", "#A08CFF"],
+      "materials": ["graphite room", "big title card", "one lilac button"],
+      "viewport": "MEZZANINE title card on the gutter, one line, one lilac 'Sign In with Plex'. After approval the same column fills with three settled facts (account, server via LAN, library 5,616 titles) each with Change, while posters fade in behind.",
+      "risk": "Hides choices the wife's profile pick needs; Change links must be obvious.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "room light", "x": 0, "y": 0, "w": 12, "h": 10},
+        {"label": "MEZZANINE title", "x": 1, "y": 4, "w": 5, "h": 2},
+        {"label": "one line", "x": 1, "y": 6, "w": 5, "h": 1},
+        {"label": "Sign In (lilac)", "x": 1, "y": 7, "w": 3, "h": 1, "accent": true},
+        {"label": "settled facts + Change", "x": 7, "y": 5, "w": 4, "h": 3}
+      ]}
+    },
+    {
+      "id": "stacked",
+      "kind": "dealt",
+      "label": "One Page",
+      "thesis": "Every step on one page, top to bottom; each unlocks when the one above is done, and stays visible as a record.",
+      "palette": ["#0E0F11", "#1A1C20", "#F2F2F0", "#A08CFF"],
+      "materials": ["ruled step rows", "inline controls"],
+      "viewport": "Numbered rows down the gutter column: 1 Sign in (active, lilac button), 2 Server (dim), 3 Profile (dim), 4 Library (dim). Done rows collapse to one ruled caption line with a check.",
+      "risk": "Reads like a form; the least cinematic of the three.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "title", "x": 1, "y": 1, "w": 6, "h": 1},
+        {"label": "1 Sign in (active)", "x": 1, "y": 2, "w": 7, "h": 2, "accent": true},
+        {"label": "2 Server", "x": 1, "y": 4, "w": 7, "h": 1},
+        {"label": "3 Profile", "x": 1, "y": 5, "w": 7, "h": 1},
+        {"label": "4 Library", "x": 1, "y": 6, "w": 7, "h": 1},
+        {"label": "Open Mezzanine", "x": 1, "y": 8, "w": 3, "h": 1}
+      ]}
+    },
+    {
+      "id": "posterwall",
+      "kind": "dealt",
+      "label": "Poster Wall",
+      "thesis": "Your own library is the welcome: as the index reads, posters fill a wall across the window and the room takes their light; steps sit in a column at the left.",
+      "palette": ["#0E0F11", "#1A1C20", "#F2F2F0", "#A08CFF"],
+      "materials": ["live poster wall", "graphite step column", "room light from the wall"],
+      "viewport": "Left 40%: graphite column with the current step (title, one line, one control). Right 60%: a tilted-free grid of your posters appearing as they sync, dimmed until the last step, then fully lit as Home opens.",
+      "risk": "The wall needs a signed-in account; before sign-in it is empty, so step one leans on the title alone.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "step column", "x": 0, "y": 0, "w": 5, "h": 10},
+        {"label": "current step", "x": 1, "y": 4, "w": 3, "h": 3, "accent": true},
+        {"label": "poster wall (fills during sync)", "x": 5, "y": 0, "w": 7, "h": 10}
+      ]}
+    }
+  ],
+  "reroll": true,
+  "buildPath": {"value": "code", "toggle": false},
+  "steer": true
+}

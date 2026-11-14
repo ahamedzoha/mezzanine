@@ -57,6 +57,7 @@ struct PlayerStage: View {
         // Return skips while a marker plays and is swallowed otherwise, so it never reaches anything behind the player.
         .onKeyPress(.return) { _ = perform(.skipMarker); return .handled }
         .onChange(of: commands.playerRequests.count) { _, _ in _ = perform(commands.playerRequests.action) }
+        .onChange(of: player.status) { _, _ in playback.reporter?.statusChanged() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Player")
         .accessibilityAddTraits(.isModal)

@@ -101,6 +101,16 @@ final class LibraryStore {
 
     func count(section: String) -> Int { (try? index?.count(section: section)) ?? 0 }
 
+    /// Applies a finished playback session to the index (resume point, or watched past 90 %).
+    func recordStop(_ item: PlexMetadata, at time: TimeInterval, duration: TimeInterval) {
+        guard let index, duration > 0 else { return }
+        let watched = time / duration >= 0.9
+        try? index.updateProgress(ratingKey: item.ratingKey,
+                                  viewOffset: watched ? 0 : Int(time * 1000),
+                                  viewCount: watched ? (item.viewCount ?? 0) + 1 : nil)
+        revision += 1
+    }
+
     // MARK: Posters
 
     /// The poster path to draw for an item, honouring the clean-poster setting.
