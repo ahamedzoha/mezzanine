@@ -138,6 +138,93 @@ public actor PlexServerClient {
         return c.streams.sorted { ($0.score ?? 0) > ($1.score ?? 0) }
     }
 
+    // MARK: Raw pages (for the local index)
+
+    /// One page of a section with each item's own JSON kept, so the index can
+    /// store it and decode the full model later without the network.
+    public func rawItems(section: String, type: Int, offset: Int, limit: Int,
+                         filters: [URLQueryItem] = []) async throws -> (items: [(PlexMetadata, Data)], totalSize: Int?) {
+        var q = [URLQueryItem(name: "type", value: String(type)), URLQueryItem(name: "includeGuids", value: "1")]
+        q += filters
+        var request = makeRequest("GET", "/library/sections/\(section)/all", query: q)
+        request.setValue(String(offset), forHTTPHeaderField: "X-Plex-Container-Start")
+        request.setValue(String(limit), forHTTPHeaderField: "X-Plex-Container-Size")
+        let data = try await perform(request)
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let container = root["MediaContainer"] as? [String: Any] else {
+            throw PlexError.decoding("section \(section) page")
+        }
+        let total = (container["totalSize"] as? Int) ?? (container["totalSize"] as? String).flatMap(Int.init)
+        let rows = container["Metadata"] as? [[String: Any]] ?? []
+        var out: [(PlexMetadata, Data)] = []
+        out.reserveCapacity(rows.count)
+        let decoder = JSONDecoder()
+        for row in rows {
+            let json = try JSONSerialization.data(withJSONObject: row)
+            if let meta = try? decoder.decode(PlexMetadata.self, from: json) { out.append((meta, json)) }
+        }
+        return (out, total)
+    }
+
+    /// How many items of a type a section holds, without fetching them.
+    public func count(section: String, type: Int) async throws -> Int {
+        try await rawItems(section: section, type: type, offset: 0, limit: 0).totalSize ?? 0
+    }
+
+    // MARK: Folders (personal-media libraries such as Courses)
+
+    public struct FolderListing: Sendable {
+        public struct Folder: Sendable, Hashable, Identifiable {
+            public let key: String
+            public let title: String
+            public var id: String { key }
+        }
+        public let folders: [Folder]
+        public let items: [PlexMetadata]
+    }
+
+    /// The root of a section's folders, or a folder's contents (`key` from a previous listing).
+    public func folder(section: String, key: String? = nil) async throws -> FolderListing {
+        struct Raw: Decodable {
+            let metadata: [Entry]
+            enum CodingKeys: String, CodingKey { case metadata = "Metadata" }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                metadata = c.list(Entry.self, .metadata)
+            }
+        }
+        struct Entry: Decodable {
+            let item: PlexMetadata?
+            let key: String?
+            let title: String?
+            let ratingKey: String?
+            enum CodingKeys: String, CodingKey { case key, title, ratingKey }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                key = try? c.decodeIfPresent(String.self, forKey: .key)
+                title = try? c.decodeIfPresent(String.self, forKey: .title)
+                ratingKey = c.lenientString(.ratingKey)
+                item = ratingKey == nil ? nil : try? PlexMetadata(from: decoder)
+            }
+        }
+        let path: String
+        var query: [URLQueryItem] = []
+        if let key, let comps = URLComponents(string: key) {
+            path = comps.path
+            query = comps.queryItems ?? []
+        } else {
+            path = "/library/sections/\(section)/folder"
+        }
+        let raw: Raw = try await get(path, query: query)
+        var folders: [FolderListing.Folder] = []
+        var items: [PlexMetadata] = []
+        for entry in raw.metadata {
+            if let item = entry.item { items.append(item) }
+            else if let key = entry.key { folders.append(.init(key: key, title: entry.title ?? "Folder")) }
+        }
+        return FolderListing(folders: folders, items: items)
+    }
+
     // MARK: Plumbing
 
     func get<T: Decodable>(_ path: String, query: [URLQueryItem] = [], offset: Int? = nil, limit: Int? = nil) async throws -> T {
@@ -183,7 +270,7 @@ public actor PlexServerClient {
         return request
     }
 
-    private func perform(_ request: URLRequest) async throws -> Data {
+    func perform(_ request: URLRequest) async throws -> Data {
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await session.data(for: request)

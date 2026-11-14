@@ -38,3 +38,33 @@ struct LiveTests {
         #expect(!hubs.isEmpty)
     }
 }
+
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["MEZZANINE_LIVE"] == "1"))
+struct LiveSyncTests {
+    @Test func fullSyncEverySection() async throws {
+        let env = ProcessInfo.processInfo.environment
+        let token = try #require(env["PLEX_TOKEN"])
+        let identity = PlexIdentity(clientIdentifier: env["PLEX_CLIENT_ID"] ?? "mezzanine-live-tests", product: "Mezzanine (dev)")
+        let servers = try await PlexTV(identity: identity).resources(token: token)
+        let owned = try #require(servers.first { $0.owned })
+        let won = try #require(await ConnectionRacer().race(owned.candidates,
+            probe: ConnectionRacer.identityProbe(expectedMachineIdentifier: owned.clientIdentifier)))
+        let client = PlexServerClient(baseURL: won.baseURL, token: owned.accessToken ?? token,
+                                      machineIdentifier: owned.clientIdentifier, identity: identity)
+        let index = try LibraryIndex()
+        let sync = LibrarySync(client: client, index: index)
+        let clock = ContinuousClock()
+        for section in try await client.sections() where !LibrarySync.types(for: section).isEmpty {
+            let start = clock.now
+            try await sync.sync(section)
+            let full = clock.now - start
+            let start2 = clock.now
+            try await sync.sync(section)
+            print("sync \(section.title): \(try index.count(section: section.key)) items, full \(full), incremental \(clock.now - start2)")
+        }
+        let q0 = clock.now
+        let hits = try index.search("breaking")
+        print("search 'breaking': \(hits.count) hits in \(clock.now - q0)")
+        #expect(!hits.isEmpty)
+    }
+}
