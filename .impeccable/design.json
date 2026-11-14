@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-14T00:00:00Z",
+  "generatedAt": "2026-11-15T00:00:00Z",
   "title": "Design System: Mezzanine",
   "extensions": {
     "colorMeta": {
@@ -107,19 +107,19 @@
       },
       "room-message": {
         "displayName": "Room Message",
-        "purpose": "Loading, empty and error headings."
+        "purpose": "Loading, empty and error headings. .title, 22 pt."
       },
       "shelf-title": {
         "displayName": "Shelf Title",
-        "purpose": "Row headings on the gutter."
+        "purpose": "Row headings on the gutter. .title2, 17 pt."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Summaries and message detail."
+        "purpose": "Summaries, message detail, the editor note. .body, 13 pt."
       },
       "button": {
         "displayName": "Button",
-        "purpose": "Capsule labels."
+        "purpose": "Capsule labels. .body semibold, 13 pt."
       },
       "caption": {
         "displayName": "Caption",
@@ -127,11 +127,19 @@
       },
       "card-title": {
         "displayName": "Card Title",
-        "purpose": "Under posters; lilac when focused."
+        "purpose": "Under posters and on shelf strips; lilac when focused or selected. .body semibold, 13 pt."
       },
       "card-meta": {
         "displayName": "Card Meta",
-        "purpose": "Time left, episode code, year."
+        "purpose": "Time left, episode code, year, strip source lines, key hints. .callout, 12 pt."
+      },
+      "card-headline": {
+        "displayName": "Card Headline",
+        "purpose": "Up Next, failure panels, picker headings. .title2 semibold, 17 pt."
+      },
+      "reading": {
+        "displayName": "Reading",
+        "purpose": "Detail-page summary and tagline. .title3, 15 pt."
       }
     },
     "shadows": [
@@ -149,17 +157,32 @@
         "name": "play-disc",
         "value": "0 2px 6px rgba(0,0,0,0.35)",
         "purpose": "Disc over a focused poster."
+      },
+      {
+        "name": "strip-selected",
+        "value": "0 4px 10px rgba(0,0,0,0.35)",
+        "purpose": "Soft lift under the selected shelf strip."
+      },
+      {
+        "name": "strip-dragged",
+        "value": "0 14px 22px rgba(0,0,0,0.60)",
+        "purpose": "Dragged strip, with 1.02 scale."
+      },
+      {
+        "name": "quick-open-panel",
+        "value": "0 16px 30px rgba(0,0,0,0.50)",
+        "purpose": "Quick Open panel over a black 35% scrim."
       }
     ],
     "motion": [
       {
         "name": "light",
-        "value": "ease-out 0.45s",
+        "value": "ease-out 0.32s",
         "purpose": "Room light crossfades following focus."
       },
       {
         "name": "object",
-        "value": "spring(response 0.38, damping 1)",
+        "value": "spring(response 0.26, damping 1)",
         "purpose": "Lift, scroll, details, stage. No bounce."
       },
       {
@@ -169,13 +192,18 @@
       },
       {
         "name": "hover-dwell",
-        "value": "220ms",
+        "value": "120ms",
         "purpose": "Pointer rest before focus moves; never scrolls."
       },
       {
         "name": "reduce-motion",
         "value": "ease-out 0.2s crossfade",
         "purpose": "Objects crossfade, no lift or scale."
+      },
+      {
+        "name": "fold",
+        "value": "spring(response 0.26, damping 1)",
+        "purpose": "Shelf poster rows fold into strips by matched geometry; Reduce Motion crossfades in 0.2 s."
       }
     ],
     "breakpoints": []
@@ -218,7 +246,7 @@
       "kind": "custom",
       "refersTo": "typography.caption",
       "description": "Hairline over one line of facts.",
-      "html": "<div class=\"ds-cap\"><div class=\"ds-rule\"></div><div class=\"ds-line\">2019 \u00b7 1 h 38 min \u00b7 4K \u00b7 HEVC \u00b7 E-AC-3 5.1 \u00b7 26 min left</div></div>",
+      "html": "<div class=\"ds-cap\"><div class=\"ds-rule\"></div><div class=\"ds-line\">2019 · 1 h 38 min · 4K · HEVC · E-AC-3 5.1 · 26 min left</div></div>",
       "css": ".ds-cap{display:flex;flex-direction:column;gap:8px}.ds-rule{width:48px;height:1px;background:rgba(242,242,240,.14)}.ds-line{font:500 13px -apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums;color:rgba(242,242,240,.66)}"
     },
     {
@@ -235,6 +263,29 @@
       "description": "Left-aligned on the gutter, below the toolbar.",
       "html": "<div class=\"ds-msg\"><div class=\"ds-h\">Nothing in progress</div><div class=\"ds-d\">Start something from a library and it shows up here.</div></div>",
       "css": ".ds-msg{padding:48px 0 0 40px;display:flex;flex-direction:column;gap:8px;font-family:-apple-system,system-ui,sans-serif}.ds-h{font-size:22px;font-weight:600;color:#F2F2F0}.ds-d{font-size:14px;max-width:480px;color:rgba(242,242,240,.66)}"
+    },
+    {
+      "name": "Shelf Strip (selected)",
+      "kind": "custom",
+      "refersTo": "shelf-strip-selected",
+      "description": "72 pt solid strip: grip, title, source line, five-poster peek, switch, menu. Selected = raised-hover, lilac title, soft lift.",
+      "html": "<div class=\"ds-strip\"><span class=\"ds-grip\">≡</span><div><div class=\"ds-st\">Continue Watching</div><div class=\"ds-ss\">Plex · Continue Watching</div></div><span class=\"ds-peek\"><i></i><i></i><i></i><i></i><i></i></span></div>",
+      "css": ".ds-strip{display:flex;align-items:center;gap:14px;height:72px;padding:0 14px;border-radius:12px;background:#24272C;box-shadow:0 4px 10px rgba(0,0,0,.35);font-family:-apple-system,system-ui,sans-serif;cursor:default}.ds-strip:hover{background:#24272C}.ds-grip{width:22px;color:rgba(242,242,240,.46)}.ds-st{font:600 13px -apple-system,system-ui,sans-serif;color:#A08CFF}.ds-ss{margin-top:3px;font:400 12px -apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums;color:rgba(242,242,240,.66)}.ds-peek{margin-left:auto;display:flex;gap:4px}.ds-peek i{width:32px;height:48px;border-radius:4px;background:#3A3D43}"
+    },
+    {
+      "name": "Add Shelf Strip",
+      "kind": "custom",
+      "description": "Dashed 1 pt rule outline, a plus and a menu.",
+      "html": "<div class=\"ds-add\">+ Add Shelf</div>",
+      "css": ".ds-add{height:56px;display:flex;align-items:center;padding:0 14px;border-radius:12px;border:1px dashed rgba(242,242,240,.14);font:600 13px -apple-system,system-ui,sans-serif;color:#F2F2F0;cursor:default}.ds-add:hover{background:#1A1C20}"
+    },
+    {
+      "name": "Quick Open Panel",
+      "kind": "custom",
+      "refersTo": "quick-open-panel",
+      "description": "Solid raised panel, 620 pt, rule border, left-aligned under the toolbar; selected row raised-hover with lilac title and key hint.",
+      "html": "<div class=\"ds-qo\"><div class=\"ds-qf\">after</div><div class=\"ds-qs\">Titles</div><div class=\"ds-qr ds-sel\"><span>After Hours</span><em>↩ Open · ⌘↩ Play</em></div><div class=\"ds-qr\"><span>Afterglow</span></div></div>",
+      "css": ".ds-qo{width:620px;border-radius:16px;background:#1A1C20;border:1px solid rgba(242,242,240,.14);box-shadow:0 16px 30px rgba(0,0,0,.5);font-family:-apple-system,system-ui,sans-serif;color:#F2F2F0}.ds-qf{height:52px;padding:0 14px;display:flex;align-items:center;font-size:17px;border-bottom:1px solid rgba(242,242,240,.14)}.ds-qs{padding:8px 14px 4px;font:400 12px -apple-system,system-ui,sans-serif;color:rgba(242,242,240,.46)}.ds-qr{min-height:48px;margin:0 6px;padding:0 14px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;font:600 13px -apple-system,system-ui,sans-serif}.ds-sel{background:#24272C}.ds-sel span{color:#A08CFF}.ds-qr em{font:400 12px -apple-system,system-ui,sans-serif;font-style:normal;color:rgba(242,242,240,.46)}"
     }
   ],
   "narrative": {
@@ -271,7 +322,7 @@
       },
       {
         "name": "The Numbers Rule",
-        "body": "Captions state facts in tabular figures, separated by \" \u00b7 \". No adjectives.",
+        "body": "Captions state facts in tabular figures, separated by \" · \". No adjectives.",
         "section": "typography"
       },
       {
@@ -283,6 +334,11 @@
         "name": "The No Bleed Rule",
         "body": "No translucent panels that let content show through behind text.",
         "section": "elevation"
+      },
+      {
+        "name": "The Fold Rule",
+        "body": "Editing changes the same objects in place: shelf rows fold into strips by matched geometry and back, with a crossfade under Reduce Motion.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -292,9 +348,11 @@
       "Do make the whole button the hit target (capsule, disc, card).",
       "Do use solid raised surfaces for secondary controls and anything over art.",
       "Do left-align messages and text on the 40 pt gutter, clear of the toolbar.",
-      "Do write captions as facts in tabular figures joined by \" \u00b7 \", with a hairline above.",
-      "Do crossfade light at 0.45 s, move objects with spring 0.38 and no bounce, and fall back to crossfade under Reduce Motion.",
-      "Do give every shortcut a menu item."
+      "Do write captions as facts in tabular figures joined by \" · \", with a hairline above.",
+      "Do crossfade light at 0.32 s, move objects with spring 0.26 and no bounce, and fall back to crossfade under Reduce Motion.",
+      "Do give every shortcut a menu item.",
+      "Do show selection on a strip or a Quick Open row as raised-hover fill and a lilac title, with lift only on strips.",
+      "Do ask before Restore Default Shelves, and make every shelf change one ⌘Z step."
     ],
     "donts": [
       "Don't put Liquid Glass on content; toolbar, sidebar and player controls only.",
@@ -304,7 +362,9 @@
       "Don't use the pointing-hand cursor on cards.",
       "Don't scroll on hover; only keyboard moves scroll.",
       "Don't add a second accent, a coloured badge, or tint chrome with a film's colour.",
-      "Don't use Big Shoulders for anything but a logo-less title card."
+      "Don't use Big Shoulders for anything but a logo-less title card.",
+      "Don't centre Quick Open or let the scrim-covered content show through the panel.",
+      "Don't hide a shelf by deleting it; hidden strips stay, dimmed, so they can come back."
     ]
   }
 }

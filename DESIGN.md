@@ -26,13 +26,21 @@ typography:
     fontFamily: "SF Pro"
     fontSize: "17px"
     fontWeight: 600
+  card-headline:
+    fontFamily: "SF Pro"
+    fontSize: "17px"
+    fontWeight: 600
+  reading:
+    fontFamily: "SF Pro"
+    fontSize: "15px"
+    fontWeight: 400
   body:
     fontFamily: "SF Pro"
-    fontSize: "14px"
+    fontSize: "13px"
     fontWeight: 400
   button:
     fontFamily: "SF Pro"
-    fontSize: "14px"
+    fontSize: "13px"
     fontWeight: 600
   caption:
     fontFamily: "SF Pro"
@@ -93,6 +101,31 @@ components:
     textColor: "{colors.graphite}"
     rounded: "{rounded.capsule}"
     size: "34px"
+  shelf-strip:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.ink}"
+    typography: "{typography.card-title}"
+    rounded: "{rounded.poster}"
+    height: "72px"
+  shelf-strip-hover:
+    backgroundColor: "#1F2226"
+  shelf-strip-selected:
+    backgroundColor: "{colors.raised-hover}"
+    textColor: "{colors.lilac}"
+  quick-open-panel:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.panel}"
+    width: "620px"
+  quick-open-row-selected:
+    backgroundColor: "{colors.raised-hover}"
+    textColor: "{colors.lilac}"
+    rounded: "{rounded.control}"
+    height: "48px"
+  smart-shelf-sheet:
+    width: "680px"
+  collection-picker:
+    width: "520px"
 ---
 
 # Design System: Mezzanine
@@ -103,7 +136,7 @@ components:
 
 Mezzanine is a dark room with one light source: the film you are looking at. A near-black graphite ground carries the interface; the focused title throws its own colour across it, the way a bias light washes a wall behind a television. Chrome has no hue of its own. Every colour on screen belongs to a film, its artwork or the room light derived from it. The single exception is one lilac, spent on the primary action and the current selection.
 
-The system is quiet and precise. Type is SF Pro at small, exact sizes; titles without a logo are set once, large and heavy, like a title card. Facts are numbers rather than adjectives, joined by " · ". Nothing floats in the middle of the window: text and messages sit on a 40 pt gutter, left-aligned, below the toolbar.
+The system is quiet and precise. Type is SF Pro at small, exact sizes, mapped to macOS text styles so it follows the system Text Size setting; titles without a logo are set once, large and heavy, like a title card. Facts are numbers rather than adjectives, joined by " · ". Nothing floats in the middle of the window: text and messages sit on a 40 pt gutter, left-aligned, below the toolbar.
 
 Native macOS 26 is the material. Liquid Glass belongs to the system chrome and to player controls; content is solid.
 
@@ -147,13 +180,16 @@ The focused title's four UltraBlur corner colours, each mixed 25% back toward gr
 
 ### Hierarchy
 - **Title card** (800, 92 pt, tracking -1, capitals, up to two lines, scales to 50%): the hero title, only when a title has no clearLogo. Also the sign-in wordmark at 72 pt.
-- **Room message** (600, 22 pt): loading, empty and error headings.
-- **Shelf title** (600, 17 pt): the row heading on the gutter.
-- **Body** (400, 14 pt): hero summary (ink at 86%, four lines, 560 pt measure), message detail (480 pt measure).
-- **Button** (600, 14 pt): capsule labels.
-- **Caption** (500, 13 pt, tabular figures): the hero's ruled caption and fact lines.
-- **Card title** (600, 13 pt): under posters, one line.
-- **Card meta** (400, 12 pt, tabular figures): "26 min left", "S2 E3", year, season count.
+Sizes are the defaults of the macOS text styles they map to (`Theme.Typeface`); they grow and shrink with Accessibility ▸ Display ▸ Text Size. Glyphs inside fixed-size discs keep point sizes.
+- **Room message** (`.title`, 600, 22 pt): loading, empty and error headings.
+- **Shelf title** (`.title2`, 600, 17 pt): the row heading on the gutter.
+- **Card headline** (`.title2`, 600, 17 pt): Up Next, failure panels and picker headings.
+- **Reading** (`.title3`, 400, 15 pt): a title's summary and tagline on the detail page.
+- **Body** (`.body`, 400, 13 pt): hero summary (ink at 86%, four lines, 560 pt measure), message detail (480 pt measure), the editor's quiet note.
+- **Button** (`.body`, 600, 13 pt): capsule labels.
+- **Caption** (`.body`, 500, 13 pt, tabular figures): the hero's ruled caption and fact lines.
+- **Card title** (`.body`, 600, 13 pt): under posters and on shelf strips, one line.
+- **Card meta** (`.callout`, 400, 12 pt, tabular figures): "26 min left", "S2 E3", year, season count, a strip's source line, a Quick Open row's caption and key hint.
 
 ### Named Rules
 **The Title Card Rule.** Big Shoulders is used at weight 800, in capitals, for a title with no logo, and nowhere else in the UI.
@@ -167,6 +203,8 @@ Shelves are horizontal rows of 150 pt posters (2:3) at 20 pt spacing, 14 pt belo
 
 Space scale: 4, 8, 14, 20, 32, 48.
 
+While editing, the hero is gone and shelves are strips stacked at 8 pt on the same gutter, at most 980 pt wide (see Edit Shelves). A library's Shelves layout uses Home's column unchanged.
+
 ## Elevation & Depth
 
 Depth is tonal plus the room light: graphite ground, raised surfaces one step lighter, posters standing on soft black shadows. Shadows respond to focus; they are not decoration at rest. Liquid Glass is reserved for system chrome (toolbar, sidebar) and the player's controls, tinted black over media. Content never gets glass.
@@ -176,6 +214,9 @@ Depth is tonal plus the room light: graphite ground, raised surfaces one step li
 - **Poster focused** (`black 60%, blur 22, y 14`): with a 1.045 scale from the bottom edge (cards, 1.04 in grids) and a 4 pt lift.
 - **Play disc** (`black 35%, blur 6, y 2`).
 - **Player glass** (`glassEffect regular, tint black 55%`): controls over the picture only.
+- **Strip selected** (`black 35%, blur 10, y 4`): the soft lift under the selected shelf strip.
+- **Strip dragged** (`black 60%, blur 22, y 14`, 1.02 scale): the poster-focused shadow at a strip's size.
+- **Quick Open panel** (`black 50%, blur 30, y 16`) over a black 35% scrim.
 
 ### Named Rules
 **The Glass Is Chrome Rule.** Liquid Glass appears only on toolbar, sidebar and player controls. Never on posters, captions, panels or messages.
@@ -207,6 +248,36 @@ Heading, detail, optional small spinner; left-aligned on the gutter below the to
 ### Player stage
 Opens from the hero or poster frame, then fills the window; the room light drops to 0 over 0.6 s. Controls (close, title and transport panel) are Liquid Glass tinted black; scrub bar is ink capsules. Skip Intro and Skip Credits are primary buttons sliding in from the trailing edge. Subtitles are 26 pt semibold white with a black shadow.
 
+### Edit Shelves
+Home edits in place: the owner's shelves fold into strips he can grab, and fold back into posters when he is done. Same world, no new colour; strips are solid.
+
+- **Strip anatomy:** 72 pt tall, 12 pt continuous corners, 14 pt side padding, on the gutter, 8 pt between strips. Left to right: grip (three lines, tertiary, secondary on hover; open-hand cursor), title (card title) over a source line (card meta: "Plex · Continue Watching", "Collection · IMDb Top 250 · 44", "Smart · Unwatched · Comedy · 1990s"), a peek of the shelf's first five posters (32 × 48, 4 pt corners, 4 pt apart), a small show-on-Home switch, a ⋯ menu (rename, move, edit rules, remove). The whole strip is the target; no focus ring.
+- **States:** solid raised at rest; hovering lightens it halfway to raised-hover, so hover is always lighter than rest and darker than selected; selected = raised-hover fill, lilac title, soft lift (`Strip selected`). Hidden = title at 60%, source line ink-tertiary, peek desaturated at 45%. Dragged = raised-hover, 1.02 scale, the poster shadow (`Strip dragged`), spring 0.18.
+- **The fold:** each strip's five peek posters are the shelf's first five posters, matched in geometry between the poster row and the strip (spring 0.26, no bounce). Reduce Motion: a 0.2 s crossfade.
+- **Chrome:** a quiet one-line note on the gutter ("Drag to reorder. Hidden shelves stay here, dimmed."); Restore Default Shelves… beside it, which asks first ("Restore the default shelves?") and says Undo brings the rows back. The last strip is Add Shelf: a dashed 1 pt rule outline, a + and a menu (a Plex row not yet on Home, Collection…, Playlist, Smart Shelf…). Plex rows missing on the current server stay as a strip "Not on this server".
+- **Toolbar:** "Edit Shelves" becomes a prominent lilac "Done" while editing (Home and each library's Shelves layout); the window subtitle reads "Editing shelves". Done is the screen's primary action.
+- **Undo:** every change (move, hide, rename, remove, add, rule edit, restore) is one ⌘Z step with a named Undo item, and is announced to VoiceOver.
+- **Keys:** ↑/↓ select; ⌥↑/⌥↓ move the shelf; Space shows or hides; Return renames or edits the rules; ⌫ removes; Esc or ⌘E finishes. They are View-menu items: Edit Shelves / Done Editing Shelves (⌘E), Move Shelf Up, Move Shelf Down, Show or Hide Shelf (Space), Rename Shelf… (Return), Remove Shelf (Delete); File has New Smart Shelf… (⌘N) and Add Collection…. Every key has a pointer path: drag, switch, ⋯ menu, Add Shelf.
+
+**The Fold Rule.** Editing changes the same objects in place: shelf rows fold into strips by matched geometry and back, with a crossfade under Reduce Motion.
+
+### Smart shelves
+A native sheet, 680 pt wide, opened from Add Shelf, ⌘N or a strip's Edit Rules.
+
+- **Form:** Name (placeholder is the automatic name), From (libraries pop-up) and Show (kind), then "Titles that match all of these": rule rows ANDed, each a field pop-up, its value control and −/+; Sort by and Show up to pop-ups; a 1 pt rule; the live preview. Cancel and a lilac Add Shelf (Save when editing).
+- **Fields:** Genre (is or is not), Decade, Years (between), Watch state, Added within, Minimum rating, Resolution, HDR or Dolby Vision, Channels (5.1 or more, 7.1), Collection, Person.
+- **Preview:** up to ten 52 × 78 pt posters and a count in card meta: "38 titles", or "24 of 1,145 titles" when the size limit cuts it short. It refreshes as rules change (the local index answers in milliseconds). Empty: "Nothing in your library matches yet."
+- **Scroll:** rules scroll inside the sheet past 280 pt.
+- **Collection picker:** "Add a Collection", a 520 × 560 pt sheet of collections with a 24 × 36 thumbnail each, chosen by pointer or keys.
+
+### Quick Open
+⌘K opens a command panel over the content; Esc, a click on the scrim, or ⌘K again closes it.
+
+- **Shape:** solid raised panel, 620 pt wide, 16 pt corners, 1 pt rule border, left-aligned on the gutter 14 pt under the toolbar, never centred. A black 35% scrim covers the window; the panel has no glass and nothing shows through it.
+- **Anatomy:** a 52 pt search field, a 1 pt rule, then a list up to 420 pt tall in sections: Continue (Resume <title>), Titles (28 × 42 thumbnail, title, ruled caption), Actions (Edit Shelves, New Smart Shelf…, Play Next Episode of <show>), Go To (Home, each library, Settings, with their ⌘ keys as captions). An empty query shows Continue and Go To.
+- **Rows:** 48 pt minimum, 8 pt corners. Selected = raised-hover fill, lilac title, and a key hint at the trailing edge in ink-tertiary ("↩ Open · ⌘↩ Play" on a title, "↩ Play", "↩").
+- **Keys:** ↑/↓ select, Return runs, ⌘Return plays a title, Esc closes. The selected row is announced to VoiceOver.
+
 ### Motion
 - **Light** crossfades: ease-out 0.32 s.
 - **Objects** (scroll, details, stage): spring, response 0.26, no bounce. **Pointer lift:** spring 0.18, immediate on hover. **Stage:** opens 0.34, closes 0.3.
@@ -215,7 +286,7 @@ Opens from the hero or poster frame, then fills the window; the room light drops
 - **Reduce Motion:** objects become a 0.2 s crossfade, no lift or scale; light keeps crossfading. **Reduce Transparency:** room light drops to 0.36.
 
 ### Keyboard
-Arrows move focus and scroll (← at the first column returns to the sidebar; Home/End jump); Return opens, Space plays; I toggles the summary on Home; ⌘[ or Esc goes back; ⌘↑ goes to the enclosing folder; ⌃⌘1–⌃⌘4 switch layout; ⌘F searches; ⌘1 Home, ⌘2 to ⌘9 libraries (Go menu); ⌘= and ⌘− resize posters. In the player: Esc closes, Space or K pauses, J and L seek 10 s, arrows seek 10 s, S or Return skips, F toggles full screen. Every key is also a menu item.
+Arrows move focus and scroll (← at the first column returns to the sidebar; Home/End jump); Return opens, Space plays; I toggles the summary on Home; ⌘[ or Esc goes back; ⌘↑ goes to the enclosing folder; ⌃⌘1–⌃⌘5 switch layout; ⌘F searches; ⌘K opens Quick Open; ⌘E edits shelves (⌘N adds a smart shelf while editing); ⌘[ and ⌘] go back and forward; ⌘1 Home, ⌘2 to ⌘9 libraries (Go menu); ⌘= and ⌘− resize posters. In the player: Esc closes, Space or K pauses, J and L seek 10 s, arrows seek 10 s, S or Return skips, F toggles full screen. Every key is also a menu item.
 
 ## Do's and Don'ts
 
@@ -229,6 +300,8 @@ Arrows move focus and scroll (← at the first column returns to the sidebar; Ho
 - **Do** write captions as facts in tabular figures joined by " · ", with a hairline above.
 - **Do** crossfade light at 0.32 s, move objects with spring 0.26 and no bounce, and fall back to crossfade under Reduce Motion.
 - **Do** give every shortcut a menu item.
+- **Do** show selection on a strip or a Quick Open row as raised-hover fill and a lilac title, with lift only on strips.
+- **Do** ask before Restore Default Shelves, and make every shelf change one ⌘Z step.
 
 ### Don't:
 - **Don't** put Liquid Glass on content; toolbar, sidebar and player controls only.
@@ -239,10 +312,12 @@ Arrows move focus and scroll (← at the first column returns to the sidebar; Ho
 - **Don't** scroll on hover; only keyboard moves scroll.
 - **Don't** add a second accent, a coloured badge, or tint chrome with a film's colour.
 - **Don't** use Big Shoulders for anything but a logo-less title card.
+- **Don't** centre Quick Open or let the scrim-covered content show through the panel.
+- **Don't** hide a shelf by deleting it; hidden strips stay, dimmed, so they can come back.
 
 ## Library layouts
 
-- **Posters** (2:3, density 110–260 pt), **Wide** (16:9 backdrop with the clear logo at bottom-left), **List** (56 pt rows: 32×48 poster, title, then right-aligned tabular columns Year · Length · Rating · Quality), **Folders** (personal-media libraries: one click opens a folder; rows carry "N sections · M videos").
+- **Posters** (2:3, density 110–260 pt), **Wide** (16:9 backdrop with the clear logo at bottom-left), **Shelves** (⌃⌘5; the library's own Home: Plex's hubs for that library by default, shelves of 150 pt posters, edited with the same Edit Shelves and ⌘E, layout kept per server and profile; Filter, Sort and Poster size are disabled here, not removed; an Edit Shelves item joins the toolbar), **List** (56 pt rows: 32×48 poster, title, then right-aligned tabular columns Year · Length · Rating · Quality), **Folders** (personal-media libraries: one click opens a folder; rows carry "N sections · M videos").
 - The toolbar item set is constant across layouts (Layout · Filter · Sort · Poster size); items that don't apply are disabled, never removed, so nothing shifts.
 - Filters live in one menu (Watch State, Genre, Decade, Resolution as single-choice submenus showing their value; HDR and 5.1 or More as toggles). Active filters show as removable chips under the toolbar with Clear All pinned at the end.
 
