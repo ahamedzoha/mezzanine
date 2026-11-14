@@ -61,6 +61,7 @@ struct PosterCard: View {
     let onPlay: (CGRect) -> Void
 
     @Environment(SessionStore.self) private var session
+    @Environment(LibraryStore.self) private var library
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dwell: Task<Void, Never>?
     @State private var frame: CGRect = .zero
@@ -105,11 +106,12 @@ struct PosterCard: View {
         .contextMenu {
             Button("Play") { onPlay(frame) }
         }
+        .task(id: item.ratingKey) { await library.resolveCleanPoster(for: item) }
     }
 
     private var poster: some View {
         let pixelWidth = Int(width * 2)
-        return RemoteImage(url: session.posterURL(item.posterPath, pixelWidth: pixelWidth), pixelWidth: pixelWidth)
+        return RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: pixelWidth), pixelWidth: pixelWidth)
             .frame(width: width, height: width * 1.5)
             .overlay(alignment: .bottom) { progress }
             .overlay(alignment: .bottomTrailing) {

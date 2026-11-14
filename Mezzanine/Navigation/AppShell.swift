@@ -17,6 +17,7 @@ struct AppShell: View {
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(AppCommandCenter.self) private var commands
+    @Environment(LibraryStore.self) private var library
     @Environment(\.colorSchemeContrast) private var contrast
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
@@ -128,6 +129,10 @@ struct AppShell: View {
             // Music stays with Plexamp; photos aren't part of Mezzanine.
             commands.sections = sections.filter { $0.kind == .movie || $0.kind == .show }
             sectionsError = nil
+            if let server = session.currentServer {
+                library.connect(client: client, serverID: server.clientIdentifier,
+                                userID: session.account?.uuid ?? "owner", sections: commands.sections)
+            }
         } catch {
             sectionsError = (error as? PlexError)?.userMessage ?? "\(error)"
         }

@@ -171,6 +171,27 @@ public actor PlexServerClient {
         try await rawItems(section: section, type: type, offset: 0, limit: 0).totalSize ?? 0
     }
 
+    // MARK: Artwork
+
+    /// The poster an agent chose, before any overlay tool (Kometa) replaced it
+    /// with an uploaded copy: the agent's own stored poster when there is one,
+    /// else the first provider poster. Read-only; nothing changes on the server.
+    public func cleanPosterPath(ratingKey: String) async throws -> String? {
+        struct Container: Decodable {
+            struct Poster: Decodable { let key: String?; let provider: String?; let ratingKey: String? }
+            let posters: [Poster]
+            enum CodingKeys: String, CodingKey { case posters = "Metadata" }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                posters = c.list(Poster.self, .posters)
+            }
+        }
+        let c: Container = try await get("/library/metadata/\(ratingKey)/posters")
+        let agentStored = c.posters.first { ($0.ratingKey ?? "").hasPrefix("metadata://posters/") }
+        let firstProvider = c.posters.first { $0.provider != nil }
+        return (agentStored ?? firstProvider)?.key
+    }
+
     // MARK: Folders (personal-media libraries such as Courses)
 
     public struct FolderListing: Sendable {

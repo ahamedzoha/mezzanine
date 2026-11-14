@@ -11,6 +11,7 @@ struct SearchView: View {
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(AppCommandCenter.self) private var commands
+    @Environment(LibraryStore.self) private var library
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var results: [PlexMetadata] = []
     @State private var phase: Phase = .idle
@@ -66,6 +67,15 @@ struct SearchView: View {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard q.count >= 2 else { results = []; phase = .tooShort; return }
         guard let client = session.client else { return }
+        // The local index answers as you type; the server only when it's empty.
+        let local = await library.search(q)
+        if !local.isEmpty || library.index != nil && library.syncState == .idle {
+            let titles = local.filter { $0.kind != .episode }
+            results = titles + local.filter { $0.kind == .episode }.prefix(12)
+            focused = nil
+            phase = .done
+            return
+        }
         phase = .searching
         // Wait for the typing to settle.
         try? await Task.sleep(for: .milliseconds(250))
