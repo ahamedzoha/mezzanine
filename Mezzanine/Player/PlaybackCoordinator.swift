@@ -41,6 +41,14 @@ final class PlaybackCoordinator {
     private(set) var nextEpisode: PlexMetadata?
     /// The episode before it, for ⇧N.
     private(set) var previousEpisode: PlexMetadata?
+    /// After a film: what to watch next (Plex's related rows), and the row's own name.
+    private(set) var suggestions: [PlexMetadata] = []
+    private(set) var suggestionsTitle = "More Like This"
+    /// Post-play after films (Settings ▸ Playback).
+    var showsPostPlay: Bool {
+        get { UserDefaults.standard.object(forKey: "postPlayMovies") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "postPlayMovies") }
+    }
     /// Episodes played in this sitting (for "skip intro after the first episode").
     private(set) var episodesThisSession = 0
     /// Episodes started by autoplay in a row (for "Still watching?").
@@ -124,6 +132,7 @@ final class PlaybackCoordinator {
             if detail.kind == .episode { episodesThisSession += 1 }
             nextEpisode = nil
             previousEpisode = nil
+            suggestions = []
             await resolveNext(after: detail, client: client)
         } catch is CancellationError {
         } catch {
@@ -293,6 +302,28 @@ final class PlaybackCoordinator {
         let all = episodesCache[show] ?? []
         previousEpisode = BingePlanner.previousEpisode(before: episode, in: all)
         nextEpisode = BingePlanner.nextEpisode(after: episode, in: all)
+    }
+
+    /// Loads a film's post-play suggestions: the first related rows, unwatched first, never
+    /// the film itself.
+    func loadSuggestions() async {
+        guard let item, item.kind == .movie, suggestions.isEmpty, let client = session.client else { return }
+        let hubs = (try? await client.related(item.ratingKey, count: 12)) ?? []
+        var seen: Set<String> = [item.ratingKey]
+        var picks: [PlexMetadata] = []
+        for hub in hubs where !hub.items.isEmpty {
+            for candidate in hub.items where candidate.kind == .movie && seen.insert(candidate.ratingKey).inserted {
+                picks.append(candidate)
+            }
+            if picks.count >= 6 { break }
+        }
+        suggestionsTitle = hubs.first { !$0.items.isEmpty }?.title ?? "More Like This"
+        suggestions = Array((picks.filter { !$0.isWatched } + picks.filter(\.isWatched)).prefix(6))
+    }
+
+    /// Plays a suggestion from post-play (from the start, or its resume point).
+    func playSuggestion(_ next: PlexMetadata) async {
+        await play(next, from: nil, autoplayed: false)
     }
 
     /// Warms the next episode's file (called when Up Next appears).

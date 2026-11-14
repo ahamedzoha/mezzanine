@@ -23,7 +23,9 @@
   `{"users": [...]}` reply never decoded, so profiles (and onboarding's profile step) were empty.
 - Fixed before shipping: menu-bar commands have no environment objects (the profile menu
   crashed at launch in Debug); stores are passed in.
-- Next: M10 Trakt (needs the owner's Trakt API app), M11 offline downloads, M12 AI subtitles.
+- M6 leftover: post-play for films (suggestions at the credits, no autoplay); setting in Playback.
+- Next: M10 Trakt (needs the owner's Trakt API app), M11 offline downloads (new page: needs a
+  design pick), M12 AI subtitles, new-episode notifications (asks macOS permission).
 
 ## 2026-11-15 (night) — player keys, previews, fallback
 

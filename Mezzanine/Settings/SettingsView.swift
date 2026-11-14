@@ -44,6 +44,10 @@ struct SettingsView: View {
                         }
                         Toggle("Skip credits and go to the next episode", isOn: $playback.binge.autoSkipCredits)
                     }
+                    Section("Films") {
+                        Toggle("Suggest what to watch next at the credits", isOn: Binding(
+                            get: { playback.showsPostPlay }, set: { playback.showsPostPlay = $0 }))
+                    }
                     Section {
                         Picker("Ask “Still watching?” after", selection: Binding(
                             get: { playback.binge.stillWatchingAfterEpisodes ?? 0 },

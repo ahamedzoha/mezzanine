@@ -377,3 +377,9 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - Plex Home profiles each keep their own index, Continue Watching, watched marks and shelves.
 - Sidebar footer: the current profile's avatar and name with a ⌃⌄ chevron; a click opens the profile menu (current one checked, "(PIN)" on protected ones). Mezzanine ▸ Switch Profile holds the same menu. Disabled while a film plays.
 - A protected profile asks for its PIN in a 400 pt sheet (avatar, "Switch to Name", secure field, Cancel / Switch); a wrong PIN says "That PIN didn’t match." and clears the field. Switching returns to Home.
+
+## Post-play (films)
+
+- At a film's credits (the final credits marker, else 30 s before the end) the picture shrinks exactly as for Up Next and a 380 pt card offers what to watch next: Plex's first related row's name as the heading (card meta), six films on a 3 × 2 grid of 116 pt posters (unwatched first), then Watch Again and Keep Watching Credits (secondary). No countdown: films never autoplay.
+- Arrows choose (3 per row), Return or a click plays, Esc keeps the credits; the selection lifts with a lilac title. Only a moving pointer selects. At the end of the film the card stays until you choose or close.
+- Settings ▸ Playback ▸ Films: "Suggest what to watch next at the credits" (on by default).

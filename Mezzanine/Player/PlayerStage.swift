@@ -34,17 +34,19 @@ struct PlayerStage: View {
     @State private var upNext: UpNextState = .hidden
     @State private var autoSkipped = Set<String>()
     @State private var upNextTrigger: TimeInterval?
+    /// The highlighted suggestion in a film's post-play.
+    @State private var postPlaySelection = 0
     @State private var pendingToggle: Task<Void, Never>?
     @State private var optionsPage: PlayerOptions.Page = .root
     @AppStorage("playerStatsVisible") private var statsVisible = false
     @AppStorage("subtitleOffset") private var subtitleOffset: Double = 0
     @FocusState private var focused: Bool
 
-    enum UpNextState: Equatable { case hidden, counting(Int), dismissed, stillWatching }
+    enum UpNextState: Equatable { case hidden, counting(Int), dismissed, stillWatching, postPlay }
 
     private var player: MezzaninePlayer { playback.player }
     private var upNextShown: Bool {
-        switch upNext { case .counting, .stillWatching: return true; default: return false }
+        switch upNext { case .counting, .stillWatching, .postPlay: return true; default: return false }
     }
 
     var body: some View {
@@ -331,6 +333,18 @@ struct PlayerStage: View {
             StillWatchingCard(resume: { Task { await playback.playNext(autoplayed: false) } },
                               stop: { _ = perform(.close) })
                 .transition(.opacity)
+        case .postPlay:
+            GeometryReader { geo in
+                let layout = UpNextLayout(size: geo.size, aspect: videoAspect)
+                PostPlayCard(title: playback.suggestionsTitle, suggestions: playback.suggestions, selected: postPlaySelection,
+                             select: { postPlaySelection = $0 },
+                             play: { next in Task { await playback.playSuggestion(next) } },
+                             replay: { replay() },
+                             hide: { dismissUpNext() })
+                    .frame(width: UpNextLayout.cardWidth, alignment: .topLeading)
+                    .offset(x: layout.cardOrigin.x, y: layout.cardOrigin.y)
+            }
+            .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
         default:
             EmptyView()
         }
@@ -376,6 +390,12 @@ struct PlayerStage: View {
         if upNextTrigger == nil, player.duration > 0 {
             upNextTrigger = BingePlanner.upNextTrigger(duration: player.duration, markers: item.markers) ?? .infinity
         }
+        // Films: at the credits, suggestions instead of a countdown.
+        if item.kind == .movie, upNext == .hidden, playback.showsPostPlay, let trigger = upNextTrigger, t >= trigger,
+           player.status == .playing {
+            showPostPlay()
+            return
+        }
         guard upNext == .hidden, let trigger = upNextTrigger, t >= trigger,
               playback.nextEpisode != nil, playback.binge.upNextCountdown > 0, player.status == .playing else { return }
         playback.prewarmNext()
@@ -402,11 +422,35 @@ struct PlayerStage: View {
         }
     }
 
+    private func showPostPlay() {
+        postPlaySelection = 0
+        Task {
+            await playback.loadSuggestions()
+            if let first = playback.suggestions.first {
+                AccessibilityNotification.Announcement("\(playback.suggestionsTitle). \(first.title) and \(playback.suggestions.count - 1) more. Return plays, Escape hides.").post()
+            }
+        }
+        withAnimation(Theme.Motion.object(reduceMotion)) { upNext = .postPlay }
+    }
+
+    private func replay() {
+        withAnimation(Theme.Motion.object(reduceMotion)) { upNext = .dismissed }
+        upNextTrigger = nil
+        Task {
+            await player.seek(to: 0)
+            player.play()
+            // Shown again at this viewing's credits.
+            upNext = .hidden
+        }
+    }
+
     private func dismissUpNext() {
         withAnimation(Theme.Motion.object(reduceMotion)) { upNext = .dismissed }
     }
 
     private func handleEnded() {
+        // A film's suggestions stay up at the end until you choose (or close).
+        if upNext == .postPlay { return }
         if playback.nextEpisode != nil, upNext != .dismissed, playback.binge.upNextCountdown > 0 {
             if playback.shouldAskStillWatching { withAnimation { upNext = .stillWatching } }
             else { Task { await playback.playNext(autoplayed: true) } }
@@ -435,6 +479,21 @@ struct PlayerStage: View {
         case KeyBinding.returnKey, KeyBinding.enter: returnKey(); return true
         default: break
         }
+        // Post-play: the arrows choose a suggestion (3 per row) instead of seeking.
+        if upNext == .postPlay, !playback.suggestions.isEmpty, !event.modifierFlags.contains(.option) {
+            let delta: Int? = switch event.keyCode {
+            case KeyBinding.left: -1
+            case KeyBinding.right: 1
+            case KeyBinding.up: -3
+            case KeyBinding.down: 3
+            default: nil
+            }
+            if let delta {
+                postPlaySelection = min(max(0, postPlaySelection + delta), playback.suggestions.count - 1)
+                AccessibilityNotification.Announcement(playback.suggestions[postPlaySelection].title).post()
+                return true
+            }
+        }
         if let key { return perform(.key(key)) == .handled }
         if !event.modifierFlags.contains(.option), let c = event.charactersIgnoringModifiers,
            c.count == 1, let digit = Int(c) {
@@ -460,6 +519,9 @@ struct PlayerStage: View {
         if failure != nil { Task { await playback.retry() }; return }
         switch upNext {
         case .counting, .stillWatching: Task { await playback.playNext(autoplayed: false) }
+        case .postPlay:
+            let list = playback.suggestions
+            if list.indices.contains(postPlaySelection) { Task { await playback.playSuggestion(list[postPlaySelection]) } }
         default: _ = perform(.key(.skipMarker))
         }
     }
