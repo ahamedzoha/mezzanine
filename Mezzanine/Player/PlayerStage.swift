@@ -36,7 +36,7 @@ struct PlayerStage: View {
         .position(x: frame.midX, y: frame.midY)
         .onAppear {
             focused = true
-            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 1)) { opened = true }
+            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.34, dampingFraction: 1)) { opened = true }
             scheduleHUDHide()
         }
         .onDisappear { NSCursor.unhide() }
@@ -155,9 +155,9 @@ struct PlayerStage: View {
     }
 
     private func close() {
-        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.42, dampingFraction: 1)) { opened = false }
+        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 1)) { opened = false }
         Task {
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 200 : 380))
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 200 : 280))
             playback.close()
         }
     }

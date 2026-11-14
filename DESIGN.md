@@ -193,10 +193,10 @@ Continuous (squircle) corners. Posters and stills 12 pt, controls 8 pt, badges 4
 - **Play disc:** 34 pt solid ink circle, graphite play glyph, bottom-right of a focused poster, inset 10 pt. The pointer's route to play; fully clickable.
 
 ### Poster card (shelf and grid)
-Poster, then title (card title) and one line of facts (card meta). Focus, by arrow keys or by the pointer resting 220 ms: the poster lifts, shadow deepens, title turns lilac, the play disc fades in, and the room light follows. No ring. Single click focuses, double click or Return plays. Hovering never scrolls; only keyboard moves scroll to the focused card. Pointer cursor stays the arrow, not the pointing hand.
+Poster, then title (card title) and one line of facts (card meta). The pointer lifts the poster at once (spring 0.18); focus, by arrow keys or by the pointer resting 120 ms: the poster lifts, shadow deepens, title turns lilac, the play disc fades in, and the room light follows. No ring. Single click focuses, double click or Return plays. Hovering never scrolls; only keyboard moves scroll to the focused card. Pointer cursor stays the arrow, not the pointing hand.
 
 ### Hero
-Backdrop right, logo or title card left at the bottom of the block, one 48 pt hairline, one caption line, then Play (primary) and Details (secondary). Title change crossfades in 0.45 s. Details toggle with I.
+Backdrop right, logo or title card left at the bottom of the block, one 48 pt hairline, one caption line, then Play (primary) and Details (secondary). Title change crossfades in 0.32 s; Home prefetches every shelf title's backdrop and logo so the swap never waits on the server. Details toggle with I.
 
 ### Navigation
 Native sidebar (system glass) with Home and Libraries; native toolbar with search (prompt "Titles, people, collections"), Sort menu and a poster-size slider in libraries. Selection uses the system selection tinted ink. Dark scheme forced.
@@ -208,10 +208,10 @@ Heading, detail, optional small spinner; left-aligned on the gutter below the to
 Opens from the hero or poster frame, then fills the window; the room light drops to 0 over 0.6 s. Controls (close, title and transport panel) are Liquid Glass tinted black; scrub bar is ink capsules. Skip Intro and Skip Credits are primary buttons sliding in from the trailing edge. Subtitles are 26 pt semibold white with a black shadow.
 
 ### Motion
-- **Light** crossfades: ease-out 0.45 s.
-- **Objects** (lift, scroll, details, stage): spring, response 0.38, no bounce.
+- **Light** crossfades: ease-out 0.32 s.
+- **Objects** (scroll, details, stage): spring, response 0.26, no bounce. **Pointer lift:** spring 0.18, immediate on hover. **Stage:** opens 0.34, closes 0.3.
 - **Quick** state changes: ease-out 0.16 s.
-- **Hover dwell** before focus moves: 220 ms.
+- **Hover dwell** before the room and hero follow: 120 ms (the card itself lifts immediately).
 - **Reduce Motion:** objects become a 0.2 s crossfade, no lift or scale; light keeps crossfading. **Reduce Transparency:** room light drops to 0.36.
 
 ### Keyboard
@@ -227,7 +227,7 @@ Arrows move focus and scroll; Return or Space plays; I toggles details; ⌘F sea
 - **Do** use solid raised surfaces for secondary controls and anything over art.
 - **Do** left-align messages and text on the 40 pt gutter, clear of the toolbar.
 - **Do** write captions as facts in tabular figures joined by " · ", with a hairline above.
-- **Do** crossfade light at 0.45 s, move objects with spring 0.38 and no bounce, and fall back to crossfade under Reduce Motion.
+- **Do** crossfade light at 0.32 s, move objects with spring 0.26 and no bounce, and fall back to crossfade under Reduce Motion.
 - **Do** give every shortcut a menu item.
 
 ### Don't:

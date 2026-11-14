@@ -71,12 +71,15 @@ enum Theme {
 
     enum Motion {
         /// The room's light following focus.
-        static let light = Animation.easeOut(duration: 0.45)
+        static let light = Animation.easeOut(duration: 0.32)
         /// Objects moving (posters lifting, the stage opening). No bounce.
-        static let object = Animation.spring(response: 0.38, dampingFraction: 1)
+        static let object = Animation.spring(response: 0.26, dampingFraction: 1)
         static let quick = Animation.easeOut(duration: 0.16)
-        /// How long the pointer rests on a poster before the room follows it.
-        static let hoverDwell: Duration = .milliseconds(220)
+        /// Pointer lift: immediate, short, no bounce.
+        static let lift = Animation.spring(response: 0.18, dampingFraction: 1)
+        /// How long the pointer rests on a poster before the room and hero follow it.
+        /// The card itself lifts at once; only the expensive change waits.
+        static let hoverDwell: Duration = .milliseconds(120)
 
         /// Object motion, or a plain crossfade when Reduce Motion is on.
         static func object(_ reduceMotion: Bool) -> Animation {

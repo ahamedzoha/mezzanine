@@ -96,6 +96,24 @@ struct HomeView: View {
         guard let client = session.client else { return }
         await model.load(client: client)
         updateRoom()
+        await prefetchHeroArt()
+    }
+
+    /// Warms the backdrop and logo of every shelf title, so moving focus
+    /// swaps the hero from memory instead of waiting on the server.
+    private func prefetchHeroArt() async {
+        let width = Int((NSScreen.main?.frame.width ?? 1440) * 0.74 * 2)
+        let items = model.shelves.flatMap { $0.items.prefix(16) }
+        await withTaskGroup(of: Void.self) { group in
+            for item in items {
+                if let url = session.backdropURL(item.backdropPath, pixelWidth: width) {
+                    group.addTask(priority: .utility) { [images = session.images] in _ = try? await images.image(for: url, pixelSize: width) }
+                }
+                if let url = session.logoURL(item.clearLogoPath) {
+                    group.addTask(priority: .utility) { [images = session.images] in _ = try? await images.image(for: url, pixelSize: 1200) }
+                }
+            }
+        }
     }
 
     private func heroHeight(_ windowHeight: CGFloat) -> CGFloat {

@@ -192,6 +192,9 @@ struct GridPoster: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dwell: Task<Void, Never>?
     @State private var frame: CGRect = .zero
+    @State private var hovering = false
+
+    private var lifted: Bool { isFocused || hovering }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
@@ -202,20 +205,20 @@ struct GridPoster: View {
                         if let p = item.progress {
                             Capsule().fill(Theme.ink).frame(width: max(4, (geo.size.width - 20) * p), height: 3)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 10).padding(.bottom, isFocused ? 54 : 10)
+                                .padding(.horizontal, 10).padding(.bottom, lifted ? 54 : 10)
                         }
                     }
                     .overlay(alignment: .bottomTrailing) {
-                        if isFocused { PlayDisc { onPlay(frame) }.padding(10).transition(.opacity) }
+                        if lifted { PlayDisc { onPlay(frame) }.padding(10).transition(.opacity) }
                     }
             }
             .aspectRatio(2 / 3, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous))
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
-            .shadow(color: .black.opacity(isFocused ? 0.6 : 0.3), radius: isFocused ? 22 : 8, y: isFocused ? 14 : 4)
-            .scaleEffect(isFocused && !reduceMotion ? 1.045 : 1, anchor: .bottom)
-            .offset(y: isFocused && !reduceMotion ? -4 : 0)
-            .animation(Theme.Motion.object(reduceMotion), value: isFocused)
+            .shadow(color: .black.opacity(lifted ? 0.6 : 0.3), radius: lifted ? 22 : 8, y: lifted ? 14 : 4)
+            .scaleEffect(lifted && !reduceMotion ? 1.045 : 1, anchor: .bottom)
+            .offset(y: lifted && !reduceMotion ? -4 : 0)
+            .animation(reduceMotion ? .easeOut(duration: 0.15) : Theme.Motion.lift, value: lifted)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(Format.displayTitle(item)).font(Theme.Typeface.cardTitle)
@@ -226,6 +229,7 @@ struct GridPoster: View {
         }
         .contentShape(Rectangle())
         .onHover { inside in
+            withAnimation(Theme.Motion.lift) { hovering = inside }
             dwell?.cancel()
             guard inside, !isFocused else { return }
             dwell = Task {
