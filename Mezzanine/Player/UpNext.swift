@@ -20,7 +20,7 @@ struct UpNextCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.still, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 Text([Format.episodeCode(next), next.title].compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.ink).lineLimit(2)
+                    .font(Theme.Typeface.cardHeadline).foregroundStyle(Theme.ink).lineLimit(2)
                 if let summary = next.summary, !summary.isEmpty {
                     Text(summary).font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary).lineLimit(3)
                 }
@@ -73,7 +73,7 @@ struct StillWatchingCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
-            Text("Still watching?").font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.ink)
+            Text("Still watching?").font(Theme.Typeface.messageTitle).foregroundStyle(Theme.ink)
                 .accessibilityAddTraits(.isHeader)
             Text("Mezzanine paused before the next episode.").font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary)
             HStack(spacing: Theme.Space.m) {

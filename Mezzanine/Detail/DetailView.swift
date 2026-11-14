@@ -119,7 +119,7 @@ struct DetailView: View {
         HStack(alignment: .top, spacing: Theme.Space.xxl) {
             if let summary = item.summary, !summary.isEmpty {
                 Text(summary)
-                    .font(.system(size: 15))
+                    .font(Theme.Typeface.reading)
                     .lineSpacing(3)
                     .foregroundStyle(Theme.ink.opacity(0.88))
                     .frame(maxWidth: 640, alignment: .leading)

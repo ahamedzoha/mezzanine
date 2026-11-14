@@ -26,7 +26,9 @@ final class SessionStore {
     let identity: PlexIdentity
     /// Every remote image in the app goes through this one pipeline.
     let images = ImagePipeline(disk: .standard(limitMB: 512))
-    private let keychain = Keychain(service: "com.mezzanine.mac.plex")
+    /// "com.mezzanine.mac.plex" for the app; Debug builds (com.mezzanine.mac.debug) keep
+    /// their own token, so test runs never touch the installed app's sign-in.
+    private let keychain = Keychain(service: (Bundle.main.bundleIdentifier ?? "com.mezzanine.mac") + ".plex")
     private let tv: PlexTV
     private var signInTask: Task<Void, Never>?
     /// The browser page for the sign-in in progress (to reopen it).

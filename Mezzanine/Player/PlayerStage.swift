@@ -266,7 +266,7 @@ struct PlayerStage: View {
     private var titleMark: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
             LogoImage(url: session.logoURL(item.clearLogoPath), pixelWidth: 640) {
-                Text(Format.displayTitle(item)).font(.system(size: 20, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text(Format.displayTitle(item)).font(.system(.title, weight: .semibold)).foregroundStyle(Theme.ink)
             }
             .frame(maxWidth: 300, maxHeight: 84, alignment: .topLeading)
             .shadow(color: .black.opacity(0.5), radius: 8, y: 2)
@@ -956,7 +956,7 @@ private struct PlaybackFailure: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
             Label("Playback stopped", systemImage: "exclamationmark.triangle.fill")
-                .font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.ink)
+                .font(Theme.Typeface.cardHeadline).foregroundStyle(Theme.ink)
                 .accessibilityAddTraits(.isHeader)
             Text(message).font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary).frame(maxWidth: 420, alignment: .leading)
             HStack(spacing: Theme.Space.m) {

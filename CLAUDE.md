@@ -55,10 +55,10 @@ Build output goes to `build.noindex/` (Spotlight skips it).
 (real key events through the router; menus ignore keys while the app is in the background, so
 ⌘ items use `!action`) `-ScrubHoverAt 0.6` `-SnapshotNoClipboard YES`; detail:
 `-MezzanineOpen <ratingKey>` `-DetailSection cast`; windows: `-MezzanineOpenWindow shortcuts|settings`
-with `-settingsTab shortcuts`; delivery: `-PlayerQuality remux|convert|8000` `-ForceDirectFail YES`
+with `-settingsTab shortcuts`. Debug builds are `com.mezzanine.mac.debug` (own container,
+defaults and Keychain item), so test runs never change the installed app's settings or sign-in; delivery: `-PlayerQuality remux|convert|8000` `-ForceDirectFail YES`
 (each starts a real transcode on the server: keep runs short, let the player close itself
-(`-MezzanineAutoClose`) so the session stops, and check `Scripts/plex.sh pms /transcode/sessions`). Player tests that change settings (stats, subtitle offset) write to
-the same defaults as the installed app: reset them afterwards.
+(`-MezzanineAutoClose`) so the session stops, and check `Scripts/plex.sh pms /transcode/sessions`).
 
 Full screen: AppKit keeps the title/toolbar strip as an opaque band over the content even with
 the toolbar hidden; `WindowChrome` sets `.autoHideToolbar` while the player owns the window.

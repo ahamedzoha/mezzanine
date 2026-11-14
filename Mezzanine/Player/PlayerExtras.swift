@@ -76,7 +76,7 @@ struct PlayerStats: View {
         let path: String
         switch d.route {
         case "native": path = "AVPlayer"
-        case "loopback", "hls": path = "remuxed to HLS for AVPlayer"
+        case "loopback", "hls": path = "AVPlayer via the in-app HLS bridge"
         case "software": path = "software renderer"
         default: path = d.route
         }

@@ -33,7 +33,7 @@ struct DetailHero: View {
                 Rectangle().fill(Theme.rule).frame(width: 48, height: 1)
                 Text(caption).font(Theme.Typeface.caption).foregroundStyle(Theme.inkSecondary).lineLimit(1)
                 if let tagline = item.tagline, !tagline.isEmpty {
-                    Text(tagline).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.ink.opacity(0.9)).lineLimit(2)
+                    Text(tagline).font(Theme.Typeface.reading.weight(.medium)).foregroundStyle(Theme.ink.opacity(0.9)).lineLimit(2)
                 }
             }
 

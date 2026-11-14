@@ -14,7 +14,12 @@ final class AppCommandCenter {
         didSet { if selection != oldValue { query = ""; path = [] } }
     }
     /// Detail pages pushed over the current section.
-    var path: [DetailRoute] = []
+    var path: [DetailRoute] = [] {
+        didSet { recordForward(from: oldValue) }
+    }
+    /// Pages left by Back (⌘[ or the toolbar), most recent last, for Forward (⌘]).
+    private(set) var forwardStack: [DetailRoute] = []
+    @ObservationIgnored private var steppingForward = false
     /// Toolbar search text. Choosing a sidebar item or a Go item clears it.
     var query = ""
 
@@ -73,6 +78,7 @@ final class AppCommandCenter {
         query = ""
         selection = item
         path = []
+        forwardStack = []
         focusContent()
     }
 
@@ -90,8 +96,26 @@ final class AppCommandCenter {
         focusContent()
     }
 
-    /// The visible content has a focused title that Open would show.
+    func goForward() {
+        guard let next = forwardStack.popLast() else { return }
+        steppingForward = true
+        path.append(next)
+        steppingForward = false
+        focusContent()
+    }
+
     var canGoBack: Bool { !path.isEmpty }
+    var canGoForward: Bool { !forwardStack.isEmpty }
+
+    /// Back keeps what it left for Forward; opening anything new clears it (as in Safari).
+    private func recordForward(from old: [DetailRoute]) {
+        guard !steppingForward, path != old else { return }
+        if path.count < old.count, Array(old.prefix(path.count)) == path {
+            forwardStack.append(contentsOf: old[path.count...].reversed())
+        } else {
+            forwardStack.removeAll()
+        }
+    }
 }
 
 struct MezzanineCommands: Commands {
@@ -154,6 +178,9 @@ struct MezzanineCommands: Commands {
             Button("Back") { center.goBack() }
                 .keyboardShortcut("[", modifiers: .command)
                 .disabled(!center.canGoBack || center.isPlayerOpen)
+            Button("Forward") { center.goForward() }
+                .keyboardShortcut("]", modifiers: .command)
+                .disabled(!center.canGoForward || center.isPlayerOpen)
             Button("Enclosing Folder") { center.enclosingFolder() }
                 .keyboardShortcut(.upArrow, modifiers: .command)
                 .disabled(!center.isFolderBrowserVisible || center.isPlayerOpen)

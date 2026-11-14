@@ -62,15 +62,27 @@ enum Theme {
 
     // MARK: Type
 
+    /// Text styles, so the type follows macOS's Text Size setting (Accessibility ▸
+    /// Display); sizes in comments are the defaults. Glyphs inside fixed-size discs keep
+    /// point sizes.
     enum Typeface {
-        /// Room messages (empty, error, loading states).
-        static let messageTitle = Font.system(size: 22, weight: .semibold)
-        static let shelfTitle = Font.system(size: 17, weight: .semibold)
-        static let cardTitle = Font.system(size: 13, weight: .semibold)
-        static let cardMeta = Font.system(size: 12, weight: .regular).monospacedDigit()
-        static let caption = Font.system(size: 13, weight: .medium).monospacedDigit()
-        static let body = Font.system(size: 14, weight: .regular)
-        static let button = Font.system(size: 14, weight: .semibold)
+        /// Room messages (empty, error, loading states). 22 pt.
+        static let messageTitle = Font.system(.title, weight: .semibold)
+        /// Shelf and section titles. 17 pt.
+        static let shelfTitle = Font.system(.title2, weight: .semibold)
+        /// Card and row titles. 13 pt.
+        static let cardTitle = Font.system(.body, weight: .semibold)
+        /// Facts under titles. 12 pt, tabular digits.
+        static let cardMeta = Font.system(.callout).monospacedDigit()
+        /// Ruled captions. 13 pt, tabular digits.
+        static let caption = Font.system(.body, weight: .medium).monospacedDigit()
+        /// Summaries and running text. 13 pt.
+        static let body = Font.system(.body)
+        /// Long-form reading (a title's summary, taglines). 15 pt.
+        static let reading = Font.system(.title3)
+        static let button = Font.system(.body, weight: .semibold)
+        /// A card's headline (Up Next, failure panels). 17 pt.
+        static let cardHeadline = Font.system(.title2, weight: .semibold)
     }
 
     // MARK: Motion

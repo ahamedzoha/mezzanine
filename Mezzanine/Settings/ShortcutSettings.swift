@@ -265,7 +265,7 @@ enum ShortcutReference {
 
     static let anywhere: [Entry] = [
         .init(keys: "⌘F", action: "Find"),
-        .init(keys: "⌘[", action: "Back"),
+        .init(keys: "⌘[ ⌘]", action: "Back / forward"),
         .init(keys: "⌘1", action: "Home"),
         .init(keys: "⌘2 – ⌘9", action: "Libraries"),
         .init(keys: "⌘/", action: "Keyboard shortcuts"),

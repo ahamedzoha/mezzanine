@@ -125,7 +125,7 @@ private struct StepText: View {
     var detail: String?
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
-            Text(line).font(.system(size: 17, weight: .medium)).foregroundStyle(Theme.ink)
+            Text(line).font(.system(.title2, weight: .medium)).foregroundStyle(Theme.ink)
                 .accessibilityAddTraits(.isHeader)
             if let detail {
                 Text(detail).font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary)
@@ -156,7 +156,7 @@ private struct SignInStep: View {
                     Link("plex.tv/link", destination: URL(string: "https://plex.tv/link")!)
                     Text("and enter").foregroundStyle(Theme.inkSecondary)
                     Text(code)
-                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                        .font(.system(.title3, design: .monospaced, weight: .semibold))
                         .foregroundStyle(Theme.ink)
                         .textSelection(.enabled)
                         .accessibilityLabel("Code \(code.map(String.init).joined(separator: " "))")
@@ -296,7 +296,7 @@ private struct ProfileStep: View {
             }
             if let error {
                 Label(error, systemImage: "exclamationmark.circle.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Typeface.button)
                     .foregroundStyle(Theme.ink)
             }
         }
