@@ -25,6 +25,7 @@ struct MezzanineApp: App {
     @State private var playback: PlaybackCoordinator
     @State private var commands = AppCommandCenter()
     @State private var library = LibraryStore()
+    @State private var sound: SoundSettings
 
     init() {
         TitleFont.register()
@@ -33,6 +34,7 @@ struct MezzanineApp: App {
         _session = State(initialValue: session)
         _player = State(initialValue: player)
         _playback = State(initialValue: PlaybackCoordinator(player: player, session: session))
+        _sound = State(initialValue: SoundSettings(route: AudioRouteMonitor(), player: player))
     }
 
     var body: some Scene {
@@ -43,6 +45,7 @@ struct MezzanineApp: App {
                 .environment(playback)
                 .environment(commands)
                 .environment(library)
+                .environment(sound)
                 .task {
                     appDelegate.beforeQuit = { [playback] in await playback.finishForQuit() }
                     playback.onStopped = { [library] item, time, duration in
@@ -56,12 +59,13 @@ struct MezzanineApp: App {
         }
         .defaultSize(width: 1440, height: 900)
         .windowResizability(.contentMinSize)
-        .commands { MezzanineCommands(center: commands) }
+        .commands { MezzanineCommands(center: commands, sound: sound) }
 
         Settings {
             SettingsView()
                 .environment(session)
                 .environment(library)
+                .environment(sound)
         }
 
         #if DEBUG

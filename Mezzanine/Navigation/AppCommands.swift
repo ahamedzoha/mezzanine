@@ -87,6 +87,7 @@ final class AppCommandCenter {
 
 struct MezzanineCommands: Commands {
     let center: AppCommandCenter
+    let sound: SoundSettings
 
     var body: some Commands {
         CommandGroup(after: .textEditing) {
@@ -148,16 +149,35 @@ struct MezzanineCommands: Commands {
                 Button("Skip Intro or Credits") { center.player(.skipMarker) }
                     .keyboardShortcut("s", modifiers: [])
                 Divider()
+                Button("Volume Up") { sound.stepVolume(10) }
+                    .keyboardShortcut(.upArrow, modifiers: [])
+                Button("Volume Down") { sound.stepVolume(-10) }
+                    .keyboardShortcut(.downArrow, modifiers: [])
+                Toggle("Dialogue Boost", isOn: Binding(get: { sound.current.profile.dialogueGainDB > 0 }, set: { _ in sound.toggleDialogue() }))
+                    .keyboardShortcut("d", modifiers: [])
+                Toggle("Night Mode", isOn: Binding(get: { sound.current.profile.nightMode }, set: { _ in sound.toggleNight() }))
+                    .keyboardShortcut("n", modifiers: .option)
+                Divider()
                 Button("Close Player") { center.player(.close) }
                     .keyboardShortcut(.escape, modifiers: [])
                 Divider()
-                Text("Also: K play/pause · J back · L forward · F full screen")
-            } else {
+                Text("Also: K play/pause · J back · L forward · F full screen · ↑ ↓ volume to 400 %")
+            }
+            Divider()
+            Menu("Sound Profile for \(sound.deviceName)") {
+                Picker("Profile", selection: Binding(get: { sound.current.kind }, set: { sound.setKind($0) })) {
+                    ForEach([AudioOutputKind.builtInSpeakers, .headphones, .speakers21, .airPods, .hdmi, .other], id: \.self) {
+                        Text($0.label).tag($0)
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+            if !center.isPlayerOpen {
                 Button("Play") { center.playFocused() }
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(!center.hasFocusedTitle || !center.isSignedIn)
                 Divider()
-                Text("Also: Return or Space plays the focused title")
+                Text("Also: Space plays the focused title; Return opens it")
             }
         }
     }

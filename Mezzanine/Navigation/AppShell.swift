@@ -118,6 +118,12 @@ struct AppShell: View {
                let item = try? await client.metadata(key) {
                 if UserDefaults.standard.bool(forKey: "playerMuted") { playback.player.volume = VolumeLevel(percent: 0) }
                 await playback.play(item, from: nil)
+                Task {
+                    try? await Task.sleep(for: .seconds(8))
+                    let d = playback.player.diagnostics
+                    print("AUTOPLAY route=\(d.route) audio=\(d.audioDelivery) adec=\(d.audioDecoder ?? "-") shaping=\(d.audioShaping) profile=\(playback.player.audioProfile)")
+                    fflush(stdout)
+                }
                 let seekTo = UserDefaults.standard.integer(forKey: "MezzanineAutoSeek")
                 if seekTo > 0 { try? await Task.sleep(for: .seconds(3)); await playback.player.seek(to: Double(seekTo)) }
                 // -MezzanineAutoClose <seconds> closes the player like Esc (activity tests).

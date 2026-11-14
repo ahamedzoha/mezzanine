@@ -6,6 +6,7 @@ import MezzanineKit
 struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
+    @Environment(SoundSettings.self) private var sound
 
     var body: some View {
         TabView {
@@ -19,6 +20,45 @@ struct SettingsView: View {
                     if session.account != nil {
                         Button("Sign Out") { session.signOut() }
                     }
+                }
+                .formStyle(.grouped)
+            }
+            Tab("Sound", systemImage: "speaker.wave.2") {
+                Form {
+                    Section {
+                        LabeledContent("Output", value: sound.deviceName)
+                        Picker("This output is", selection: Binding(get: { sound.current.kind }, set: { sound.setKind($0) })) {
+                            ForEach([AudioOutputKind.builtInSpeakers, .headphones, .speakers21, .airPods, .hdmi, .other], id: \.self) {
+                                Text($0.label).tag($0)
+                            }
+                        }
+                    } footer: {
+                        Text(sound.current.kind.summary + ". Mezzanine remembers this for each output and switches when you change outputs.")
+                    }
+                    Section("Adjust") {
+                        LabeledContent("Volume") {
+                            HStack {
+                                Slider(value: Binding(get: { sound.current.volumePercent }, set: { sound.setVolume($0) }), in: 0...400, step: 10)
+                                    .frame(width: 200)
+                                Text("\(Int(sound.current.volumePercent)) %").monospacedDigit().frame(width: 52, alignment: .trailing)
+                            }
+                        }
+                        LabeledContent("Dialogue boost") {
+                            HStack {
+                                Slider(value: Binding(get: { sound.current.profile.dialogueGainDB }, set: { sound.setDialogue($0) }), in: 0...12, step: 1)
+                                    .frame(width: 200)
+                                Text("+\(Int(sound.current.profile.dialogueGainDB)) dB").monospacedDigit().frame(width: 52, alignment: .trailing)
+                            }
+                        }
+                        Picker("Raise quiet films", selection: Binding(get: { sound.current.profile.loudnessTargetLUFS }, set: { sound.setLoudness($0) })) {
+                            Text("Off").tag(Double?.none)
+                            Text("A little").tag(Double?.some(-24))
+                            Text("Moderately").tag(Double?.some(-20))
+                            Text("A lot").tag(Double?.some(-16))
+                        }
+                        Toggle("Night mode (softer explosions, clearer whispers)", isOn: Binding(get: { sound.current.profile.nightMode }, set: { _ in sound.toggleNight() }))
+                    }
+                    .disabled(sound.current.kind == .hdmi || sound.current.kind == .airPods)
                 }
                 .formStyle(.grouped)
             }

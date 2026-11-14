@@ -14,6 +14,9 @@ struct PlayerStage: View {
 
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(AppCommandCenter.self) private var commands
+    @Environment(SoundSettings.self) private var sound
+    @State private var soundToast: String?
+    @State private var toastTask: Task<Void, Never>?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var opened = false
     @State private var hudVisible = true
@@ -30,6 +33,7 @@ struct PlayerStage: View {
             SubtitleOverlay(player: player)
             if hudVisible { hud.transition(.opacity) }
             skipButton
+            if let soundToast { SoundToast(text: soundToast, volume: sound.current.volumePercent).transition(.opacity) }
         }
         .frame(width: frame.width, height: frame.height)
         .clipShape(RoundedRectangle(cornerRadius: opened ? 0 : Theme.Radius.still, style: .continuous))
@@ -58,9 +62,26 @@ struct PlayerStage: View {
         .onKeyPress(.return) { _ = perform(.skipMarker); return .handled }
         .onChange(of: commands.playerRequests.count) { _, _ in _ = perform(commands.playerRequests.action) }
         .onChange(of: player.status) { _, _ in playback.reporter?.statusChanged() }
+        .onChange(of: sound.current) { old, new in
+            if old.volumePercent != new.volumePercent { toast("Volume \(Int(new.volumePercent)) %") }
+            else if old.profile.dialogueGainDB != new.profile.dialogueGainDB { toast(new.profile.dialogueGainDB > 0 ? "Dialogue boost on" : "Dialogue boost off") }
+            else if old.profile.nightMode != new.profile.nightMode { toast(new.profile.nightMode ? "Night mode on" : "Night mode off") }
+            else if old.kind != new.kind { toast(new.kind.label) }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Player")
         .accessibilityAddTraits(.isModal)
+    }
+
+    private func toast(_ text: String) {
+        withAnimation(Theme.Motion.quick) { soundToast = text }
+        toastTask?.cancel()
+        toastTask = Task {
+            try? await Task.sleep(for: .seconds(1.4))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.3)) { soundToast = nil }
+        }
+        AccessibilityNotification.Announcement(text).post()
     }
 
     /// Every player key and Playback menu item lands here.
@@ -252,5 +273,39 @@ struct SubtitleOverlay: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .padding(.bottom, 56)
         .allowsHitTesting(false)
+    }
+}
+
+/// A brief readout when volume or sound settings change: text, and for volume
+/// a bar to 400 % with a tick at 100 % (beyond it is boost).
+private struct SoundToast: View {
+    let text: String
+    let volume: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s) {
+            Text(text).font(Theme.Typeface.button).foregroundStyle(Theme.ink)
+            if text.hasPrefix("Volume") {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.ink.opacity(0.2))
+                        Capsule().fill(volume > 100 ? Theme.lilac : Theme.ink)
+                            .frame(width: max(4, geo.size.width * volume / VolumeLevel.maximumPercent))
+                        Rectangle().fill(Theme.ink.opacity(0.6)).frame(width: 1, height: 10)
+                            .offset(x: geo.size.width * 100 / VolumeLevel.maximumPercent)
+                    }
+                }
+                .frame(width: 180, height: 6)
+                if volume > 100 {
+                    Text("Boosted · the limiter keeps peaks clean").font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary)
+                }
+            }
+        }
+        .padding(Theme.Space.m)
+        .glassEffect(.regular.tint(.black.opacity(0.55)), in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
+        .padding(Theme.Space.l)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
