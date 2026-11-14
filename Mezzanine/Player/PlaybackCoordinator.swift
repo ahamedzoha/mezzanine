@@ -27,6 +27,25 @@ final class PlaybackCoordinator {
     /// local library reflects the new resume point at once.
     var onStopped: ((PlexMetadata, TimeInterval, TimeInterval) -> Void)?
 
+    // MARK: Binge state
+
+    /// How binges behave (Settings ▸ Playback); persisted.
+    var binge: BingeSettings = {
+        guard let data = UserDefaults.standard.data(forKey: "bingeSettings.v1"),
+              let s = try? JSONDecoder().decode(BingeSettings.self, from: data) else { return BingeSettings() }
+        return s
+    }() {
+        didSet { if let data = try? JSONEncoder().encode(binge) { UserDefaults.standard.set(data, forKey: "bingeSettings.v1") } }
+    }
+    /// The episode after the one playing (episodes only), resolved at load.
+    private(set) var nextEpisode: PlexMetadata?
+    /// Episodes played in this sitting (for "skip intro after the first episode").
+    private(set) var episodesThisSession = 0
+    /// Episodes started by autoplay in a row (for "Still watching?").
+    private(set) var autoplayedInARow = 0
+    private(set) var sessionStart = Date()
+    private var episodesCache: [String: [PlexMetadata]] = [:]
+
     init(player: MezzaninePlayer, session: SessionStore) {
         self.player = player
         self.session = session
@@ -35,7 +54,19 @@ final class PlaybackCoordinator {
     /// Plays a movie or episode (resuming), or the next unwatched episode of
     /// a season or show.
     func play(_ item: PlexMetadata, from origin: CGRect?) async {
+        await play(item, from: origin, autoplayed: false)
+    }
+
+    /// Starts the next episode (Up Next, or N while playing).
+    func playNext(autoplayed: Bool) async {
+        guard let next = nextEpisode else { return }
+        await play(next, from: nil, autoplayed: autoplayed)
+    }
+
+    private func play(_ item: PlexMetadata, from origin: CGRect?, autoplayed: Bool) async {
         guard let client = session.client else { return }
+        if self.item == nil { sessionStart = Date(); episodesThisSession = 0 }
+        autoplayedInARow = autoplayed ? autoplayedInARow + 1 : 0
         error = nil
         do {
             let playable = try await resolvePlayable(item, client: client)
@@ -67,6 +98,9 @@ final class PlaybackCoordinator {
             let reporter = ActivityReporter(client: client, item: detail, player: player)
             self.reporter = reporter
             reporter.start()
+            if detail.kind == .episode { episodesThisSession += 1 }
+            nextEpisode = nil
+            await resolveNext(after: detail, client: client)
         } catch is CancellationError {
         } catch {
             self.error = (error as? PlexError)?.userMessage ?? "Couldn’t start playback."
@@ -122,6 +156,34 @@ final class PlaybackCoordinator {
     func finishForQuit() async {
         await reporter?.stop()
         reporter = nil
+    }
+
+    /// Finds the next episode, and warms its first bytes so it starts at once.
+    private func resolveNext(after episode: PlexMetadata, client: PlexServerClient) async {
+        guard episode.kind == .episode, let show = episode.grandparentRatingKey else { return }
+        if episodesCache[show] == nil { episodesCache[show] = try? await client.allLeaves(show) }
+        guard let next = BingePlanner.nextEpisode(after: episode, in: episodesCache[show] ?? []) else { return }
+        nextEpisode = next
+    }
+
+    /// Warms the next episode's file (called when Up Next appears).
+    func prewarmNext() {
+        guard let next = nextEpisode, let client = session.client,
+              let key = next.media.first?.parts.first?.key, let url = client.urls.part(key: key) else { return }
+        let headers = client.requestHeaders
+        Task.detached(priority: .utility) { await MezzaninePlayer.prewarm(url: url, headers: headers) }
+    }
+
+    /// Whether this episode's intro should be skipped without asking.
+    var autoSkipsIntro: Bool {
+        guard let item, item.kind == .episode else { return false }
+        return BingePlanner.shouldAutoSkipIntro(settings: binge, showKey: item.grandparentRatingKey,
+                                                episodesThisSession: episodesThisSession - 1)
+    }
+
+    var shouldAskStillWatching: Bool {
+        BingePlanner.shouldAskStillWatching(settings: binge, autoplayedInARow: autoplayedInARow,
+                                            sessionStart: sessionStart, now: Date())
     }
 
     /// Seasons and shows play their next unwatched episode.

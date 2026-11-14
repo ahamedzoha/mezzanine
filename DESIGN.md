@@ -249,3 +249,14 @@ Arrows move focus and scroll (← at the first column returns to the sidebar; Ho
 ## Onboarding
 
 A solid graphite column (40 %) beside a wall of the library's own posters (edge to edge, under the title bar). The MEZZANINE wordmark sits at a fixed 38 % height; each step's content grows below it. Cells resolve blur-to-sharp in a diagonal sweep as the index reads; the room light takes a new poster's colours every 4 s (held still under Reduce Motion). The window hides its title (buttons stay) during onboarding and hides all chrome while a film plays.
+
+## Player (Bare Picture)
+
+- The film fills the window; chrome shows on pointer movement or any key and hides after 2.5 s (never while paused, a panel is open, or VoiceOver runs). The cursor hides with it.
+- Top-left: the title's clear logo (≤ 300 × 84 pt, soft shadow) with the episode line (S3 E10 · Title) under it; text title when there is no logo. Top-right: round dark-glass close (40 pt).
+- Bottom: elapsed and remaining times (card meta, tabular) above a 2 pt edge scrub (ink 30 %, played ink, intro/credits ink 50 %); it thickens to 6 pt under the pointer with a glass time tooltip.
+- One ⋯ glass button bottom-right opens a 360 pt glass panel (black 62 %): Audio, Subtitles, Sound, Speed rows with current values; each opens in place with a back header. Subtitles include Find Subtitles… (Plex's OpenSubtitles search, saved to the server), size 60–200 %, background box, timing ±0.1 s.
+- Skip Intro / Next Episode / Skip Credits: the only full button, lilac, with a fill that drains as the marker plays. Auto-skip rules can skip silently (a "Skipped intro" readout confirms).
+- Up Next: at the final credits marker (else 30 s before the end) the picture shrinks to 52 % into the top-left corner with a 16 pt radius; the card at right carries the next episode's still (380 × 214), title, three lines of synopsis, Play Now (lilac, countdown ring) and Hide, and "Starts in N s". Still Watching? replaces it after N episodes or H hours.
+- Transient glyphs (play, pause, ±10) flash centred in a 70 pt glass circle for 0.65 s; sound changes show a corner readout with a volume bar to 400 % and a tick at 100 %.
+- Click toggles play; double click toggles full screen.

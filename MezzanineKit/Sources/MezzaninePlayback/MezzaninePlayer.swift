@@ -90,6 +90,11 @@ public final class MezzaninePlayer {
         engine.volume = Float(volume.linearVolume)
     }
 
+    /// Fetches a file's opening bytes ahead of a `load` (the next episode), so it starts at once.
+    public nonisolated static func prewarm(url: URL, headers: [String: String]) async {
+        await AetherEngine.prewarm(url: url, httpHeaders: headers)
+    }
+
     // MARK: Transport
 
     public func play() { engine.play() }
