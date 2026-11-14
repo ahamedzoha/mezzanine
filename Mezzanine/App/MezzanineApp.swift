@@ -63,6 +63,7 @@ struct MezzanineApp: App {
 
         Settings {
             SettingsView()
+                .environment(playback)
                 .environment(session)
                 .environment(library)
                 .environment(sound)

@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
     @Environment(SoundSettings.self) private var sound
+    @Environment(PlaybackCoordinator.self) private var playback
 
     var body: some View {
         TabView {
@@ -19,6 +20,32 @@ struct SettingsView: View {
                     }
                     if session.account != nil {
                         Button("Sign Out") { session.signOut() }
+                    }
+                }
+                .formStyle(.grouped)
+            }
+            Tab("Playback", systemImage: "play.rectangle") {
+                @Bindable var playback = playback
+                Form {
+                    Section("Episodes") {
+                        Picker("Up Next", selection: $playback.binge.upNextCountdown) {
+                            Text("Don’t play automatically").tag(0)
+                            ForEach([5, 10, 15, 30], id: \.self) { Text("Play after \($0) seconds").tag($0) }
+                        }
+                        Picker("Skip intros", selection: $playback.binge.autoSkipIntro) {
+                            ForEach(BingeSettings.AutoSkip.allCases, id: \.self) { Text($0.label).tag($0) }
+                        }
+                        Toggle("Skip credits and go to the next episode", isOn: $playback.binge.autoSkipCredits)
+                    }
+                    Section {
+                        Picker("Ask “Still watching?” after", selection: Binding(
+                            get: { playback.binge.stillWatchingAfterEpisodes ?? 0 },
+                            set: { playback.binge.stillWatchingAfterEpisodes = $0 == 0 ? nil : $0 })) {
+                            Text("Never").tag(0)
+                            ForEach([2, 3, 4, 6, 8], id: \.self) { Text("\($0) episodes").tag($0) }
+                        }
+                    } footer: {
+                        Text("Skip Intro and Next Episode buttons always appear; these settings decide what happens without them. S or Return skips by hand.")
                     }
                 }
                 .formStyle(.grouped)
