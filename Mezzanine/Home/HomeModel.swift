@@ -68,7 +68,9 @@ final class HomeModel {
         }
         do {
             let isMain = scope == HomeLayout.mainScope
-            var layout = saved ?? []
+            // One entry per id (a layout saved by an older build could repeat one).
+            var seen = Set<String>()
+            var layout = (saved ?? []).filter { seen.insert($0.id).inserted }
             if saved == nil {
                 layout = isMain ? HomeLayout.defaultHome : Self.defaultSpecs(section: scope, hubs: try await hubs(scope))
             }
@@ -90,6 +92,19 @@ final class HomeModel {
             guard !Task.isCancelled else { return }
             self.error = (error as? PlexError)?.userMessage ?? "Couldn’t load the shelves."
         }
+    }
+
+    /// Shows an edited layout at once from what's already resolved (Done in Edit Shelves),
+    /// so the strips unfold into poster rows in the new order without a reload.
+    func apply(_ layout: [ShelfSpec]) {
+        specs = layout
+        shelves = layout.filter { !$0.hidden }.compactMap { resolved[$0.id] }.filter { !$0.items.isEmpty && !$0.isMissing }
+        clampFocus()
+    }
+
+    /// The default layout for a scope (what "Restore Default Shelves" returns to).
+    func defaults(for scope: String) -> [ShelfSpec] {
+        scope == HomeLayout.mainScope ? HomeLayout.defaultHome : Self.defaultSpecs(section: scope, hubs: hubCatalog[scope] ?? [])
     }
 
     /// The Plex rows of each library, for the main Home's Add Shelf ▸ library submenus.

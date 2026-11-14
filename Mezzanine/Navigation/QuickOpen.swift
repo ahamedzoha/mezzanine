@@ -17,6 +17,9 @@ struct QuickOpen: View {
     @State private var rows: [Row] = []
     @State private var selected = 0
     @State private var search: Task<Void, Never>?
+    /// The pointer's last position over the list: hover selects only when the pointer moves,
+    /// not when rows scroll under a resting pointer.
+    @State private var lastPointer: CGPoint?
     @FocusState private var fieldFocused: Bool
 
     struct Row: Identifiable {
@@ -46,6 +49,7 @@ struct QuickOpen: View {
                 .padding(.leading, Theme.Space.gutter)
                 .padding(.top, Theme.Space.m)
         }
+        .onExitCommand { close() }
         .onAppear {
             fieldFocused = true
             #if DEBUG
@@ -76,8 +80,8 @@ struct QuickOpen: View {
                         step(press.key == .upArrow ? -1 : 1)
                         return .handled
                     }
-                    .onKeyPress(.return) {
-                        run(play: NSEvent.modifierFlags.contains(.command))
+                    .onKeyPress(keys: [.return]) { press in
+                        run(play: press.modifiers.contains(.command))
                         return .handled
                     }
                     .onKeyPress(.escape) { close(); return .handled }
@@ -107,7 +111,13 @@ struct QuickOpen: View {
                                 rowView(row, selected: i == selected)
                                     .id(row.id)
                                     .onTapGesture { selected = i; run(play: false) }
-                                    .onHover { if $0 { selected = i } }
+                                    .onContinuousHover(coordinateSpace: .global) { phase in
+                                        guard case .active(let point) = phase else { return }
+                                        if let last = lastPointer, last != point, selected != i { selected = i }
+                                        lastPointer = point
+                                    }
+                                    .accessibilityAction { selected = i; run(play: false) }
+                                    .modifier(PlayAction(enabled: row.item != nil) { selected = i; run(play: true) })
                             }
                         }
                         .padding(Theme.Space.s)
@@ -177,6 +187,11 @@ struct QuickOpen: View {
 
     private func refresh() async {
         let q = query.trimmingCharacters(in: .whitespaces)
+        defer {
+            if !Task.isCancelled {
+                AccessibilityNotification.Announcement(rows.isEmpty ? "No results" : (rows.count == 1 ? "1 result" : "\(rows.count) results")).post()
+            }
+        }
         var out: [Row] = []
         if q.isEmpty {
             for item in inProgress(limit: 3) {
@@ -186,6 +201,8 @@ struct QuickOpen: View {
         } else {
             // Titles that contain the words first; summary and cast matches after them.
             let found = await library.search(q)
+            // A newer query is already on its way.
+            guard !Task.isCancelled, q == query.trimmingCharacters(in: .whitespaces) else { return }
             let hits = found.filter { $0.title.localizedCaseInsensitiveContains(q) }
                 + found.filter { !$0.title.localizedCaseInsensitiveContains(q) }
             for item in hits.prefix(6) {
@@ -218,8 +235,8 @@ struct QuickOpen: View {
                            caption: i < 8 ? "⌘\(i + 2)" : "", symbol: section.kind == .show ? "tv" : "film", kind: .go(.library(section.key))))
         }
         all.append(Row(id: "settings", section: "Go To", title: "Settings", caption: "⌘,", symbol: "gearshape", kind: .settings))
-        all.append(Row(id: "edit", section: "Actions", title: "Edit Home Shelves", caption: "⌘E", symbol: "rectangle.stack", kind: .editShelves))
-        all.append(Row(id: "smart", section: "Actions", title: "New Smart Shelf", caption: "⌘N", symbol: "wand.and.stars", kind: .newSmartShelf))
+        all.append(Row(id: "edit", section: "Actions", title: "Edit Shelves", caption: "Home · ⌘E", symbol: "rectangle.stack", kind: .editShelves))
+        all.append(Row(id: "smart", section: "Actions", title: "New Smart Shelf…", caption: "Home · ⌘N", symbol: "wand.and.stars", kind: .newSmartShelf))
         guard !q.isEmpty else { return all }
         return all.filter { $0.title.localizedCaseInsensitiveContains(q) }
     }
@@ -238,6 +255,8 @@ struct QuickOpen: View {
     private func step(_ delta: Int) {
         guard !rows.isEmpty else { return }
         selected = min(max(0, selected + delta), rows.count - 1)
+        let row = rows[selected]
+        AccessibilityNotification.Announcement([row.title, row.caption, row.section].filter { !$0.isEmpty }.joined(separator: ", ")).post()
     }
 
     private func run(play: Bool) {
@@ -254,15 +273,32 @@ struct QuickOpen: View {
         case .settings:
             openSettings()
         case .editShelves:
-            commands.go(to: .home)
-            Task { try? await Task.sleep(for: .milliseconds(250)); commands.toggleEditShelves() }
+            openOnHome(.startEditing)
         case .newSmartShelf:
+            openOnHome(.newSmartShelf)
+        }
+    }
+
+    /// Runs a shelf action on Home: now if Home is showing, else once it appears.
+    private func openOnHome(_ action: AppCommandCenter.ShelfAction) {
+        if commands.isHomeVisible && commands.path.isEmpty {
+            commands.shelf(action)
+        } else {
+            commands.pendingHomeAction = action
             commands.go(to: .home)
-            Task { try? await Task.sleep(for: .milliseconds(250)); commands.newSmartShelf() }
         }
     }
 
     private func close() {
         commands.isQuickOpenShown = false
+    }
+}
+
+/// "Play" for VoiceOver on rows that hold a title.
+private struct PlayAction: ViewModifier {
+    let enabled: Bool
+    let action: () -> Void
+    func body(content: Content) -> some View {
+        if enabled { content.accessibilityAction(named: "Play", action) } else { content }
     }
 }

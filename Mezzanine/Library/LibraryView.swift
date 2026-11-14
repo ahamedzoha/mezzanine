@@ -87,6 +87,7 @@ struct LibraryView: View {
         .task(id: "\(section.key)|\(sortRaw)|\(filters.hashValue)|\(library.revision)") { await load() }
         .onChange(of: layoutRaw, initial: true) { _, raw in
             commands.currentLayout = raw
+            commands.availableLayouts = layouts.map(\.rawValue)
             commands.isFolderBrowserVisible = raw == LibraryLayout.folders.rawValue
         }
         .onChange(of: sortRaw, initial: true) { _, raw in commands.currentSort = raw }
@@ -97,6 +98,7 @@ struct LibraryView: View {
         .onChange(of: commands.sortRequest.count) { _, _ in sortRaw = commands.sortRequest.sort }
         .onDisappear {
             commands.currentLayout = nil
+            commands.availableLayouts = []
             commands.isFolderBrowserVisible = false
         }
     }
@@ -217,8 +219,7 @@ struct LibraryView: View {
             .disabled(layout == .list || layout == .folders || layout == .shelves)
         }
         ToolbarItem(id: "editShelves") {
-            Button(commands.isEditingShelves ? "Done" : "Edit Shelves") { commands.toggleEditShelves() }
-                .help("Reorder, hide and add this library’s shelves (⌘E)")
+            EditShelvesButton(editing: commands.isEditingShelves && layout == .shelves) { commands.toggleEditShelves() }
                 .disabled(layout != .shelves)
         }
     }

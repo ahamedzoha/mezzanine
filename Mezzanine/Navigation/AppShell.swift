@@ -103,6 +103,9 @@ struct AppShell: View {
         } detail: {
             NavigationStack(path: $commands.path) {
                 sectionRoot
+                    // Quick Open is modal: VoiceOver and Tab stay inside it.
+                    .accessibilityHidden(commands.isQuickOpenShown)
+                    .disabled(commands.isQuickOpenShown)
                     .navigationDestination(for: DetailRoute.self) { route in
                         DetailView(route: route, contentFocus: $contentFocused)
                             .background { RoomLight(palette: playback.roomPalette, intensity: playback.isPresented ? 0 : 1) }
@@ -178,6 +181,7 @@ struct AppShell: View {
                 library.connect(client: client, serverID: server.clientIdentifier,
                                 userID: session.account?.uuid ?? "owner", sections: commands.sections)
                 layouts.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
+                commands.layoutsReady = true
             }
             #if DEBUG
             // -MezzanineSection "TV Shows" opens a library at launch (screenshots, manual tests).

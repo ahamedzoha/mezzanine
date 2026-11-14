@@ -34,7 +34,8 @@ struct ShelfView: View {
                             PosterCard(item: item, width: Self.posterWidth, isFocused: focusedColumn == column,
                                        onFocus: { onFocus(column) }, onPlay: { frame in onPlay(item, frame) },
                                        onOpen: { (onOpen ?? commands.open)(item) },
-                                       fold: column < 5 ? fold.map { FoldID(id: "\(shelf.id)-\(column)", namespace: $0) } : nil)
+                                       // Under Reduce Motion the fold is a plain crossfade: nothing flies.
+                                       fold: column < 5 && !reduceMotion ? fold.map { FoldID(id: "\(shelf.id)-\(column)", namespace: $0) } : nil)
                                 .id(column)
                         }
                     }

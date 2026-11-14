@@ -250,8 +250,17 @@ enum ShortcutReference {
             .init(keys: "Space or ⌘Return", action: "Play"),
             .init(keys: "⌘I", action: "Show details (Home)"),
             .init(keys: "⌘= ⌘−", action: "Larger / smaller posters"),
-            .init(keys: "⌃⌘1 – ⌃⌘4", action: "Posters, wide, list, folders"),
+            .init(keys: "⌃⌘1 – ⌃⌘5", action: "Posters, wide, list, folders, shelves"),
             .init(keys: "⌘↑", action: "Enclosing folder"),
+        ]),
+        Page(title: "Edit Shelves (⌘E)", keys: [
+            .init(keys: "↑ ↓", action: "Select a shelf"),
+            .init(keys: "⌥↑ ⌥↓", action: "Move it"),
+            .init(keys: "Space", action: "Show or hide it"),
+            .init(keys: "Return", action: "Rename, or edit a smart shelf’s rules"),
+            .init(keys: "Delete", action: "Remove it (⌘Z undoes)"),
+            .init(keys: "⌘N", action: "New smart shelf"),
+            .init(keys: "Esc or ⌘E", action: "Done"),
         ]),
         Page(title: "Title pages", keys: [
             .init(keys: "↑ ↓", action: "Sections, and episodes in the list"),
@@ -264,6 +273,7 @@ enum ShortcutReference {
     ]
 
     static let anywhere: [Entry] = [
+        .init(keys: "⌘K", action: "Quick Open: titles, places and actions"),
         .init(keys: "⌘F", action: "Find"),
         .init(keys: "⌘[ ⌘]", action: "Back / forward"),
         .init(keys: "⌘1", action: "Home"),

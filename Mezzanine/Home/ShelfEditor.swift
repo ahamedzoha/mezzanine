@@ -2,12 +2,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 import MezzanineKit
 
-/// Edit Home: every shelf folded into a strip you can drag, hide, rename or open, with Add
-/// Shelf at the end. Changes save as they happen; Done (or ⌘E) unfolds the strips back into
-/// poster rows in the new order.
+/// Edit Shelves: every shelf folded into a strip you can drag, hide, rename or open, with Add
+/// Shelf at the end. Changes save as they happen (HomeView debounces) and every change can be
+/// undone (⌘Z); Done (or ⌘E) unfolds the strips back into poster rows in the new order.
 ///
 /// Keys: ↑/↓ select, ⌥↑/⌥↓ move, Space shows or hides, Return renames (or edits a smart
-/// shelf's rules), ⌫ removes, ⌘N new smart shelf, Esc or ⌘E done.
+/// shelf's rules), ⌫ removes, ⌘N new smart shelf, Esc or ⌘E done. Every key is also in
+/// View ▸ (while editing) and every action is in the strip's ⋯ menu and VoiceOver actions.
 struct ShelfEditor: View {
     let scope: String
     let model: HomeModel
@@ -19,14 +20,23 @@ struct ShelfEditor: View {
     let addCollection: () -> Void
     let addPlaylist: (PlexMetadata) -> Void
     let playlists: [PlexMetadata]
-    let resetLayout: () -> Void
+    /// What Restore Default Shelves returns to.
+    let defaults: [ShelfSpec]
+    /// Bumped by HomeView when a sheet closes, to take keyboard focus back.
+    let refocus: Int
     let done: () -> Void
 
+    @Environment(AppCommandCenter.self) private var commands
+    @Environment(\.undoManager) private var undoManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selected: String?
     @State private var renaming: ShelfSpec?
     @State private var renameText = ""
+    @State private var confirmingReset = false
     @State private var dragging: String?
+    /// The order before a drag, so the drag can be undone as one move.
+    @State private var dragStart: [ShelfSpec]?
+    @State private var addHovering = false
     @FocusState private var focused: Bool
 
     private var isMain: Bool { scope == HomeLayout.mainScope }
@@ -39,27 +49,37 @@ struct ShelfEditor: View {
                         Text("Drag to reorder. Hidden shelves stay here, dimmed.")
                             .font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary)
                         Spacer()
-                        Button("Restore Default Shelves", action: resetLayout)
+                        Button("Restore Default Shelves…") { confirmingReset = true }
                             .buttonStyle(.borderless)
                             .foregroundStyle(Theme.inkSecondary)
-                            .help("Go back to Plex’s own rows")
+                            .focusEffectDisabled(false)
+                            .disabled(specs == defaults)
+                            .help("Go back to Plex’s own rows (asks first; ⌘Z undoes it)")
                     }
                     .padding(.bottom, Theme.Space.s)
                     ForEach(specs) { spec in
                         ShelfStrip(spec: spec, shelf: model.resolved[spec.id], sourceLine: sourceLine(spec),
-                                   isSelected: selected == spec.id, peek: peek,
+                                   isSelected: selected == spec.id, isDragging: dragging == spec.id,
+                                   peek: reduceMotion ? nil : peek,
+                                   select: { selected = spec.id },
                                    toggleHidden: { toggleHidden(spec.id) },
+                                   actions: actions(spec),
                                    menu: { stripMenu(spec) })
                             .id(spec.id)
-                            .opacity(dragging == spec.id ? 0.4 : 1)
                             .onTapGesture { selected = spec.id; focused = true }
                             .simultaneousGesture(TapGesture(count: 2).onEnded { open(spec) })
                             .onDrag {
-                                dragging = spec.id
-                                return NSItemProvider(object: spec.id as NSString)
+                                beginDrag(spec.id)
+                                let provider = NSItemProvider()
+                                provider.registerDataRepresentation(forTypeIdentifier: UTType.mezzanineShelf.identifier,
+                                                                    visibility: .ownProcess) { done in
+                                    done(Data(spec.id.utf8), nil)
+                                    return nil
+                                }
+                                return provider
                             }
-                            .onDrop(of: [.text], delegate: StripDrop(target: spec.id, specs: $specs, dragging: $dragging,
-                                                                     animation: Theme.Motion.object(reduceMotion)))
+                            .onDrop(of: [.mezzanineShelf], delegate: StripDrop(target: spec.id, specs: $specs, dragging: $dragging,
+                                                                               animation: Theme.Motion.object(reduceMotion)))
                     }
                     addStrip
                 }
@@ -68,6 +88,8 @@ struct ShelfEditor: View {
                 .padding(.bottom, Theme.Space.xxl)
                 .frame(maxWidth: 980, alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // A drop anywhere else ends the drag cleanly.
+                .onDrop(of: [.mezzanineShelf], isTargeted: nil) { _ in endDrag(); return true }
             }
             .scrollIndicators(.never)
             .onChange(of: selected) { _, id in
@@ -82,6 +104,19 @@ struct ShelfEditor: View {
             focused = true
             if selected == nil { selected = specs.first?.id }
         }
+        .onChange(of: refocus) { _, _ in focused = true }
+        .onChange(of: specs.map(\.id)) { old, new in
+            // A shelf added from a menu, sheet or picker: select it and say so.
+            guard let added = new.first(where: { !old.contains($0) }) else { return }
+            selected = added
+            let title = title(of: specs.first { $0.id == added })
+            AccessibilityNotification.Announcement("\(title) added").post()
+        }
+        .onChange(of: renaming != nil || confirmingReset) { _, up in
+            commands.isModalShown = up
+            if !up { focused = true }
+        }
+        .onChange(of: commands.shelfRequests.count) { _, _ in handle(commands.shelfRequests.action) }
         .onKeyPress(keys: [.upArrow, .downArrow]) { press in
             let up = press.key == .upArrow
             if press.modifiers.contains(.option) { moveSelected(up ? -1 : 1) } else { step(up ? -1 : 1) }
@@ -102,13 +137,19 @@ struct ShelfEditor: View {
             remove(selected)
             return .handled
         }
-        .onKeyPress(.escape) { done(); return .handled }
+        .onExitCommand { done() }
         .alert("Rename Shelf", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $renameText)
             Button("Rename") { commitRename() }
             Button("Cancel", role: .cancel) { renaming = nil }
         } message: {
             Text("Leave it empty to use the shelf’s own name.")
+        }
+        .confirmationDialog("Restore the default shelves?", isPresented: $confirmingReset) {
+            Button("Restore Defaults", role: .destructive) { reset() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your own shelves and order are replaced by Plex’s rows. Edit ▸ Undo brings them back.")
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Edit shelves")
@@ -147,7 +188,7 @@ struct ShelfEditor: View {
         } label: {
             Label("Add Shelf", systemImage: "plus")
                 .font(Theme.Typeface.cardTitle)
-                .foregroundStyle(Theme.inkSecondary)
+                .foregroundStyle(addHovering ? Theme.ink : Theme.inkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
                 .padding(.horizontal, Theme.Space.m)
                 .contentShape(Rectangle())
@@ -155,10 +196,14 @@ struct ShelfEditor: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
+        .focusEffectDisabled(false)
+        .background(RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous)
+            .fill(addHovering ? Theme.raised : .clear))
         .background(RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous)
             .strokeBorder(Theme.rule, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
+        .onHover { addHovering = $0 }
         .padding(.top, Theme.Space.s)
-        .help("Add a Plex row, a collection, a playlist or a smart shelf")
+        .help("Add a Plex row, a collection, a playlist or a smart shelf (File ▸ New Smart Shelf ⌘N)")
     }
 
     /// Plex rows not already on this Home.
@@ -170,24 +215,54 @@ struct ShelfEditor: View {
         return (model.hubCatalog[section] ?? []).filter { !used.contains($0.hubIdentifier) && (section != nil || HomeModel.offersGlobal($0)) }
     }
 
-    // MARK: Strip menu
+    // MARK: Strip menu and actions
 
     @ViewBuilder private func stripMenu(_ spec: ShelfSpec) -> some View {
         Button("Rename…") { beginRename(spec) }
-        if spec.smartRule != nil {
-            Button("Edit Rules…") { editRules(spec) }
-            Button("Duplicate") { duplicate(spec) }
-        }
+        if spec.smartRule != nil { Button("Edit Rules…") { editRules(spec) } }
+        Button("Duplicate") { duplicate(spec) }
         Divider()
         Button("Move to Top") { move(spec.id, to: 0) }.disabled(specs.first?.id == spec.id)
         Button("Move Up") { selected = spec.id; moveSelected(-1) }.disabled(specs.first?.id == spec.id)
         Button("Move Down") { selected = spec.id; moveSelected(1) }.disabled(specs.last?.id == spec.id)
+        Button("Move to Bottom") { move(spec.id, to: specs.count - 1) }.disabled(specs.last?.id == spec.id)
         Divider()
         Button(spec.hidden ? "Show on Home" : "Hide from Home") { toggleHidden(spec.id) }
-        Button("Remove", role: .destructive) { remove(spec.id) }
+        Button(spec.smartRule != nil ? "Delete Smart Shelf" : "Remove from Home", role: .destructive) { remove(spec.id) }
+    }
+
+    /// The same actions for VoiceOver, named on the strip itself.
+    private func actions(_ spec: ShelfSpec) -> [(String, () -> Void)] {
+        var list: [(String, () -> Void)] = [
+            (spec.hidden ? "Show on Home" : "Hide from Home", { toggleHidden(spec.id) }),
+            ("Move Up", { selected = spec.id; moveSelected(-1) }),
+            ("Move Down", { selected = spec.id; moveSelected(1) }),
+            ("Rename", { beginRename(spec) }),
+        ]
+        if spec.smartRule != nil { list.append(("Edit Rules", { editRules(spec) })) }
+        list.append((spec.smartRule != nil ? "Delete Smart Shelf" : "Remove from Home", { remove(spec.id) }))
+        return list
+    }
+
+    private func handle(_ action: AppCommandCenter.ShelfAction) {
+        guard let id = selected, let spec = specs.first(where: { $0.id == id }) else { return }
+        switch action {
+        case .moveUp: moveSelected(-1)
+        case .moveDown: moveSelected(1)
+        case .toggleHidden: toggleHidden(id)
+        case .rename: open(spec)
+        case .remove: remove(id)
+        default: break
+        }
     }
 
     // MARK: Words
+
+    private func title(of spec: ShelfSpec?) -> String {
+        guard let spec else { return "Shelf" }
+        if !spec.title.isEmpty { return spec.title }
+        return model.resolved[spec.id]?.title ?? spec.smartRule?.summary ?? "Shelf"
+    }
 
     private func sourceLine(_ spec: ShelfSpec) -> String {
         let shelf = model.resolved[spec.id]
@@ -210,12 +285,33 @@ struct ShelfEditor: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: Changes
+    // MARK: Changes (each one undoable)
+
+    /// Applies a change to the layout and registers its undo (and redo).
+    private func change(_ name: String, animated: Bool = true, _ body: () -> Void) {
+        let before = specs
+        if animated { withAnimation(Theme.Motion.object(reduceMotion), body) } else { body() }
+        registerUndo(name, restoring: before)
+    }
+
+    private func registerUndo(_ name: String, restoring snapshot: [ShelfSpec]) {
+        let current = specs
+        undoManager?.registerUndo(withTarget: UndoBox.shared) { _ in
+            MainActor.assumeIsolated {
+                withAnimation(Theme.Motion.object(reduceMotion)) { specs = snapshot }
+                registerUndo(name, restoring: current)
+            }
+        }
+        undoManager?.setActionName(name)
+    }
 
     private func step(_ delta: Int) {
         guard !specs.isEmpty else { return }
         let i = specs.firstIndex { $0.id == selected } ?? (delta > 0 ? -1 : specs.count)
         selected = specs[min(max(0, i + delta), specs.count - 1)].id
+        if let s = specs.first(where: { $0.id == selected }) {
+            AccessibilityNotification.Announcement("\(title(of: s)), \(sourceLine(s))").post()
+        }
     }
 
     private func moveSelected(_ delta: Int) {
@@ -225,40 +321,48 @@ struct ShelfEditor: View {
 
     private func move(_ id: String, to target: Int) {
         guard let i = specs.firstIndex(where: { $0.id == id }), i != target else { return }
-        withAnimation(Theme.Motion.object(reduceMotion)) {
-            let spec = specs.remove(at: i)
-            specs.insert(spec, at: target)
-        }
-        let title = model.resolved[id]?.title ?? "Shelf"
-        AccessibilityNotification.Announcement("\(title) moved to position \(target + 1) of \(specs.count)").post()
+        // One assignment: two mutations through a binding in one transaction read a stale array
+        // (the second sees the first undone), which duplicated the shelf.
+        var list = specs
+        list.insert(list.remove(at: i), at: target)
+        change("Move Shelf") { specs = list }
+        AccessibilityNotification.Announcement("\(title(of: specs[target])) moved to position \(target + 1) of \(specs.count)").post()
     }
 
     private func toggleHidden(_ id: String) {
         guard let i = specs.firstIndex(where: { $0.id == id }) else { return }
-        withAnimation(Theme.Motion.quick) { specs[i].hidden.toggle() }
-        let title = model.resolved[id]?.title ?? "Shelf"
-        AccessibilityNotification.Announcement(specs[i].hidden ? "\(title) hidden" : "\(title) shown").post()
+        change(specs[i].hidden ? "Show Shelf" : "Hide Shelf") { specs[i].hidden.toggle() }
+        AccessibilityNotification.Announcement(specs[i].hidden ? "\(title(of: specs[i])) hidden" : "\(title(of: specs[i])) shown").post()
     }
 
     private func remove(_ id: String) {
         guard let i = specs.firstIndex(where: { $0.id == id }) else { return }
-        withAnimation(Theme.Motion.object(reduceMotion)) { _ = specs.remove(at: i) }
-        if !specs.isEmpty { selected = specs[min(i, specs.count - 1)].id } else { selected = nil }
+        let name = title(of: specs[i])
+        var list = specs
+        list.remove(at: i)
+        change("Remove Shelf") { specs = list }
+        selected = specs.isEmpty ? nil : specs[min(i, specs.count - 1)].id
+        AccessibilityNotification.Announcement("\(name) removed. Command-Z undoes it.").post()
     }
 
     private func add(_ source: ShelfSpec.Source, title: String) {
         let spec = ShelfSpec(title: title, source: source)
-        withAnimation(Theme.Motion.object(reduceMotion)) { specs.append(spec) }
-        selected = spec.id
+        change("Add Shelf") { specs = specs + [spec] }
     }
 
     private func duplicate(_ spec: ShelfSpec) {
         guard let i = specs.firstIndex(where: { $0.id == spec.id }) else { return }
         var copy = spec
         copy.id = UUID().uuidString
-        copy.title = spec.title.isEmpty ? "" : spec.title + " Copy"
-        withAnimation(Theme.Motion.object(reduceMotion)) { specs.insert(copy, at: i + 1) }
-        selected = copy.id
+        copy.title = title(of: spec) + " Copy"
+        var list = specs
+        list.insert(copy, at: i + 1)
+        change("Duplicate Shelf") { specs = list }
+    }
+
+    private func reset() {
+        change("Restore Default Shelves") { specs = defaults }
+        selected = specs.first?.id
     }
 
     private func open(_ spec: ShelfSpec) {
@@ -272,9 +376,42 @@ struct ShelfEditor: View {
 
     private func commitRename() {
         guard let target = renaming, let i = specs.firstIndex(where: { $0.id == target.id }) else { return }
-        specs[i].title = renameText.trimmingCharacters(in: .whitespaces)
+        let name = renameText.trimmingCharacters(in: .whitespaces)
+        change("Rename Shelf", animated: false) { specs[i].title = name }
         renaming = nil
     }
+
+    // MARK: Drag
+
+    /// SwiftUI gives a drag no end callback; a drag cancelled outside the strips (Esc, dropped
+    /// on the desktop) would leave its strip lifted. Watch the mouse button instead.
+    private func beginDrag(_ id: String) {
+        dragging = id
+        dragStart = specs
+        selected = id
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            while NSEvent.pressedMouseButtons != 0 { try? await Task.sleep(for: .milliseconds(100)) }
+            endDrag()
+        }
+    }
+
+    private func endDrag() {
+        withAnimation(Theme.Motion.quick) { dragging = nil }
+        if let start = dragStart, start != specs { registerUndo("Move Shelf", restoring: start) }
+        dragStart = nil
+    }
+}
+
+/// The undo target: the layout lives in SwiftUI state, so undo closures capture it themselves.
+@MainActor
+private final class UndoBox {
+    static let shared = UndoBox()
+}
+
+extension UTType {
+    /// A shelf being dragged inside Edit Shelves (never leaves the app).
+    static let mezzanineShelf = UTType(exportedAs: "com.mezzanine.mac.shelf", conformingTo: .data)
 }
 
 /// One folded shelf: grip, name and source, a peek of its first posters, show switch, menu.
@@ -283,44 +420,64 @@ private struct ShelfStrip<MenuContent: View>: View {
     let shelf: Shelf?
     let sourceLine: String
     let isSelected: Bool
-    let peek: Namespace.ID
+    let isDragging: Bool
+    /// Nil under Reduce Motion: the fold becomes a plain crossfade.
+    let peek: Namespace.ID?
+    let select: () -> Void
     let toggleHidden: () -> Void
+    let actions: [(String, () -> Void)]
     @ViewBuilder let menu: () -> MenuContent
 
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
     @State private var hovering = false
+    @State private var gripHovering = false
+    /// A control inside the strip has keyboard focus (Full Keyboard Access): the strip is selected.
+    @FocusState private var inner: Part?
+
+    enum Part: Hashable { case toggle, menu }
 
     private var title: String {
         if !spec.title.isEmpty { return spec.title }
         return shelf?.title ?? spec.smartRule?.summary ?? "Shelf"
     }
 
+    private var fill: Color {
+        if isSelected || isDragging { return Theme.raisedHover }
+        return hovering ? Theme.raised.mix(with: Theme.raisedHover, by: 0.5) : Theme.raised
+    }
+
     var body: some View {
         HStack(spacing: Theme.Space.m) {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Theme.inkTertiary)
-                .frame(width: 18)
+                .foregroundStyle(gripHovering ? Theme.inkSecondary : Theme.inkTertiary)
+                .frame(width: 22, height: 44)
+                .contentShape(Rectangle())
+                .onHover { inside in
+                    gripHovering = inside
+                    if inside { NSCursor.openHand.push() } else { NSCursor.pop() }
+                }
+                .help("Drag to reorder (or ⌥↑ / ⌥↓)")
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(Theme.Typeface.cardTitle)
                     .foregroundStyle(isSelected ? Theme.lilac : Theme.ink)
+                    .opacity(spec.hidden ? 0.6 : 1)
                     .lineLimit(1)
                 Text(sourceLine)
                     .font(Theme.Typeface.cardMeta)
-                    .foregroundStyle(Theme.inkSecondary)
+                    .foregroundStyle(spec.hidden ? Theme.inkTertiary : Theme.inkSecondary)
                     .lineLimit(1)
             }
-            .opacity(spec.hidden ? 0.55 : 1)
             Spacer(minLength: Theme.Space.l)
             HStack(spacing: 4) {
                 ForEach(Array((shelf?.items ?? []).prefix(5).enumerated()), id: \.offset) { i, item in
                     RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: 96), pixelWidth: 96)
                         .frame(width: 32, height: 48)
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        .matchedGeometryEffect(id: "\(spec.id)-\(i)", in: peek)
+                        .modifier(FoldMatch(fold: peek.map { FoldID(id: "\(spec.id)-\(i)", namespace: $0) }))
                 }
             }
             .saturation(spec.hidden ? 0 : 1)
@@ -330,6 +487,8 @@ private struct ShelfStrip<MenuContent: View>: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .labelsHidden()
+                .focusEffectDisabled(false)
+                .focused($inner, equals: .toggle)
                 .help(spec.hidden ? "Show on Home (Space)" : "Hide from Home (Space)")
             Menu(content: menu) {
                 Image(systemName: "ellipsis").font(.system(size: 13, weight: .semibold)).frame(width: 28, height: 28)
@@ -338,22 +497,38 @@ private struct ShelfStrip<MenuContent: View>: View {
             .menuStyle(.button)
             .buttonStyle(.plain)
             .menuIndicator(.hidden)
+            .focusEffectDisabled(false)
+            .focused($inner, equals: .menu)
             .foregroundStyle(Theme.inkSecondary)
             .help("Rename, move, edit rules or remove")
             .accessibilityLabel("More for \(title)")
         }
         .padding(.horizontal, Theme.Space.m)
         .frame(height: 72)
-        .background(RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous)
-            .fill(isSelected || hovering ? Theme.raisedHover : Theme.raised))
+        .background(RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous).fill(fill))
+        // Lifted while dragged or selected, in the posters' own lift-and-shadow grammar.
+        .shadow(color: .black.opacity(isDragging ? 0.6 : (isSelected ? 0.35 : 0)), radius: isDragging ? 22 : 10, y: isDragging ? 14 : 4)
+        .scaleEffect(isDragging ? 1.02 : 1)
+        .animation(Theme.Motion.lift, value: isDragging)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+        .onChange(of: inner) { _, part in if part != nil { select() } }
         .contextMenu(menuItems: menu)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(title)
         .accessibilityValue(sourceLine)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityAction(named: spec.hidden ? "Show on Home" : "Hide from Home", toggleHidden)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .modifier(StripActions(actions: actions))
+    }
+}
+
+/// Attaches each named action for VoiceOver (Move Up, Rename, Remove…).
+private struct StripActions: ViewModifier {
+    let actions: [(String, () -> Void)]
+    func body(content: Content) -> some View {
+        actions.reduce(AnyView(content)) { view, action in
+            AnyView(view.accessibilityAction(named: Text(action.0), action.1))
+        }
     }
 }
 
@@ -368,15 +543,15 @@ private struct StripDrop: DropDelegate {
         guard let dragging, dragging != target,
               let from = specs.firstIndex(where: { $0.id == dragging }),
               let to = specs.firstIndex(where: { $0.id == target }) else { return }
-        withAnimation(animation) {
-            specs.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
-        }
+        var list = specs
+        list.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        withAnimation(animation) { specs = list }
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
 
     func performDrop(info: DropInfo) -> Bool {
-        dragging = nil
+        withAnimation(Theme.Motion.quick) { dragging = nil }
         return true
     }
 }

@@ -19,6 +19,15 @@ struct SmartShelfSheet: View {
     @State private var count = 0
     @State private var genres: [String] = []
     @State private var collections: [String] = []
+    /// The rules with stable identities, so removing a middle row keeps the others' state.
+    @State private var rows: [RuleItem] = []
+    @State private var previewTask: Task<Void, Never>?
+    @FocusState private var nameFocused: Bool
+
+    struct RuleItem: Identifiable, Equatable {
+        let id = UUID()
+        var condition: SmartCondition
+    }
 
     private static let limits = [12, 24, 48, 96]
 
@@ -35,6 +44,7 @@ struct SmartShelfSheet: View {
                     TextField("Name", text: $name, prompt: Text(rule.summary))
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 360)
+                        .focused($nameFocused)
                 }
                 GridRow {
                     label("From")
@@ -59,13 +69,27 @@ struct SmartShelfSheet: View {
             VStack(alignment: .leading, spacing: Theme.Space.s) {
                 Text("Titles that match all of these")
                     .font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary)
-                ForEach(Array(rule.conditions.enumerated()), id: \.offset) { i, _ in
-                    RuleRow(condition: $rule.conditions[i], genres: genres, collections: collections,
-                            remove: { rule.conditions.remove(at: i) },
-                            addAfter: { rule.conditions.insert(.watch(.unwatched), at: i + 1) })
+                ScrollView {
+                    VStack(spacing: Theme.Space.s) {
+                        ForEach(Array(rows.enumerated()), id: \.element.id) { i, item in
+                            RuleRow(number: i + 1,
+                                    condition: Binding(get: { item.condition },
+                                                       set: { new in if let j = rows.firstIndex(where: { $0.id == item.id }) { rows[j].condition = new } }),
+                                    genres: genres, collections: collections,
+                                    remove: { rows.removeAll { $0.id == item.id } },
+                                    addAfter: {
+                                        if let j = rows.firstIndex(where: { $0.id == item.id }) {
+                                            rows.insert(RuleItem(condition: .watch(.unwatched)), at: j + 1)
+                                        }
+                                    })
+                        }
+                    }
                 }
-                if rule.conditions.isEmpty {
-                    Button { rule.conditions.append(.watch(.unwatched)) } label: {
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(maxHeight: 280)
+                .fixedSize(horizontal: false, vertical: true)
+                if rows.isEmpty {
+                    Button { rows.append(RuleItem(condition: .watch(.unwatched))) } label: {
                         Label("Add a Rule", systemImage: "plus")
                     }
                     .buttonStyle(SecondaryButtonStyle())
@@ -87,11 +111,12 @@ struct SmartShelfSheet: View {
             Rectangle().fill(Theme.rule).frame(height: 1)
 
             VStack(alignment: .leading, spacing: Theme.Space.s) {
-                Text(count == 1 ? "1 title" : "\(count) titles")
+                Text(countLine)
                     .font(Theme.Typeface.caption)
                     .foregroundStyle(Theme.inkSecondary)
                     .contentTransition(.numericText())
                     .accessibilityLabel(count == 1 ? "1 title matches" : "\(count) titles match")
+                    .accessibilityAddTraits(.updatesFrequently)
                 HStack(spacing: Theme.Space.s) {
                     ForEach(preview, id: \.ratingKey) { item in
                         RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: 128), pixelWidth: 128)
@@ -124,7 +149,24 @@ struct SmartShelfSheet: View {
         .frame(width: 680)
         .presentationBackground(Theme.graphite)
         .onAppear(perform: start)
-        .onChange(of: rule) { _, _ in refreshPreview() }
+        .onChange(of: rows) { _, new in rule.conditions = new.map(\.condition) }
+        .onChange(of: rule) { _, _ in
+            // Debounced: typing a name or a year shouldn't query on every keystroke.
+            previewTask?.cancel()
+            previewTask = Task {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+                refreshPreview()
+            }
+        }
+        .onChange(of: rule.sections) { _, _ in loadOptions() }
+    }
+
+    /// "38 titles", or "24 of 1,145 titles" when the shelf's size cuts it short.
+    private var countLine: String {
+        let total = count.formatted()
+        if rule.limit > 0, count > rule.limit { return "\(rule.limit) of \(total) titles" }
+        return count == 1 ? "1 title" : "\(total) titles"
     }
 
     private func label(_ text: String) -> some View {
@@ -138,11 +180,21 @@ struct SmartShelfSheet: View {
         } else {
             rule = SmartRule(sections: scope == HomeLayout.mainScope ? [] : [scope], conditions: [.watch(.unwatched)])
         }
-        if let index = library.index {
-            genres = (try? index.genres(sections: rule.sections)) ?? []
-            collections = (try? index.collectionNames(sections: rule.sections)) ?? []
-        }
+        rows = rule.conditions.map { RuleItem(condition: $0) }
+        loadOptions()
         refreshPreview()
+        #if DEBUG
+        // Captures: the field's suggestion pop-up blocks window snapshots.
+        if UserDefaults.standard.bool(forKey: "SheetNoAutoFocus") { return }
+        #endif
+        nameFocused = true
+    }
+
+    /// Genres and collections of the libraries the shelf draws from.
+    private func loadOptions() {
+        guard let index = library.index else { return }
+        genres = (try? index.genres(sections: rule.sections)) ?? []
+        collections = (try? index.collectionNames(sections: rule.sections)) ?? []
     }
 
     private func refreshPreview() {
@@ -162,6 +214,7 @@ struct SmartShelfSheet: View {
 
 /// One rule: a field, its value, and − / + to remove it or add one after it.
 private struct RuleRow: View {
+    let number: Int
     @Binding var condition: SmartCondition
     let genres: [String]
     let collections: [String]
@@ -185,15 +238,17 @@ private struct RuleRow: View {
             Button(action: remove) { Image(systemName: "minus").frame(width: 22, height: 22).contentShape(Rectangle()) }
                 .buttonStyle(.borderless)
                 .help("Remove this rule")
-                .accessibilityLabel("Remove rule \(condition.label)")
+                .accessibilityLabel("Remove rule \(number), \(condition.label)")
             Button(action: addAfter) { Image(systemName: "plus").frame(width: 22, height: 22).contentShape(Rectangle()) }
                 .buttonStyle(.borderless)
-                .help("Add a rule")
-                .accessibilityLabel("Add a rule")
+                .help("Add a rule after this one")
+                .accessibilityLabel("Add a rule after rule \(number)")
         }
         .padding(.horizontal, Theme.Space.m)
         .padding(.vertical, Theme.Space.s)
         .background(RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous).fill(Theme.raised))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Rule \(number): \(condition.field.label)")
     }
 
     @ViewBuilder private var value: some View {
@@ -207,7 +262,7 @@ private struct RuleRow: View {
             Picker("Genre", selection: Binding(get: { g }, set: { condition = .genre($0, excluded: excluded) })) {
                 ForEach(options(genres, including: g), id: \.self) { Text($0).tag($0) }
             }
-            .labelsHidden().frame(maxWidth: 220)
+            .labelsHidden().fixedSize()
         case .decade(let d):
             Picker("Decade", selection: Binding(get: { d }, set: { condition = .decade($0) })) {
                 ForEach(Self.decades, id: \.self) { Text("the \(String($0))s").tag($0) }
@@ -253,7 +308,7 @@ private struct RuleRow: View {
                 if c.isEmpty { Text("Choose…").tag("") }
                 ForEach(options(collections, including: c), id: \.self) { Text($0).tag($0) }
             }
-            .labelsHidden().frame(maxWidth: 260)
+            .labelsHidden().fixedSize()
         case .person(let p):
             TextField("Name, as on the server", text: Binding(get: { p }, set: { condition = .person($0) }))
                 .textFieldStyle(.roundedBorder).frame(maxWidth: 260)

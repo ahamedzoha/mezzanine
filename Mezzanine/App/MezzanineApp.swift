@@ -79,6 +79,14 @@ struct MezzanineApp: App {
         .windowResizability(.contentMinSize)
 
         #if DEBUG
+        // Review captures: the rule sheet and collection picker as plain windows (window
+        // snapshots of an attached sheet fail).
+        Window("Sheet Preview", id: "sheetPreview") {
+            SheetPreview()
+                .environment(session)
+                .environment(library)
+                .environment(commands)
+        }
         Window("Lab", id: "lab") {
             LabView()
                 .environment(session)
@@ -105,6 +113,25 @@ private struct LabLauncher: ViewModifier {
             if let id = UserDefaults.standard.string(forKey: "MezzanineOpenWindow") {
                 if id == "settings" { openSettings() } else { openWindow(id: id) }
             }
+        }
+    }
+}
+#endif
+
+#if DEBUG
+/// `-MezzanineOpenWindow sheetPreview -SheetPreviewKind picker|rules`.
+private struct SheetPreview: View {
+    @Environment(AppCommandCenter.self) private var commands
+    @Environment(SessionStore.self) private var session
+    var body: some View {
+        if UserDefaults.standard.string(forKey: "SheetPreviewKind") == "picker" {
+            if session.client != nil && !commands.sections.isEmpty {
+                CollectionPicker(sections: commands.sections, existing: []) { _, _ in }
+            }
+        } else {
+            SmartShelfSheet(existing: ShelfSpec(title: "", source: .smart(SmartRule(
+                conditions: [.watch(.unwatched), .genre("Comedy", excluded: false), .decade(1990), .minRating(7)],
+                sort: .rating))), scope: HomeLayout.mainScope, sections: commands.sections) { _ in }
         }
     }
 }

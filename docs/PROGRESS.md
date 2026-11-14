@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-11-15 (late) — M7 Home shelves, smart shelves, Quick Open
+
+- Owner picked **Edit in Place** on the decision page (over typed rules in ⌘K and a separate
+  composer window). Contract: `.impeccable/surfaces/mezzanine-home-shelfeditor-swift.md`.
+- Edit Shelves (⌘E): shelves fold into strips (matched geometry), drag or ⌥↑/⌥↓, Space hides,
+  Return renames or edits rules, ⌫ removes, everything undoable (⌘Z), Restore Defaults asks
+  first; changes save as they happen per server + Plex Home profile. Add Shelf: Plex rows (per
+  library), a collection (searchable picker), a playlist, a smart shelf.
+- Smart shelves answered by the local index (11 fields, sort, size) with a live preview.
+- Libraries gain a Shelves layout (⌃⌘5) with Plex's own rows by default and the same editor.
+- Quick Open (⌘K): titles, Play Next Episode of a show, Resume, Go To, shelf actions.
+- Design finish review (fix) and HIG review (Needs Work) applied in one batch: undo/confirm,
+  focus rings under Full Keyboard Access, selection follows focus, VoiceOver actions and
+  announcements, modal/Quick Open guards on menu shortcuts, drag that can't stick, Reduce
+  Motion crossfade, unfold in the new order without a reload, picker keyboard and errors.
+- Bug found in testing: two mutations of a `@Binding` array in one transaction duplicated a
+  moved shelf (now one assignment; layouts de-duplicated on load).
+- Next: M8 artwork picker, M9 Plex Home switching, then Trakt, downloads, AI subtitles.
+
 ## 2026-11-15 (night) — player keys, previews, fallback
 
 - Rebindable player keys (28) with Playback menu items, Settings ▸ Shortcuts, Help ▸ Keyboard

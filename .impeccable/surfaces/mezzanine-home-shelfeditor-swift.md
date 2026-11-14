@@ -27,7 +27,7 @@ selected strip's title and the sheet's primary button. No new colour, no glass o
 Strips are solid raised surfaces (#1A1C20), 72 pt tall, 12 pt continuous corners, on the
 40 pt gutter.
 
-STORY: ⌘E (or Edit in the toolbar) → the hero folds up and every shelf collapses into a strip
+STORY: ⌘E (or Edit Shelves in the toolbar) → the hero folds up and every shelf collapses into a strip
 in place → drag or ⌥↑/⌥↓ to reorder, Space or the switch to hide, Return to rename or edit
 rules → Add Shelf at the end: Plex rows, a collection, a playlist, a smart shelf → ⌘E or Done
 unfolds them back into poster rows, in the new order.
@@ -40,10 +40,11 @@ Comedy · 1990s"), a peek of the first five posters at 32 × 48, hide switch, �
 strips drop to ink tertiary with the peek desaturated. Add Shelf is the last strip, a dashed
 1 pt rule outline with a + and a menu.
 
-RULE SHEET: native sheet 640 pt: Name field (placeholder is the auto name), Libraries pop-up,
+RULE SHEET: native sheet 680 pt (widened from 640 so a rule row fits field, operator, value and −/+ without wrapping): Name field (placeholder is the auto name), Libraries pop-up,
 rule rows (field pop-up · value control · −/+), "Match all of these" fixed, Sort and Show up to
 pop-ups, then a live preview: up to ten 64 pt posters and the count ("38 titles"), refreshing
-as rules change (index answers in ms). Cancel / Add Shelf (lilac).
+as rules change (index answers in ms; 52 pt posters so ten fit the sheet), "24 of 1,145 titles" when the
+size limit cuts it short. Rules scroll inside the sheet past 280 pt. Cancel / Add Shelf (lilac).
 
 QUICK OPEN (⌘K): a solid graphite panel (raised, 1 pt rule border, 16 pt corners) dropping
 from under the toolbar, left-aligned on the content gutter, 620 pt wide, never centred. Field
@@ -52,7 +53,7 @@ Settings), Actions (Edit Home, New Smart Shelf, Resume <first Continue Watching>
 Episode of <matching show>). ↑/↓ select (selected row title lilac, raised-hover fill), Return
 runs, ⌘Return plays a title, Esc closes. Empty query shows Continue Watching and Go To.
 
-FORM: signature move = the fold: shelves collapse from poster rows into strips and back with
+FORM: Edit in Place (owner's pick of three dealt structures; surface roll seed:513785686e6ce27882b2a0155c30b32d, deal 7·1·5, lead "Say It" declined). Signature move = the fold: shelves collapse from poster rows into strips and back with
 matched geometry (each strip's poster peek is literally the shelf's first posters shrinking),
 spring 0.26, no bounce; Reduce Motion → 0.2 s crossfade. Everything else is standard native
 controls (pop-ups, switches, text fields, menus).

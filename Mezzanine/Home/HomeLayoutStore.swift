@@ -36,7 +36,8 @@ final class HomeLayoutStore {
     }
 
     func set(_ scope: String, _ shelves: [ShelfSpec]) {
-        layout.scopes[scope] = shelves
+        var seen = Set<String>()
+        layout.scopes[scope] = shelves.filter { seen.insert($0.id).inserted }
         save()
     }
 

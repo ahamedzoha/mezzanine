@@ -64,15 +64,31 @@ final class AppCommandCenter {
     var statsVisible = false
 
     // Shelves (Home, or a library's Shelves layout).
-    var isShelvesPageVisible = false
+    /// Shelf pages on screen (a counter: the next page can appear before the last disappears).
+    var shelvesPages = 0
+    var isShelvesPageVisible: Bool { shelvesPages > 0 && layoutsReady }
+    /// The layout store knows the server and profile (nothing can be saved before).
+    var layoutsReady = false
     var isEditingShelves = false
-    private(set) var editShelvesRequests = 0
-    private(set) var newSmartShelfRequests = 0
+    /// A sheet, alert or confirmation is up over a shelf page: menu shortcuts stand down.
+    var isModalShown = false
     /// ⌘K.
     var isQuickOpenShown = false
+    /// Something shortcuts must not reach underneath.
+    var isBlocked: Bool { isModalShown || isQuickOpenShown || isPlayerOpen }
 
-    func toggleEditShelves() { editShelvesRequests += 1 }
-    func newSmartShelf() { newSmartShelfRequests += 1 }
+    enum ShelfAction: Equatable {
+        case toggleEditing, startEditing, newSmartShelf, addCollection, moveUp, moveDown, toggleHidden, rename, remove
+    }
+    private(set) var shelfRequests: (count: Int, action: ShelfAction) = (0, .toggleEditing)
+    /// An action for Home that waits until Home is on screen (Quick Open from another page).
+    var pendingHomeAction: ShelfAction?
+
+    func shelf(_ action: ShelfAction) { shelfRequests = (shelfRequests.count + 1, action) }
+    func toggleEditShelves() { shelf(.toggleEditing) }
+
+    /// The visible library's layouts (the Layout menu enables only these).
+    var availableLayouts: [String] = []
 
     func requestSearch() { searchRequests += 1 }
     func focusContent() { contentFocusRequests += 1 }
@@ -157,19 +173,37 @@ struct MezzanineCommands: Commands {
         CommandGroup(after: .textEditing) {
             Button("Find…") { center.requestSearch() }
                 .keyboardShortcut("f", modifiers: .command)
-                .disabled(!center.isSignedIn || center.isPlayerOpen)
+                .disabled(!center.isSignedIn || center.isBlocked)
+        }
+        CommandGroup(after: .newItem) {
+            Button("New Smart Shelf…") { center.shelf(.newSmartShelf) }
+                .keyboardShortcut("n", modifiers: .command)
+                .disabled(!center.isShelvesPageVisible || center.isBlocked)
+            Button("Add Collection…") { center.shelf(.addCollection) }
+                .disabled(!center.isShelvesPageVisible || center.isBlocked)
         }
         CommandGroup(after: .toolbar) {
             Button(center.isEditingShelves ? "Done Editing Shelves" : "Edit Shelves") { center.toggleEditShelves() }
                 .keyboardShortcut("e", modifiers: .command)
-                .disabled(!center.isShelvesPageVisible || center.isPlayerOpen)
-            Button("New Smart Shelf…") { center.newSmartShelf() }
-                .keyboardShortcut("n", modifiers: .command)
-                .disabled(!center.isShelvesPageVisible || center.isPlayerOpen)
+                .disabled(!center.isShelvesPageVisible || center.isBlocked)
+            if center.isEditingShelves {
+                Button("Move Shelf Up") { center.shelf(.moveUp) }
+                    .keyboardShortcut(.upArrow, modifiers: .option)
+                    .disabled(center.isBlocked)
+                Button("Move Shelf Down") { center.shelf(.moveDown) }
+                    .keyboardShortcut(.downArrow, modifiers: .option)
+                    .disabled(center.isBlocked)
+                Button("Show or Hide Shelf (Space)") { center.shelf(.toggleHidden) }
+                    .disabled(center.isBlocked)
+                Button("Rename Shelf… (Return)") { center.shelf(.rename) }
+                    .disabled(center.isBlocked)
+                Button("Remove Shelf (Delete)") { center.shelf(.remove) }
+                    .disabled(center.isBlocked)
+            }
             Divider()
             Button("Show Details") { center.toggleDetails() }
                 .keyboardShortcut("i", modifiers: .command)
-                .disabled(!center.isHomeVisible || center.isPlayerOpen)
+                .disabled(!center.isHomeVisible || center.isBlocked || center.isEditingShelves)
             Button("Larger Posters") { center.stepDensity(20) }
                 .keyboardShortcut("=", modifiers: .command)
                 .disabled(!center.isLibraryVisible || center.isPlayerOpen)
@@ -180,7 +214,7 @@ struct MezzanineCommands: Commands {
                 ForEach(Array(LibraryLayout.allCases.enumerated()), id: \.element) { i, layout in
                     Button(layout.label) { center.setLayout(layout.rawValue) }
                         .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: [.control, .command])
-                        .disabled(layout == .folders && center.currentLayout == nil)
+                        .disabled(!center.availableLayouts.contains(layout.rawValue))
                 }
             }
             .disabled(!center.isLibraryVisible || center.isPlayerOpen)
@@ -195,7 +229,7 @@ struct MezzanineCommands: Commands {
         CommandMenu("Go") {
             Button("Quick Open…") { center.isQuickOpenShown.toggle() }
                 .keyboardShortcut("k", modifiers: .command)
-                .disabled(!center.isSignedIn || center.isPlayerOpen)
+                .disabled(!center.isSignedIn || center.isPlayerOpen || center.isModalShown)
             Divider()
             Button("Back") { center.goBack() }
                 .keyboardShortcut("[", modifiers: .command)
@@ -281,7 +315,7 @@ struct MezzanineCommands: Commands {
             if !center.isPlayerOpen {
                 Button("Play") { center.playFocused() }
                     .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(!center.hasFocusedTitle || !center.isSignedIn)
+                    .disabled(!center.hasFocusedTitle || !center.isSignedIn || center.isBlocked || center.isEditingShelves)
                 Divider()
                 Text("Also: Space plays the focused title; Return opens it")
             }

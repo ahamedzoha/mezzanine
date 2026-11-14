@@ -60,6 +60,14 @@ defaults and Keychain item), so test runs never change the installed app's setti
 (each starts a real transcode on the server: keep runs short, let the player close itself
 (`-MezzanineAutoClose`) so the session stops, and check `Scripts/plex.sh pms /transcode/sessions`).
 
+Shelves: `-HomeSeedShelves YES` (smart shelf, collection, hidden row), `-HomeEditing YES`,
+`-HomeKeyScript "down,opt+down,space"`, `-SmartShelfSheet YES`, `-CollectionPicker YES`,
+`-QuickOpenQuery "after"` (`_` for empty). Window snapshots of an attached sheet fail: capture
+`-MezzanineOpenWindow sheetPreview -SheetPreviewKind rules|picker` instead.
+
+SwiftUI gotcha: never mutate a `@Binding` array twice in one transaction (remove, then insert):
+the second read sees the stale array and duplicates the element. Build the new array, assign once.
+
 Full screen: AppKit keeps the title/toolbar strip as an opaque band over the content even with
 the toolbar hidden; `WindowChrome` sets `.autoHideToolbar` while the player owns the window.
 

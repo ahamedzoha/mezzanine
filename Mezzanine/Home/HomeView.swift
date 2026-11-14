@@ -30,6 +30,11 @@ struct HomeView: View {
     @State private var ruleSheet: RuleSheetTarget?
     @State private var pickingCollection = false
     @State private var playlists: [PlexMetadata] = []
+    /// What this page last loaded or saved (to tell our own writes from a change elsewhere).
+    @State private var loadedSaved: [ShelfSpec]??
+    @State private var saveTask: Task<Void, Never>?
+    /// Bumped when a sheet closes, so the editor takes keyboard focus back.
+    @State private var refocus = 0
     @Namespace private var fold
 
     /// The rule sheet's subject: an existing smart shelf, or a new one.
@@ -48,31 +53,51 @@ struct HomeView: View {
                                 editSpecs.append(ShelfSpec(title: playlist.title, source: .playlist(ratingKey: playlist.ratingKey)))
                             },
                             playlists: playlists,
-                            resetLayout: resetLayout,
+                            defaults: model.defaults(for: scope),
+                            refocus: refocus,
                             done: { setEditing(false) })
                     .transition(.opacity)
             } else {
                 browsing
             }
         }
-        .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(scope)|\(layouts.revision)|\(library.revision)") { await load() }
+        .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(scope)|\(library.revision)") { await load() }
+        .onChange(of: layouts.revision) { _, _ in
+            // Reload only for changes made elsewhere (a profile switch), not for this page's own saves.
+            guard !editing, loadedSaved != .some(layouts.saved(scope)) else { return }
+            Task { await load() }
+        }
         .onChange(of: editSpecs) { _, specs in
+            guard editing else { return }
             // A shelf just added has nothing resolved yet: fetch its posters for the strip's peek.
-            guard let client = session.client else { return }
-            for spec in specs where model.resolved[spec.id] == nil {
-                Task { await model.refresh(spec, client: client, index: library.index) }
+            if let client = session.client {
+                for spec in specs where model.resolved[spec.id] == nil {
+                    Task { await model.refresh(spec, client: client, index: library.index) }
+                }
+            }
+            // Save as the edit happens (debounced), so a quit mid-edit keeps it.
+            saveTask?.cancel()
+            saveTask = Task {
+                try? await Task.sleep(for: .milliseconds(400))
+                guard !Task.isCancelled else { return }
+                save()
             }
         }
-        .onChange(of: commands.editShelvesRequests) { _, _ in setEditing(!editing) }
-        .onChange(of: commands.newSmartShelfRequests) { _, _ in
-            if !editing { setEditing(true) }
-            ruleSheet = RuleSheetTarget(spec: nil)
+        .onChange(of: commands.shelfRequests.count) { _, _ in handle(commands.shelfRequests.action) }
+        .onChange(of: commands.pendingHomeAction) { _, _ in consumePendingAction() }
+        .onChange(of: ruleSheet == nil && !pickingCollection) { _, closed in
+            commands.isModalShown = !closed
+            if closed { refocus += 1 }
         }
-        .onAppear { commands.isShelvesPageVisible = true }
+        .onAppear {
+            commands.shelvesPages += 1
+            consumePendingAction()
+        }
         .onDisappear {
             if editing { save() }
-            commands.isShelvesPageVisible = false
+            commands.shelvesPages -= 1
             commands.isEditingShelves = false
+            commands.isModalShown = false
         }
         .sheet(item: $ruleSheet) { target in
             SmartShelfSheet(existing: target.spec, scope: scope, sections: commands.sections) { spec in
@@ -85,7 +110,11 @@ struct HomeView: View {
             }
         }
         .sheet(isPresented: $pickingCollection) {
-            CollectionPicker(sections: isMain ? commands.sections : commands.sections.filter { $0.key == scope }) { collection, section in
+            CollectionPicker(sections: isMain ? commands.sections : commands.sections.filter { $0.key == scope },
+                             existing: Set(editSpecs.compactMap { spec in
+                                 if case .collection(let key, _) = spec.source { return key }
+                                 return nil
+                             })) { collection, section in
                 editSpecs.append(ShelfSpec(title: collection.title, source: .collection(ratingKey: collection.ratingKey, section: section)))
             }
         }
@@ -94,20 +123,38 @@ struct HomeView: View {
                 ToolbarItem(placement: .primaryAction) { editButton }
             }
         }
-        .modifier(MainTitle(isMain: isMain))
+        .modifier(MainTitle(isMain: isMain, editing: editing))
     }
 
-    /// Edit / Done. Done is the screen's primary action while editing.
+    /// Edit Shelves / Done. Done is the screen's primary action while editing.
     @ViewBuilder private var editButton: some View {
-        if editing {
-            Button("Done") { setEditing(false) }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.lilac)
-                .help("Finish editing shelves (⌘E)")
-        } else {
-            Button("Edit") { setEditing(true) }
-                .help("Reorder, hide and add shelves (⌘E)")
+        EditShelvesButton(editing: editing) { setEditing(!editing) }
+            .disabled(!layouts.isReady)
+    }
+
+    // MARK: Requests
+
+    private func handle(_ action: AppCommandCenter.ShelfAction) {
+        switch action {
+        case .toggleEditing: setEditing(!editing)
+        case .startEditing: setEditing(true)
+        case .newSmartShelf:
+            guard ruleSheet == nil, !pickingCollection else { return }
+            setEditing(true)
+            ruleSheet = RuleSheetTarget(spec: nil)
+        case .addCollection:
+            guard ruleSheet == nil, !pickingCollection else { return }
+            setEditing(true)
+            pickingCollection = true
+        default: break   // strip actions: the editor handles them
         }
+    }
+
+    /// Quick Open asked for something on Home before Home was on screen.
+    private func consumePendingAction() {
+        guard isMain, layouts.isReady, let action = commands.pendingHomeAction else { return }
+        commands.pendingHomeAction = nil
+        handle(action)
     }
 
     private var browsing: some View {
@@ -205,32 +252,44 @@ struct HomeView: View {
                     playlists = (try? await client.playlists()) ?? []
                 }
             }
+            AccessibilityNotification.Announcement("Editing shelves. Arrow keys select, Option-arrow moves, Space hides.").post()
         } else {
+            saveTask?.cancel()
             save()
         }
-        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : Theme.Motion.object) { editing = on }
+        // One transaction: the strips unfold into the new order (matched geometry), no reload.
+        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : Theme.Motion.object) {
+            if !on { model.apply(editSpecs) }
+            editing = on
+        }
+        if !on { updateRoom() }
         commands.isEditingShelves = on
     }
 
-    /// Saves the edited layout when it differs from what Home shows (untouched defaults stay defaults).
+    /// Saves the layout; a layout equal to the defaults stays "not customised", so Plex's own
+    /// rows keep following the server.
     private func save() {
-        guard editSpecs != model.specs || layouts.saved(scope) != nil else { return }
-        layouts.set(scope, editSpecs)
-    }
-
-    private func resetLayout() {
-        let defaults = isMain ? HomeLayout.defaultHome : HomeModel.defaultSpecs(section: scope, hubs: model.hubCatalog[scope] ?? [])
-        withAnimation(Theme.Motion.object(reduceMotion)) { editSpecs = defaults }
-        layouts.reset(scope)
+        let defaults = model.defaults(for: scope)
+        if editSpecs == defaults {
+            guard layouts.saved(scope) != nil else { return }
+            loadedSaved = .some(nil)
+            layouts.reset(scope)
+        } else if layouts.saved(scope) != editSpecs {
+            loadedSaved = .some(editSpecs)
+            layouts.set(scope, editSpecs)
+        }
     }
 
     // MARK: Loading
 
     private func load() async {
         guard let client = session.client else { return }
-        await model.load(scope: scope, saved: layouts.saved(scope), client: client, index: library.index)
+        let saved = layouts.saved(scope)
+        await model.load(scope: scope, saved: saved, client: client, index: library.index)
         // A newer load (the layout changed) supersedes this one.
         guard !Task.isCancelled else { return }
+        loadedSaved = .some(saved)
+        if editing { return }
         if !editing { updateRoom() }
         #if DEBUG
         // -HomeSeedShelves YES: a layout with a smart shelf, a collection and a hidden row (captures).
@@ -246,6 +305,18 @@ struct HomeView: View {
         // -HomeEditing YES opens Edit Home; -SmartShelfSheet YES also opens a new smart shelf (captures).
         if isMain, !editing, layouts.isReady, !model.specs.isEmpty, UserDefaults.standard.bool(forKey: "HomeEditing") {
             setEditing(true)
+            // -HomeKeyScript "down,opt+down,space": key events into the editor after 2 s.
+            if let script = UserDefaults.standard.string(forKey: "HomeKeyScript") {
+                try? await Task.sleep(for: .seconds(2))
+                for token in script.split(separator: ",") {
+                    DebugKeys.post(String(token))
+                    try? await Task.sleep(for: .milliseconds(400))
+                }
+            }
+            if UserDefaults.standard.bool(forKey: "CollectionPicker") {
+                try? await Task.sleep(for: .milliseconds(600))
+                pickingCollection = true
+            }
             if UserDefaults.standard.bool(forKey: "SmartShelfSheet") {
                 try? await Task.sleep(for: .milliseconds(600))
                 ruleSheet = RuleSheetTarget(spec: nil)
@@ -295,8 +366,26 @@ struct HomeView: View {
 /// The main Home names itself; a library's Shelves layout keeps the library's title.
 private struct MainTitle: ViewModifier {
     let isMain: Bool
+    let editing: Bool
     func body(content: Content) -> some View {
-        if isMain { content.navigationTitle("Home") } else { content }
+        if isMain { content.navigationTitle("Home").navigationSubtitle(editing ? "Editing shelves" : "") } else { content }
+    }
+}
+
+/// Edit Shelves, or the prominent Done while editing (Home and library toolbars alike).
+struct EditShelvesButton: View {
+    let editing: Bool
+    let action: () -> Void
+    var body: some View {
+        if editing {
+            Button("Done", action: action)
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.lilac)
+                .help("Finish editing shelves (⌘E)")
+        } else {
+            Button("Edit Shelves", action: action)
+                .help("Reorder, hide and add shelves (⌘E)")
+        }
     }
 }
 
