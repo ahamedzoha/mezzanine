@@ -11,6 +11,7 @@ struct HomeView: View {
 
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
+    @Environment(AppCommandCenter.self) private var commands
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model = HomeModel()
     @State private var showsDetails = false
@@ -66,29 +67,35 @@ struct HomeView: View {
             withAnimation(Theme.Motion.object(reduceMotion)) { showsDetails.toggle() }
             return .handled
         }
-        .onChange(of: model.focusedItem?.ratingKey) { _, _ in
+        .onChange(of: model.focusedItem?.ratingKey, initial: true) { _, key in
             showsDetails = false
+            commands.hasFocusedTitle = key != nil
             updateRoom()
         }
-        .onAppear { updateRoom() }
-        .task(id: session.currentServer?.clientIdentifier) {
-            guard let client = session.client else { return }
-            await model.load(client: client)
-            updateRoom()
+        .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }
+        .onChange(of: commands.detailsRequests) { _, _ in
+            withAnimation(Theme.Motion.object(reduceMotion)) { showsDetails.toggle() }
         }
+        .task(id: session.currentServer?.clientIdentifier) { await load() }
         .navigationTitle("Home")
     }
 
     @ViewBuilder private var emptyOrLoading: some View {
         if model.shelves.isEmpty {
             if model.isLoading {
-                RoomMessage { ProgressView().controlSize(.small) }
+                RoomMessage { ProgressView().controlSize(.small).accessibilityLabel("Loading") }
             } else if let error = model.error {
-                RoomMessage(title: "Home didn’t load", detail: error)
+                RoomMessage(title: "Home didn’t load", detail: error, retry: { Task { await load() } })
             } else {
                 RoomMessage(title: "Nothing in progress", detail: "Start something from a library and it shows up here.")
             }
         }
+    }
+
+    private func load() async {
+        guard let client = session.client else { return }
+        await model.load(client: client)
+        updateRoom()
     }
 
     private func heroHeight(_ windowHeight: CGFloat) -> CGFloat {
@@ -116,17 +123,33 @@ struct HomeView: View {
 struct RoomMessage<Accessory: View>: View {
     var title: String?
     var detail: String?
+    var retry: (() -> Void)?
     @ViewBuilder var accessory: () -> Accessory
+
+    init(title: String? = nil, detail: String? = nil, retry: (() -> Void)? = nil,
+         @ViewBuilder accessory: @escaping () -> Accessory) {
+        self.title = title
+        self.detail = detail
+        self.retry = retry
+        self.accessory = accessory
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
             accessory()
             if let title {
                 Text(title).font(Theme.Typeface.messageTitle).foregroundStyle(Theme.ink)
+                    .accessibilityAddTraits(.isHeader)
             }
             if let detail {
                 Text(detail).font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary)
                     .frame(maxWidth: 480, alignment: .leading)
+            }
+            if let retry {
+                Button("Try Again", action: retry)
+                    .buttonStyle(SecondaryButtonStyle())
+                    .focusEffectDisabled(false)
+                    .padding(.top, Theme.Space.s)
             }
         }
         .padding(.leading, Theme.Space.gutter)
@@ -136,7 +159,7 @@ struct RoomMessage<Accessory: View>: View {
 }
 
 extension RoomMessage where Accessory == EmptyView {
-    init(title: String?, detail: String?) {
-        self.init(title: title, detail: detail) { EmptyView() }
+    init(title: String?, detail: String?, retry: (() -> Void)? = nil) {
+        self.init(title: title, detail: detail, retry: retry) { EmptyView() }
     }
 }

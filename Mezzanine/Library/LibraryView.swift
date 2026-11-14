@@ -56,15 +56,17 @@ struct LibraryView: View {
         .onMoveCommand(perform: move)
         .onKeyPress(.return) { playFocused() }
         .onKeyPress(.space) { playFocused() }
+        .onChange(of: focused, initial: true) { _, index in commands.hasFocusedTitle = index != nil }
+        .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }
         .onChange(of: commands.densitySteps.count) { _, _ in
             withAnimation(Theme.Motion.object(reduceMotion)) {
                 density = min(Self.densityRange.upperBound, max(Self.densityRange.lowerBound, density + commands.densitySteps.delta))
             }
         }
         .navigationTitle(section.title)
-        .navigationSubtitle(items.isEmpty ? "" : "\(items.count) titles")
+        .navigationSubtitle(items.isEmpty ? "" : (items.count == 1 ? "1 title" : "\(items.count) titles"))
         .toolbar {
-            ToolbarItem {
+            ToolbarItem(id: "sort") {
                 Menu {
                     Picker("Sort", selection: $sortRaw) {
                         Text("Title").tag(PlexSort.titleAscending.rawValue)
@@ -79,8 +81,9 @@ struct LibraryView: View {
                 }
                 .help("Sort")
             }
-            ToolbarItem {
-                Slider(value: $density, in: Self.densityRange)
+            ToolbarItem(id: "posterSize") {
+                Slider(value: $density, in: Self.densityRange) { Text("Poster Size") }
+                    .labelsHidden()
                     .frame(width: 110)
                     .help("Poster size (View ▸ Larger Posters ⌘=, Smaller Posters ⌘−)")
                     .accessibilityLabel("Poster size")
@@ -92,8 +95,8 @@ struct LibraryView: View {
 
     @ViewBuilder private var state: some View {
         if items.isEmpty {
-            if loading { RoomMessage { ProgressView().controlSize(.small) } }
-            else if let error { RoomMessage(title: "Couldn’t load \(section.title)", detail: error) }
+            if loading { RoomMessage { ProgressView().controlSize(.small).accessibilityLabel("Loading") } }
+            else if let error { RoomMessage(title: "Couldn’t load \(section.title)", detail: error, retry: { Task { await load() } }) }
             else { RoomMessage(title: "\(section.title) is empty", detail: "Add media to this library in Plex and it appears here.") }
         }
     }
@@ -234,7 +237,9 @@ struct GridPoster: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded { onPlay(frame) })
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction(named: "Play") { onPlay(frame) }
+        .accessibilityValue(item.progress.map { "\(Int($0 * 100)) percent watched" } ?? "")
+        .accessibilityHint("Plays")
+        .accessibilityAction { onPlay(frame) }
         .contextMenu { Button("Play") { onPlay(frame) } }
     }
 }

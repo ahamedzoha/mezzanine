@@ -94,7 +94,9 @@ struct PosterCard: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded { onPlay(frame) })
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction(named: "Play") { onPlay(frame) }
+        .accessibilityValue(item.progress.map { "\(Int($0 * 100)) percent watched" } ?? "")
+        .accessibilityHint("Plays")
+        .accessibilityAction { onPlay(frame) }
         .contextMenu {
             Button("Play") { onPlay(frame) }
         }
@@ -145,6 +147,7 @@ struct PlayDisc: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled(false)
         .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
         .help("Play")
         .accessibilityLabel("Play")

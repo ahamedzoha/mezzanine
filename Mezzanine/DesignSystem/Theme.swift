@@ -19,14 +19,18 @@ enum Theme {
     /// Type and icons.
     static let ink = Color(hex: 0xF2F2F0)
     /// Secondary type. 66 % ink on graphite ≈ 7:1, still AA over the room light.
-    static let inkSecondary = Color(hex: 0xF2F2F0).opacity(0.66)
-    static let inkTertiary = Color(hex: 0xF2F2F0).opacity(0.46)
+    /// Increase Contrast sets it in full ink.
+    static var inkSecondary: Color { increaseContrast ? ink : Color(hex: 0xF2F2F0).opacity(0.66) }
+    static var inkTertiary: Color { increaseContrast ? ink.opacity(0.85) : Color(hex: 0xF2F2F0).opacity(0.46) }
     /// The one accent: primary action and current selection only.
     static let lilac = Color(hex: 0xA08CFF)
     /// Type set on lilac.
     static let onLilac = Color(hex: 0x0E0F11)
     /// Hairlines (the ruled caption, separators).
-    static let rule = Color(hex: 0xF2F2F0).opacity(0.14)
+    static var rule: Color { Color(hex: 0xF2F2F0).opacity(increaseContrast ? 0.4 : 0.14) }
+
+    /// Read at render time; AppShell rebuilds its content when the setting changes.
+    static var increaseContrast: Bool { NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast }
 
     // MARK: Shape & space
 

@@ -31,7 +31,13 @@ struct MezzanineApp: App {
                 #endif
         }
         .defaultSize(width: 1440, height: 900)
+        .windowResizability(.contentMinSize)
         .commands { MezzanineCommands(center: commands) }
+
+        Settings {
+            SettingsView()
+                .environment(session)
+        }
 
         #if DEBUG
         Window("Lab", id: "lab") {

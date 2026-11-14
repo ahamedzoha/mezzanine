@@ -19,6 +19,21 @@ Motion honoured, top dissolve under the toolbar, left-aligned room messages, no 
 View menu (⌘= / ⌘−), focus returns after the player, play grows from the played poster,
 hero grows for details. Verdict pass skipped per the cost budget.
 
+DESIGN.md + `.impeccable/design.json` written from the built world; impeccable reverted to
+Sonnet. **HIG review: Needs Work → fixed** (highs 1–6 and most mediums/lows): focus outlines on
+capsule buttons and re-enabled focus effects on real buttons; Playback menu (plain-key items
+exist only while the player is open, so they never eat typing), View ▸ Show Details ⌘I,
+Playback ▸ Play ⌘↩; shell disabled + VoiceOver-hidden while the player is open, stage is modal,
+Return swallowed in the player; search keyboard navigation and honest states (too short,
+failed + retry), query cleared by sidebar/Go; VO default action + progress value on cards;
+close button label; HUD stays for VoiceOver and reappears on keys; adjustable scrub bar;
+Settings scene (Account tab) and a 900×600 minimum window; Try Again on Home/Library/sections
+errors; Increase Contrast (full-ink secondary text, stronger rules, outlined secondary
+buttons); density items enabled only on libraries; plural fix; sign-in default/cancel keys;
+cursor hides with the HUD. Deferred: GlassEffectContainer for the HUD (rebuilt in M3),
+richer card context menus (M2), cards reachable by Tab under Full Keyboard Access (arrow keys
+are the route; document in the M13 shortcuts sheet).
+
 ## 2026-11-14 — M0 started
 
 Done:

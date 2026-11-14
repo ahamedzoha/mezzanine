@@ -96,7 +96,7 @@ struct HeroView: View {
                 Label(primaryLabel, systemImage: "play.fill")
             }
             .buttonStyle(PrimaryButtonStyle())
-            .keyboardShortcut(.defaultAction)
+            .focusEffectDisabled(false)
             .help("Play (Return)")
 
             Button {
@@ -105,7 +105,8 @@ struct HeroView: View {
                 Text(showsDetails ? "Less" : "Details")
             }
             .buttonStyle(SecondaryButtonStyle())
-            .help("Details (I)")
+            .focusEffectDisabled(false)
+            .help("Details (I or ⌘I)")
         }
     }
 
@@ -148,6 +149,17 @@ struct HeroView: View {
 
 // MARK: - Buttons
 
+/// Keyboard focus on a capsule button: a 2 pt ink outline just outside it
+/// (Full Keyboard Access / Tab). Posters use lift and the room light instead.
+private struct CapsuleFocusOutline: ViewModifier {
+    @Environment(\.isFocused) private var isFocused
+    func body(content: Content) -> some View {
+        content.overlay {
+            Capsule().strokeBorder(Theme.ink, lineWidth: 2).padding(-4).opacity(isFocused ? 1 : 0)
+        }
+    }
+}
+
 /// Lilac capsule: the one primary action on a screen. The whole capsule is the target.
 struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
@@ -163,12 +175,14 @@ struct PrimaryButtonStyle: ButtonStyle {
             .opacity(isEnabled ? 1 : 0.5)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(Theme.Motion.quick, value: configuration.isPressed)
+            .modifier(CapsuleFocusOutline())
     }
 }
 
 /// Solid raised capsule (never translucent over art).
 struct SecondaryButtonStyle: ButtonStyle {
     @State private var hovering = false
+    @Environment(\.colorSchemeContrast) private var contrast
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -177,8 +191,10 @@ struct SecondaryButtonStyle: ButtonStyle {
             .padding(.horizontal, 16)
             .frame(height: 34)
             .background(Capsule().fill(configuration.isPressed ? Theme.raisedHover : (hovering ? Theme.raisedHover : Theme.raised)))
+            .overlay { if contrast == .increased { Capsule().strokeBorder(Theme.ink.opacity(0.5), lineWidth: 1) } }
             .contentShape(Capsule())
             .onHover { hovering = $0 }
             .animation(Theme.Motion.quick, value: hovering)
+            .modifier(CapsuleFocusOutline())
     }
 }

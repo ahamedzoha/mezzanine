@@ -13,6 +13,7 @@ struct PlayerStage: View {
     let window: CGSize
 
     @Environment(PlaybackCoordinator.self) private var playback
+    @Environment(AppCommandCenter.self) private var commands
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var opened = false
     @State private var hudVisible = true
@@ -35,27 +36,50 @@ struct PlayerStage: View {
         .position(x: frame.midX, y: frame.midY)
         .onAppear {
             focused = true
-            withAnimation(.spring(response: 0.5, dampingFraction: 1)) { opened = true }
+            withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 1)) { opened = true }
             scheduleHUDHide()
         }
-        .onContinuousHover { _ in
-            withAnimation(Theme.Motion.quick) { hudVisible = true }
-            scheduleHUDHide()
-        }
+        .onDisappear { NSCursor.unhide() }
+        .onContinuousHover { _ in showHUD() }
+        // The player is the only thing on screen; its own controls keep their focus indication.
         .focusable()
         .focusEffectDisabled()
         .focused($focused)
-        .onKeyPress(.escape) { close(); return .handled }
-        .onKeyPress(.space) { player.togglePlayPause(); return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "kK")) { _ in player.togglePlayPause(); return .handled }
-        .onKeyPress(.leftArrow) { Task { await player.seek(by: -10) }; return .handled }
-        .onKeyPress(.rightArrow) { Task { await player.seek(by: 10) }; return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "jJ")) { _ in Task { await player.seek(by: -10) }; return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "lL")) { _ in Task { await player.seek(by: 10) }; return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "sS")) { _ in skip() ? .handled : .ignored }
+        .onKeyPress(.escape) { perform(.close) }
+        .onKeyPress(.space) { perform(.togglePlay) }
+        .onKeyPress(characters: CharacterSet(charactersIn: "kK")) { _ in perform(.togglePlay) }
+        .onKeyPress(.leftArrow) { perform(.back) }
+        .onKeyPress(.rightArrow) { perform(.forward) }
+        .onKeyPress(characters: CharacterSet(charactersIn: "jJ")) { _ in perform(.back) }
+        .onKeyPress(characters: CharacterSet(charactersIn: "lL")) { _ in perform(.forward) }
+        .onKeyPress(characters: CharacterSet(charactersIn: "sS")) { _ in perform(.skipMarker) }
         .onKeyPress(characters: CharacterSet(charactersIn: "fF")) { _ in NSApp.keyWindow?.toggleFullScreen(nil); return .handled }
-        .onKeyPress(.return) { skip() ? .handled : .ignored }
+        // Return skips while a marker plays and is swallowed otherwise, so it never reaches anything behind the player.
+        .onKeyPress(.return) { _ = perform(.skipMarker); return .handled }
+        .onChange(of: commands.playerRequests.count) { _, _ in _ = perform(commands.playerRequests.action) }
+        .accessibilityElement(children: .contain)
         .accessibilityLabel("Player")
+        .accessibilityAddTraits(.isModal)
+    }
+
+    /// Every player key and Playback menu item lands here.
+    @discardableResult
+    private func perform(_ action: AppCommandCenter.PlayerAction) -> KeyPress.Result {
+        showHUD()
+        switch action {
+        case .togglePlay: player.togglePlayPause()
+        case .back: Task { await player.seek(by: -10) }
+        case .forward: Task { await player.seek(by: 10) }
+        case .skipMarker: return skip() ? .handled : .ignored
+        case .close: close()
+        }
+        return .handled
+    }
+
+    private func showHUD() {
+        NSCursor.unhide()
+        withAnimation(Theme.Motion.quick) { hudVisible = true }
+        scheduleHUDHide()
     }
 
     // MARK: HUD
@@ -68,8 +92,10 @@ struct PlayerStage: View {
                         .frame(width: 32, height: 32).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .glassEffect(.regular.tint(.black.opacity(0.55)), in: Circle())
+                .glassEffect(.regular.tint(.black.opacity(0.55)).interactive(), in: Circle())
+                .focusEffectDisabled(false)
                 .help("Close (Esc)")
+                .accessibilityLabel("Close Player")
                 Spacer()
             }
             .padding(Theme.Space.l)
@@ -83,6 +109,7 @@ struct PlayerStage: View {
                 ScrubBar(current: player.currentTime, duration: player.duration, markers: item.markers) { t in
                     Task { await player.seek(to: t) }
                 }
+                .accessibilityValue("\(clock(player.currentTime)) of \(clock(player.duration))")
                 HStack {
                     Text(clock(player.currentTime))
                     Spacer()
@@ -105,12 +132,13 @@ struct PlayerStage: View {
                 Text(marker.kind == .intro ? "Skip Intro" : "Skip Credits")
             }
             .buttonStyle(PrimaryButtonStyle())
+            .focusEffectDisabled(false)
             .help("Skip (S or Return)")
             .padding(.trailing, Theme.Space.xl)
             .padding(.bottom, 150)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-            .transition(.move(edge: .trailing).combined(with: .opacity))
-            .animation(Theme.Motion.object, value: marker.kind)
+            .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
+            .animation(Theme.Motion.object(reduceMotion), value: marker.kind)
         }
     }
 
@@ -127,9 +155,9 @@ struct PlayerStage: View {
     }
 
     private func close() {
-        withAnimation(.spring(response: 0.42, dampingFraction: 1)) { opened = false }
+        withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.42, dampingFraction: 1)) { opened = false }
         Task {
-            try? await Task.sleep(for: .milliseconds(380))
+            try? await Task.sleep(for: .milliseconds(reduceMotion ? 200 : 380))
             playback.close()
         }
     }
@@ -138,8 +166,10 @@ struct PlayerStage: View {
         hideHUD?.cancel()
         hideHUD = Task {
             try? await Task.sleep(for: .seconds(2.5))
-            guard !Task.isCancelled, player.status == .playing else { return }
+            // VoiceOver users keep the controls; they can't chase a disappearing HUD.
+            guard !Task.isCancelled, player.status == .playing, !NSWorkspace.shared.isVoiceOverEnabled else { return }
             withAnimation(.easeOut(duration: 0.4)) { hudVisible = false }
+            NSCursor.setHiddenUntilMouseMoves(true)
         }
     }
 
@@ -184,7 +214,14 @@ struct ScrubBar: View {
         .frame(height: 16)
         .accessibilityElement()
         .accessibilityLabel("Playback position")
-        .accessibilityValue("\(Int(current / 60)) of \(Int(duration / 60)) minutes")
+        .accessibilityAddTraits(.updatesFrequently)
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: seek(min(duration, current + 10))
+            case .decrement: seek(max(0, current - 10))
+            @unknown default: break
+            }
+        }
     }
 }
 
