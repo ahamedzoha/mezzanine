@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-14T00:00:00Z",
+  "title": "Design System: Mezzanine",
+  "extensions": {
+    "colorMeta": {
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Matte Graphite",
+        "canonical": "#0E0F11",
+        "tonalRamp": [
+          "#0E0F11",
+          "#1A1C20",
+          "#24272C",
+          "#3A3D43",
+          "#585B62",
+          "#82858B",
+          "#B4B6BA",
+          "#F2F2F0"
+        ]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised Graphite",
+        "canonical": "#1A1C20",
+        "tonalRamp": [
+          "#0E0F11",
+          "#1A1C20",
+          "#24272C",
+          "#3A3D43",
+          "#585B62",
+          "#82858B",
+          "#B4B6BA",
+          "#F2F2F0"
+        ]
+      },
+      "raised-hover": {
+        "role": "neutral",
+        "displayName": "Raised Hover",
+        "canonical": "#24272C",
+        "tonalRamp": [
+          "#0E0F11",
+          "#1A1C20",
+          "#24272C",
+          "#3A3D43",
+          "#585B62",
+          "#82858B",
+          "#B4B6BA",
+          "#F2F2F0"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "canonical": "#F2F2F0",
+        "tonalRamp": [
+          "#3A3A39",
+          "#585857",
+          "#787877",
+          "#9A9A98",
+          "#B8B8B6",
+          "#D2D2D0",
+          "#E6E6E4",
+          "#F2F2F0"
+        ]
+      },
+      "ink-secondary": {
+        "role": "neutral",
+        "displayName": "Ink 66%",
+        "canonical": "rgba(242,242,240,0.66)"
+      },
+      "ink-tertiary": {
+        "role": "neutral",
+        "displayName": "Ink 46%",
+        "canonical": "rgba(242,242,240,0.46)"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(242,242,240,0.14)"
+      },
+      "lilac": {
+        "role": "primary",
+        "displayName": "Single Lilac",
+        "canonical": "#A08CFF",
+        "tonalRamp": [
+          "#2A2252",
+          "#3D3278",
+          "#5143A3",
+          "#6B59CC",
+          "#8470F0",
+          "#A08CFF",
+          "#C3B6FF",
+          "#E6E0FF"
+        ]
+      },
+      "on-lilac": {
+        "role": "neutral",
+        "displayName": "Graphite on Lilac",
+        "canonical": "#0E0F11"
+      }
+    },
+    "typographyMeta": {
+      "title-card": {
+        "displayName": "Title Card",
+        "purpose": "Hero title for a film with no clearLogo. Big Shoulders Display 800, capitals."
+      },
+      "room-message": {
+        "displayName": "Room Message",
+        "purpose": "Loading, empty and error headings."
+      },
+      "shelf-title": {
+        "displayName": "Shelf Title",
+        "purpose": "Row headings on the gutter."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Summaries and message detail."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "Capsule labels."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "The ruled hero caption of facts."
+      },
+      "card-title": {
+        "displayName": "Card Title",
+        "purpose": "Under posters; lilac when focused."
+      },
+      "card-meta": {
+        "displayName": "Card Meta",
+        "purpose": "Time left, episode code, year."
+      }
+    },
+    "shadows": [
+      {
+        "name": "poster-rest",
+        "value": "0 4px 8px rgba(0,0,0,0.30)",
+        "purpose": "Resting poster."
+      },
+      {
+        "name": "poster-focused",
+        "value": "0 14px 22px rgba(0,0,0,0.60)",
+        "purpose": "Focused poster, with 1.045 scale and 4px lift."
+      },
+      {
+        "name": "play-disc",
+        "value": "0 2px 6px rgba(0,0,0,0.35)",
+        "purpose": "Disc over a focused poster."
+      }
+    ],
+    "motion": [
+      {
+        "name": "light",
+        "value": "ease-out 0.45s",
+        "purpose": "Room light crossfades following focus."
+      },
+      {
+        "name": "object",
+        "value": "spring(response 0.38, damping 1)",
+        "purpose": "Lift, scroll, details, stage. No bounce."
+      },
+      {
+        "name": "quick",
+        "value": "ease-out 0.16s",
+        "purpose": "Press and hover on controls."
+      },
+      {
+        "name": "hover-dwell",
+        "value": "220ms",
+        "purpose": "Pointer rest before focus moves; never scrolls."
+      },
+      {
+        "name": "reduce-motion",
+        "value": "ease-out 0.2s crossfade",
+        "purpose": "Objects crossfade, no lift or scale."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one lilac capsule on a screen.",
+      "html": "<button class=\"ds-btn-primary\">Play</button>",
+      "css": ".ds-btn-primary{background:#A08CFF;color:#0E0F11;height:34px;padding:0 18px;border:none;border-radius:999px;font:600 14px -apple-system,system-ui,sans-serif;cursor:default;transition:transform .16s ease-out,background .16s ease-out}.ds-btn-primary:active{background:rgba(160,140,255,.82);transform:scale(.97)}.ds-btn-primary:focus-visible{outline:none}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Solid raised capsule, never translucent.",
+      "html": "<button class=\"ds-btn-secondary\">Details</button>",
+      "css": ".ds-btn-secondary{background:#1A1C20;color:#F2F2F0;height:34px;padding:0 16px;border:none;border-radius:999px;font:600 14px -apple-system,system-ui,sans-serif;cursor:default;transition:background .16s ease-out}.ds-btn-secondary:hover,.ds-btn-secondary:active{background:#24272C}.ds-btn-secondary:focus-visible{outline:none}"
+    },
+    {
+      "name": "Play Disc",
+      "kind": "custom",
+      "refersTo": "play-disc",
+      "description": "Pointer's way to play a focused poster.",
+      "html": "<button class=\"ds-disc\"><svg width=\"13\" height=\"13\" viewBox=\"0 0 13 13\"><path d=\"M3 1.5v10l8-5z\" fill=\"#0E0F11\"/></svg></button>",
+      "css": ".ds-disc{width:34px;height:34px;border-radius:50%;border:none;background:#F2F2F0;display:grid;place-items:center;cursor:default;box-shadow:0 2px 6px rgba(0,0,0,.35)}"
+    },
+    {
+      "name": "Poster Card (focused)",
+      "kind": "card",
+      "refersTo": "poster-card-focused",
+      "description": "Lift, shadow, lilac title, play disc. No ring.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-poster\"></div><div class=\"ds-title\">Blade Runner</div><div class=\"ds-meta\">26 min left</div></div>",
+      "css": ".ds-card{width:150px;cursor:default;font-family:-apple-system,system-ui,sans-serif}.ds-poster{width:150px;height:225px;border-radius:12px;background:#1A1C20;box-shadow:0 4px 8px rgba(0,0,0,.3);transform-origin:bottom;transition:transform .38s cubic-bezier(.2,.8,.2,1),box-shadow .38s ease-out}.ds-card:hover .ds-poster{transform:translateY(-4px) scale(1.045);box-shadow:0 14px 22px rgba(0,0,0,.6)}.ds-title{margin-top:8px;font:600 13px -apple-system,system-ui,sans-serif;color:#F2F2F0}.ds-card:hover .ds-title{color:#A08CFF}.ds-meta{margin-top:2px;font:400 12px -apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums;color:rgba(242,242,240,.66)}"
+    },
+    {
+      "name": "Ruled Caption",
+      "kind": "custom",
+      "refersTo": "typography.caption",
+      "description": "Hairline over one line of facts.",
+      "html": "<div class=\"ds-cap\"><div class=\"ds-rule\"></div><div class=\"ds-line\">2019 \u00b7 1 h 38 min \u00b7 4K \u00b7 HEVC \u00b7 E-AC-3 5.1 \u00b7 26 min left</div></div>",
+      "css": ".ds-cap{display:flex;flex-direction:column;gap:8px}.ds-rule{width:48px;height:1px;background:rgba(242,242,240,.14)}.ds-line{font:500 13px -apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums;color:rgba(242,242,240,.66)}"
+    },
+    {
+      "name": "Title Card",
+      "kind": "custom",
+      "refersTo": "title-card",
+      "description": "Fallback title when there is no clearLogo.",
+      "html": "<div class=\"ds-titlecard\">THE LONG GOODBYE</div>",
+      "css": ".ds-titlecard{font-family:'Big Shoulders Display','Arial Narrow',sans-serif;font-weight:800;font-size:92px;line-height:1;letter-spacing:-1px;color:#F2F2F0;text-transform:uppercase}"
+    },
+    {
+      "name": "Room Message",
+      "kind": "custom",
+      "description": "Left-aligned on the gutter, below the toolbar.",
+      "html": "<div class=\"ds-msg\"><div class=\"ds-h\">Nothing in progress</div><div class=\"ds-d\">Start something from a library and it shows up here.</div></div>",
+      "css": ".ds-msg{padding:48px 0 0 40px;display:flex;flex-direction:column;gap:8px;font-family:-apple-system,system-ui,sans-serif}.ds-h{font-size:22px;font-weight:600;color:#F2F2F0}.ds-d{font-size:14px;max-width:480px;color:rgba(242,242,240,.66)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Bias Light",
+    "overview": "Mezzanine is a dark room with one light source: the film you are looking at. A near-black graphite ground carries the interface; the focused title throws its own colour across it. Chrome has no hue of its own; the single exception is one lilac, spent on the primary action and the current selection. The system is quiet and precise, and nothing floats in the middle of the window: text and messages sit on a 40 pt gutter, left-aligned, below the toolbar.",
+    "keyCharacteristics": [
+      "Graphite room, never pure black; the room light follows focus.",
+      "One accent (lilac), two jobs: primary action, current selection.",
+      "Focus is lift, shadow, lilac caption, room light and a play disc. No rings.",
+      "Left-aligned on a 40 pt gutter; one ruled caption of facts under each title.",
+      "Solid surfaces over art; glass only on toolbar, sidebar and player controls.",
+      "Every key has a menu item; every hit target is the whole control."
+    ],
+    "rules": [
+      {
+        "name": "The Borrowed Colour Rule",
+        "body": "Chrome carries no hue. Colour comes from artwork and the room light; the only exception is lilac.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Lilac Rule",
+        "body": "Lilac is for the primary action and the current selection. Not for links, badges, toggles or decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Steady Floor Rule",
+        "body": "The room light fades to graphite toward the bottom; text and posters never sit on saturated colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Title Card Rule",
+        "body": "Big Shoulders is used at weight 800, in capitals, for a title with no logo, and nowhere else in the UI.",
+        "section": "typography"
+      },
+      {
+        "name": "The Numbers Rule",
+        "body": "Captions state facts in tabular figures, separated by \" \u00b7 \". No adjectives.",
+        "section": "typography"
+      },
+      {
+        "name": "The Glass Is Chrome Rule",
+        "body": "Liquid Glass appears only on toolbar, sidebar and player controls. Never on posters, captions, panels or messages.",
+        "section": "elevation"
+      },
+      {
+        "name": "The No Bleed Rule",
+        "body": "No translucent panels that let content show through behind text.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep chrome hueless; let artwork and the room light supply colour.",
+      "Do use lilac (#A08CFF) only for the primary action and the current selection.",
+      "Do show focus as lift, shadow, lilac caption, room light and play disc.",
+      "Do make the whole button the hit target (capsule, disc, card).",
+      "Do use solid raised surfaces for secondary controls and anything over art.",
+      "Do left-align messages and text on the 40 pt gutter, clear of the toolbar.",
+      "Do write captions as facts in tabular figures joined by \" \u00b7 \", with a hairline above.",
+      "Do crossfade light at 0.45 s, move objects with spring 0.38 and no bounce, and fall back to crossfade under Reduce Motion.",
+      "Do give every shortcut a menu item."
+    ],
+    "donts": [
+      "Don't put Liquid Glass on content; toolbar, sidebar and player controls only.",
+      "Don't draw focus rings or use system focus effects on content.",
+      "Don't use translucent panels with content bleeding through behind text.",
+      "Don't centre or float content in the window; no centred empty or loading states.",
+      "Don't use the pointing-hand cursor on cards.",
+      "Don't scroll on hover; only keyboard moves scroll.",
+      "Don't add a second accent, a coloured badge, or tint chrome with a film's colour.",
+      "Don't use Big Shoulders for anything but a logo-less title card."
+    ]
+  }
+}

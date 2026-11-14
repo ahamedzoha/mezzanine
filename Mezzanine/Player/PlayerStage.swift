@@ -75,7 +75,7 @@ struct PlayerStage: View {
             .padding(Theme.Space.l)
             Spacer()
             VStack(alignment: .leading, spacing: Theme.Space.s) {
-                Text(Format.displayTitle(item)).font(.system(size: 17, weight: .semibold))
+                Text(Format.displayTitle(item)).font(Theme.Typeface.shelfTitle)
                 if item.kind == .episode {
                     Text([Format.episodeCode(item), item.title].compactMap { $0 }.joined(separator: " · "))
                         .font(Theme.Typeface.caption).foregroundStyle(Theme.inkSecondary)
@@ -93,7 +93,7 @@ struct PlayerStage: View {
             }
             .foregroundStyle(Theme.ink)
             .padding(Theme.Space.l)
-            .glassEffect(.regular.tint(.black.opacity(0.55)), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .glassEffect(.regular.tint(.black.opacity(0.55)), in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
             .padding(Theme.Space.l)
         }
     }

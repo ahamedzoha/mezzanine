@@ -122,7 +122,7 @@ struct RoomMessage<Accessory: View>: View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
             accessory()
             if let title {
-                Text(title).font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text(title).font(Theme.Typeface.messageTitle).foregroundStyle(Theme.ink)
             }
             if let detail {
                 Text(detail).font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary)

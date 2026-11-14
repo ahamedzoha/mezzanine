@@ -35,6 +35,8 @@ enum Theme {
         static let control: CGFloat = 8
         static let poster: CGFloat = 12
         static let still: CGFloat = 12
+        /// Floating control panels (the player HUD).
+        static let panel: CGFloat = 16
     }
 
     enum Space {
@@ -51,6 +53,8 @@ enum Theme {
     // MARK: Type
 
     enum Typeface {
+        /// Room messages (empty, error, loading states).
+        static let messageTitle = Font.system(size: 22, weight: .semibold)
         static let shelfTitle = Font.system(size: 17, weight: .semibold)
         static let cardTitle = Font.system(size: 13, weight: .semibold)
         static let cardMeta = Font.system(size: 12, weight: .regular).monospacedDigit()

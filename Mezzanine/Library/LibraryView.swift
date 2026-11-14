@@ -210,7 +210,8 @@ struct GridPoster: View {
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous))
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
             .shadow(color: .black.opacity(isFocused ? 0.6 : 0.3), radius: isFocused ? 22 : 8, y: isFocused ? 14 : 4)
-            .scaleEffect(isFocused && !reduceMotion ? 1.04 : 1, anchor: .bottom)
+            .scaleEffect(isFocused && !reduceMotion ? 1.045 : 1, anchor: .bottom)
+            .offset(y: isFocused && !reduceMotion ? -4 : 0)
             .animation(Theme.Motion.object(reduceMotion), value: isFocused)
 
             VStack(alignment: .leading, spacing: 2) {
