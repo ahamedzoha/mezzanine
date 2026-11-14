@@ -24,10 +24,12 @@ struct AppShell: View {
 
     var body: some View {
         Group {
-            if session.phase == .ready {
+            // Once connected, the library stays on screen through reconnects.
+            if session.phase == .ready || (session.client != nil && session.phase == .connecting) {
                 split
                     .disabled(playback.isPresented)
                     .accessibilityHidden(playback.isPresented)
+                    .toolbarVisibility(playback.isPresented ? .hidden : .visible, for: .windowToolbar)
             } else {
                 SignInView()
             }

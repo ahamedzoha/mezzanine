@@ -60,14 +60,21 @@ public final class NetworkPath: @unchecked Sendable {
     private let lock = NSLock()
     private var satisfied = true
     private var generation = 0
+    /// Status + interfaces + cost flags. macOS re-reports an identical path
+    /// every ~30 s on some setups (seen with a Twingate tunnel); only a
+    /// change to this signature counts as a network change.
+    private var signature = ""
     private var handlers: [UUID: @Sendable (Bool) -> Void] = [:]
 
     private init() {
         monitor.pathUpdateHandler = { [weak self] path in
             guard let self else { return }
             let ok = path.status == .satisfied
+            let signature = Self.signature(of: path)
             let toCall = self.lock.withLock { () -> [@Sendable (Bool) -> Void] in
                 self.satisfied = ok
+                guard signature != self.signature else { return [] }
+                self.signature = signature
                 self.generation += 1
                 return Array(self.handlers.values)
             }
@@ -77,6 +84,11 @@ public final class NetworkPath: @unchecked Sendable {
     }
 
     public var isSatisfied: Bool { lock.withLock { satisfied } }
+
+    static func signature(of path: NWPath) -> String {
+        let interfaces = path.availableInterfaces.map { "\($0.name):\($0.type)" }.sorted().joined(separator: ",")
+        return "\(path.status)|\(path.isExpensive)|\(path.isConstrained)|\(interfaces)"
+    }
 
     /// Increments on every path change (Wi-Fi switch, VPN up/down).
     public var changeGeneration: Int { lock.withLock { generation } }

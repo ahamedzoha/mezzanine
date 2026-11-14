@@ -133,7 +133,11 @@ final class SessionStore {
     }
 
     private func select(_ server: PlexServerResource, token: String) async throws {
-        phase = .connecting
+        // A refresh of the same server keeps the window as it is; only a first
+        // connection or a server switch shows "Connecting".
+        if currentServer?.clientIdentifier != server.clientIdentifier || client == nil {
+            phase = .connecting
+        }
         let racer = ConnectionRacer()
         guard let won = await racer.race(server.candidates,
                                          probe: ConnectionRacer.identityProbe(expectedMachineIdentifier: server.clientIdentifier)) else {
@@ -176,7 +180,21 @@ final class SessionStore {
         let generation = NetworkPath.shared.changeGeneration
         guard generation != lastPathGeneration, phase == .ready, let server = currentServer else { return }
         lastPathGeneration = generation
-        Task { await select(server) }
+        Task { await refreshConnection(server) }
+    }
+
+    /// Re-races in the background after a real network change and swaps the
+    /// client only when a different address wins. Nothing on screen reloads
+    /// unless the address actually changed.
+    private func refreshConnection(_ server: PlexServerResource) async {
+        guard let token else { return }
+        guard let won = await ConnectionRacer().race(server.candidates,
+                                                     probe: ConnectionRacer.identityProbe(expectedMachineIdentifier: server.clientIdentifier)),
+              won.connection != connection?.connection else { return }
+        connection = won
+        client = PlexServerClient(baseURL: won.baseURL, token: server.accessToken ?? token,
+                                  machineIdentifier: server.clientIdentifier, identity: identity)
+        await images.setToken(server.accessToken ?? token, host: won.baseURL.host(), serverID: server.clientIdentifier)
     }
 
     // MARK: Artwork URLs
