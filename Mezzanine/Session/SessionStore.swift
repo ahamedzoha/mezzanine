@@ -29,6 +29,8 @@ final class SessionStore {
     private let keychain = Keychain(service: "com.mezzanine.mac.plex")
     private let tv: PlexTV
     private var signInTask: Task<Void, Never>?
+    /// The browser page for the sign-in in progress (to reopen it).
+    private(set) var pendingAuthURL: URL?
     private var pathObserver: UUID?
     private var lastPathGeneration = NetworkPath.shared.changeGeneration
 
@@ -81,7 +83,9 @@ final class SessionStore {
             do {
                 let pin = try await tv.createPin(strong: true)
                 phase = .awaitingApproval(code: pin.code)
-                NSWorkspace.shared.open(tv.authURL(for: pin))
+                let url = tv.authURL(for: pin)
+                pendingAuthURL = url
+                NSWorkspace.shared.open(url)
                 let token = try await tv.waitForToken(pin: pin)
                 try keychain.write(token, for: Self.accountKey)
                 keychain.delete(Self.profileKey)
@@ -92,6 +96,17 @@ final class SessionStore {
                 phase = .failed((error as? PlexError)?.userMessage ?? error.localizedDescription)
             }
         }
+    }
+
+    func reopenApproval() {
+        if let pendingAuthURL { NSWorkspace.shared.open(pendingAuthURL) }
+    }
+
+    /// System Settings ▸ Privacy & Security ▸ Local Network (new pane id first, legacy after).
+    static func openLocalNetworkSettings() {
+        let modern = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_LocalNetwork")!
+        let legacy = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")!
+        if !NSWorkspace.shared.open(modern) { NSWorkspace.shared.open(legacy) }
     }
 
     func cancelSignIn() {

@@ -72,6 +72,8 @@ import Testing
         #expect(movie.image(.coverPoster) != nil)
         #expect(movie.backdropPath != nil)
         #expect(movie.ultraBlur?.topLeft.count == 6)
+        #expect(movie.extras.count == 3)
+        #expect(movie.extras.first?.subtype == "trailer")
     }
 
     @Test func homeHubs() throws {

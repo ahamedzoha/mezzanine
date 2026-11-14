@@ -25,21 +25,26 @@ struct SettingsView: View {
             Tab("Library", systemImage: "books.vertical") {
                 @Bindable var library = library
                 Form {
-                    Toggle("Show original posters", isOn: $library.prefersCleanPosters)
-                    Text("Shows each title's agent poster instead of the server's selected one, so overlays added by tools like Kometa don't appear in Mezzanine. Nothing changes on the server.")
-                        .font(.callout).foregroundStyle(.secondary)
-                    LabeledContent("Local library") {
-                        switch library.syncState {
-                        case .idle: Text("Up to date")
-                        case .syncing(let s, let d, let t): Text("Reading \(s) (\(d) of \(t))")
-                        case .failed(let m): Text(m).foregroundStyle(.red)
-                        }
+                    Section {
+                        Toggle("Show original posters", isOn: $library.prefersCleanPosters)
+                    } footer: {
+                        Text("Uses each title’s original poster instead of the one your server shows, so badges added to posters on the server (like resolution or rating stickers) don’t appear here. Nothing on the server changes.")
                     }
-                    Button("Read Library Again") { Task { await library.syncAll(force: true) } }
+                    Section {
+                        LabeledContent("Local library") {
+                            switch library.syncState {
+                            case .idle: Text("Up to date")
+                            case .syncing(let s, let d, let t): Text("Reading \(s) (\(d.formatted()) of \(t.formatted()))")
+                            case .failed(let m): Label(m, systemImage: "exclamationmark.triangle.fill")
+                            }
+                        }
+                        Button("Read Library Again") { Task { await library.syncAll(force: true) } }
+                            .disabled({ if case .syncing = library.syncState { return true }; return false }())
+                    }
                 }
                 .formStyle(.grouped)
             }
         }
-        .frame(width: 520, height: 320)
+        .frame(minWidth: 520, idealWidth: 540, minHeight: 320)
     }
 }

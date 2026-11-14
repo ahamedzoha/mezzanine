@@ -27,8 +27,9 @@ struct SearchView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     PosterGrid(items: results, density: Self.density, focused: focused,
-                               onFocus: { setFocus($0, byKeyboard: false) },
-                               onPlay: { item, frame in Task { await playback.play(item, from: frame) } })
+                               actions: CardActions(focus: { setFocus($0, byKeyboard: false) },
+                                                    open: { commands.open($0) },
+                                                    play: { item, frame in Task { await playback.play(item, from: frame) } }))
                 }
                 .onChange(of: focused) { _, index in
                     guard let index, keyboardMoved else { return }
@@ -42,7 +43,11 @@ struct SearchView: View {
         .focusEffectDisabled()
         .focused(contentFocus)
         .onMoveCommand(perform: move)
-        .onKeyPress(.return) { playFocused() }
+        .onKeyPress(.return) {
+            guard let focused, results.indices.contains(focused) else { return .ignored }
+            commands.open(results[focused])
+            return .handled
+        }
         .onKeyPress(.space) { playFocused() }
         .onChange(of: focused, initial: true) { _, index in commands.hasFocusedTitle = index != nil }
         .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }

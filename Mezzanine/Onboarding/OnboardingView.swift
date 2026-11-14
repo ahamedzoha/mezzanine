@@ -12,6 +12,7 @@ struct OnboardingView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackCoordinator.self) private var playback
     @AppStorage("onboardingComplete") private var onboardingComplete = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var serverConfirmed = false
     @State private var profileConfirmed = false
     @State private var wall: [PlexMetadata] = []
@@ -48,6 +49,7 @@ struct OnboardingView: View {
             if items.count != wall.count { withAnimation(.easeOut(duration: 0.3)) { wall = items } }
         }
         .task(id: wall.count) { await cycleRoomLight() }
+        .onChange(of: step) { _, _ in AccessibilityNotification.ScreenChanged(nil).post() }
         .task(id: session.phase) {
             if session.phase == .ready { await session.loadHomeUsers() }
         }
@@ -64,9 +66,12 @@ struct OnboardingView: View {
 
     // MARK: Column
 
+    /// The wordmark sits at a fixed height; each step's content grows below it,
+    /// so nothing jumps as steps change.
     private var column: some View {
+        GeometryReader { geo in
         VStack(alignment: .leading, spacing: Theme.Space.l) {
-            Spacer(minLength: Theme.Space.xxl)
+            Spacer().frame(height: max(Theme.Space.xxl, geo.size.height * 0.38))
             Text("MEZZANINE")
                 .font(TitleFont.font(size: 76))
                 .foregroundStyle(Theme.ink)
@@ -81,10 +86,11 @@ struct OnboardingView: View {
             }
             .transition(.opacity)
             .animation(Theme.Motion.light, value: step)
-            Spacer().frame(height: Theme.Space.xxl * 1.5)
+            Spacer(minLength: Theme.Space.xxl)
         }
         .padding(.horizontal, Theme.Space.gutter)
         .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var allRead: Bool {
@@ -98,6 +104,11 @@ struct OnboardingView: View {
 
     /// The room takes the light of a newly arrived poster every few seconds.
     private func cycleRoomLight() async {
+        // Reduce Motion: one steady light, no drifting.
+        if reduceMotion {
+            if let item = wall.first, let palette = RoomPalette(item.ultraBlur) { playback.roomPalette = palette }
+            return
+        }
         while !Task.isCancelled {
             if let item = wall.prefix(40).randomElement(), let palette = RoomPalette(item.ultraBlur) {
                 playback.roomPalette = palette
@@ -115,6 +126,7 @@ private struct StepText: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s) {
             Text(line).font(.system(size: 17, weight: .medium)).foregroundStyle(Theme.ink)
+                .accessibilityAddTraits(.isHeader)
             if let detail {
                 Text(detail).font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -138,12 +150,25 @@ private struct SignInStep: View {
                     .keyboardShortcut(.defaultAction)
             case .awaitingApproval(let code):
                 StepText(line: "Approve Mezzanine in your browser.",
-                         detail: "Waiting for Plex. If the page didn’t open, go to plex.tv/link and enter \(code).")
+                         detail: "This window carries on by itself once you do.")
+                HStack(spacing: Theme.Space.s) {
+                    Text("Or go to").foregroundStyle(Theme.inkSecondary)
+                    Link("plex.tv/link", destination: URL(string: "https://plex.tv/link")!)
+                    Text("and enter").foregroundStyle(Theme.inkSecondary)
+                    Text(code)
+                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.ink)
+                        .textSelection(.enabled)
+                        .accessibilityLabel("Code \(code.map(String.init).joined(separator: " "))")
+                }
+                .font(Theme.Typeface.body)
                 HStack(spacing: Theme.Space.m) {
-                    ProgressView().controlSize(.small).accessibilityLabel("Waiting")
+                    Button("Open Plex Again") { session.reopenApproval() }
+                        .buttonStyle(PrimaryButtonStyle())
                     Button("Cancel") { session.cancelSignIn() }
                         .buttonStyle(SecondaryButtonStyle())
                         .keyboardShortcut(.cancelAction)
+                    ProgressView().controlSize(.small).accessibilityLabel("Waiting for approval")
                 }
             case .connecting:
                 StepText(line: "Finding your server…", detail: "Trying its local address first.")
@@ -155,9 +180,7 @@ private struct SignInStep: View {
                         .buttonStyle(PrimaryButtonStyle())
                         .keyboardShortcut(.defaultAction)
                     if session.isLocalNetworkDenied {
-                        Button("Open Local Network Settings") {
-                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")!)
-                        }
+                        Button("Open Local Network Settings") { SessionStore.openLocalNetworkSettings() }
                         .buttonStyle(SecondaryButtonStyle())
                     }
                     Button("Sign Out") { session.signOut() }.buttonStyle(SecondaryButtonStyle())
@@ -199,7 +222,9 @@ private struct ServerStep: View {
                     }
                     .buttonStyle(.plain)
                     .focusEffectDisabled(false)
-                    .accessibilityAddTraits(current ? .isSelected : [])
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(current ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityHint(current ? "Connected" : "Connects to this server")
                 }
             }
             .frame(maxWidth: 440)
@@ -226,6 +251,7 @@ private struct ProfileStep: View {
     @State private var pin = ""
     @State private var error: String?
     @State private var working = false
+    @FocusState private var pinFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.l) {
@@ -260,6 +286,7 @@ private struct ProfileStep: View {
                     SecureField("PIN for \(user.title)", text: $pin)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 160)
+                        .focused($pinFocused)
                         .onSubmit { submitPIN(user) }
                     Button("Continue") { submitPIN(user) }
                         .buttonStyle(PrimaryButtonStyle())
@@ -267,13 +294,22 @@ private struct ProfileStep: View {
                         .disabled(pin.count < 4 || working)
                 }
             }
-            if let error { Text(error).font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary) }
+            if let error {
+                Label(error, systemImage: "exclamationmark.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
         }
     }
 
     private func choose(_ user: PlexHomeUser) {
         error = nil
-        if user.protected && !user.admin { pinFor = user; pin = ""; return }
+        if user.protected && !user.admin {
+            pinFor = user
+            pin = ""
+            pinFocused = true
+            return
+        }
         Task { await switchTo(user, pin: nil) }
     }
 
@@ -289,6 +325,9 @@ private struct ProfileStep: View {
             done()
         } catch PlexError.unauthorized {
             error = "That PIN didn’t match."
+            self.pin = ""
+            pinFocused = true
+            AccessibilityNotification.Announcement("That PIN didn’t match.").post()
         } catch {
             self.error = (error as? PlexError)?.userMessage ?? "Couldn’t switch profile."
         }
@@ -379,7 +418,7 @@ struct PosterWall: View {
                 return
             }
             while revealed < items.count && !Task.isCancelled {
-                revealed += 1
+                withAnimation(.easeOut(duration: 0.35)) { revealed += 1 }
                 try? await Task.sleep(for: .milliseconds(45))
             }
         }
@@ -391,14 +430,20 @@ private struct WallCell: View {
     let size: CGSize
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var sharp = false
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous).fill(Theme.raised.opacity(0.6))
             if let item {
+                // Each poster resolves blur-to-sharp as it arrives.
                 RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: Int(size.width * 2)),
                             pixelWidth: Int(size.width * 2), placeholder: .clear)
-                    .transition(.opacity)
+                    .blur(radius: sharp || reduceMotion ? 0 : 10)
+                    .opacity(sharp ? 1 : 0)
+                    .onAppear { withAnimation(.easeOut(duration: reduceMotion ? 0.2 : 0.6)) { sharp = true } }
+                    .task(id: item.ratingKey) { await library.resolveCleanPoster(for: item) }
             }
         }
         .frame(width: size.width, height: size.height)

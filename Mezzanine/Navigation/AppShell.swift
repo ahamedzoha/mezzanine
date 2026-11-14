@@ -18,9 +18,9 @@ struct AppShell: View {
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(AppCommandCenter.self) private var commands
     @Environment(LibraryStore.self) private var library
-    @Environment(\.colorSchemeContrast) private var contrast
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
+    @FocusState private var sidebarFocused: Bool
     @State private var sectionsError: String?
     @AppStorage("onboardingComplete") private var onboardingComplete = false
 
@@ -49,14 +49,14 @@ struct AppShell: View {
         .toolbarVisibility(playback.isPresented ? .hidden : .visible, for: .windowToolbar)
         .toolbarBackgroundVisibility(chromeHidden ? .hidden : .automatic, for: .windowToolbar)
         .background(WindowChrome(hidden: chromeHidden, hidesToolbar: playback.isPresented))
-        // Theme reads Increase Contrast at render time; rebuild when it changes.
-        .id(contrast)
         .frame(minWidth: 900, minHeight: 600)
         .containerBackground(Theme.graphite, for: .window)
         .preferredColorScheme(.dark)
-        .onChange(of: session.phase, initial: true) { _, phase in
+        .onChange(of: session.phase, initial: true) { old, phase in
             commands.isSignedIn = phase == .ready
-            if phase == .signedOut { onboardingComplete = false }
+            // Only a real sign-out starts onboarding over (every launch begins signed out
+            // for a moment while the session restores).
+            if phase == .signedOut && old != .signedOut { onboardingComplete = false }
         }
         // Sections and the local library follow the connection, onboarding included.
         .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(session.account?.uuid ?? "")") { await loadSections() }
@@ -89,22 +89,16 @@ struct AppShell: View {
                     }
                 }
             }
+            .focused($sidebarFocused)
             .onKeyPress(.rightArrow) { contentFocused = true; return .handled }
             .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
         } detail: {
-            Group {
-                if !commands.query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    SearchView(query: commands.query, contentFocus: $contentFocused)
-                } else {
-                    switch commands.selection {
-                    case .library(let key):
-                        if let section = commands.sections.first(where: { $0.key == key }) {
-                            LibraryView(section: section, contentFocus: $contentFocused).id(key)
-                        }
-                    default:
-                        HomeView(contentFocus: $contentFocused)
+            NavigationStack(path: $commands.path) {
+                sectionRoot
+                    .navigationDestination(for: DetailRoute.self) { route in
+                        DetailView(route: route, contentFocus: $contentFocused)
+                            .background { RoomLight(palette: playback.roomPalette, intensity: playback.isPresented ? 0 : 1) }
                     }
-                }
             }
             .background {
                 RoomLight(palette: playback.roomPalette, intensity: playback.isPresented ? 0 : 1)
@@ -115,14 +109,8 @@ struct AppShell: View {
         .onChange(of: searchFocused) { _, focused in commands.isSearchFieldFocused = focused }
         .onChange(of: commands.searchRequests) { _, _ in searchFocused = true }
         .onChange(of: commands.contentFocusRequests) { _, _ in contentFocused = true }
+        .onChange(of: commands.sidebarFocusRequests) { _, _ in sidebarFocused = true }
         .task(id: session.currentServer?.clientIdentifier) {
-            #if DEBUG
-            // -MezzanineSection "TV Shows" opens a library at launch (screenshots, manual tests).
-            if let title = UserDefaults.standard.string(forKey: "MezzanineSection"),
-               let match = commands.sections.first(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }) {
-                commands.selection = .library(match.key)
-            }
-            #endif
             contentFocused = true
             #if DEBUG
             // -MezzanineAutoplay <ratingKey> starts a title at launch (player tests).
@@ -143,6 +131,22 @@ struct AppShell: View {
         }
     }
 
+    /// The current section's own page (search results while a query is typed).
+    @ViewBuilder private var sectionRoot: some View {
+        if !commands.query.trimmingCharacters(in: .whitespaces).isEmpty {
+            SearchView(query: commands.query, contentFocus: $contentFocused)
+        } else {
+            switch commands.selection {
+            case .library(let key):
+                if let section = commands.sections.first(where: { $0.key == key }) {
+                    LibraryView(section: section, contentFocus: $contentFocused).id(key)
+                }
+            default:
+                HomeView(contentFocus: $contentFocused)
+            }
+        }
+    }
+
     private func loadSections() async {
         guard let client = session.client else { return }
         do {
@@ -154,6 +158,13 @@ struct AppShell: View {
                 library.connect(client: client, serverID: server.clientIdentifier,
                                 userID: session.account?.uuid ?? "owner", sections: commands.sections)
             }
+            #if DEBUG
+            // -MezzanineSection "TV Shows" opens a library at launch (screenshots, manual tests).
+            if let title = UserDefaults.standard.string(forKey: "MezzanineSection"),
+               let match = commands.sections.first(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }) {
+                commands.selection = .library(match.key)
+            }
+            #endif
         } catch {
             sectionsError = (error as? PlexError)?.userMessage ?? "\(error)"
         }

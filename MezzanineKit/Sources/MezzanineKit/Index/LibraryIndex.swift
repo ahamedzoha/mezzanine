@@ -70,6 +70,18 @@ struct SectionSyncState: Codable, FetchableRecord, PersistableRecord {
 public struct LibraryQuery: Sendable, Equatable, Hashable {
     public enum Sort: String, Sendable, CaseIterable, Codable {
         case title, addedNewest, releasedNewest, releasedOldest, rating, lastWatched, duration
+
+        public var label: String {
+            switch self {
+            case .title: return "Title"
+            case .addedNewest: return "Recently Added"
+            case .releasedNewest: return "Newest Release"
+            case .releasedOldest: return "Oldest Release"
+            case .rating: return "Rating"
+            case .lastWatched: return "Recently Watched"
+            case .duration: return "Longest"
+            }
+        }
     }
 
     public var section: String
@@ -77,6 +89,7 @@ public struct LibraryQuery: Sendable, Equatable, Hashable {
     public var sort: Sort = .title
     public var unwatchedOnly = false
     public var inProgressOnly = false
+    public var watchedOnly = false
     public var genre: String?
     public var decade: Int?
     public var resolution: String?
@@ -91,7 +104,7 @@ public struct LibraryQuery: Sendable, Equatable, Hashable {
     }
 
     public var hasFilters: Bool {
-        unwatchedOnly || inProgressOnly || genre != nil || decade != nil || resolution != nil || hdrOnly || minAudioChannels != nil
+        unwatchedOnly || inProgressOnly || watchedOnly || genre != nil || decade != nil || resolution != nil || hdrOnly || minAudioChannels != nil
     }
 }
 
@@ -255,6 +268,9 @@ public final class LibraryIndex: Sendable {
                 clauses.append("((item.kind IN ('show','season') AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0)) OR (item.kind NOT IN ('show','season') AND item.viewCount = 0))")
             }
             if q.inProgressOnly { clauses.append("item.viewOffset > 0") }
+            if q.watchedOnly {
+                clauses.append("((item.kind IN ('show','season') AND COALESCE(item.leafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) >= item.leafCount) OR (item.kind NOT IN ('show','season') AND item.viewCount > 0 AND item.viewOffset = 0))")
+            }
             if let genre = q.genre { clauses.append("item.genres LIKE ?"); args.append("%|\(genre)|%") }
             if let decade = q.decade { clauses.append("item.year BETWEEN ? AND ?"); args += [decade, decade + 9] }
             if let res = q.resolution { clauses.append("item.resolution = ?"); args.append(res) }

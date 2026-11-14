@@ -193,7 +193,7 @@ Continuous (squircle) corners. Posters and stills 12 pt, controls 8 pt, badges 4
 - **Play disc:** 34 pt solid ink circle, graphite play glyph, bottom-right of a focused poster, inset 10 pt. The pointer's route to play; fully clickable.
 
 ### Poster card (shelf and grid)
-Poster, then title (card title) and one line of facts (card meta). The pointer lifts the poster at once (spring 0.18); focus, by arrow keys or by the pointer resting 120 ms: the poster lifts, shadow deepens, title turns lilac, the play disc fades in, and the room light follows. No ring. Single click focuses, double click or Return plays. Hovering never scrolls; only keyboard moves scroll to the focused card. Pointer cursor stays the arrow, not the pointing hand.
+Poster, then title (card title) and one line of facts (card meta). The pointer lifts the poster at once (spring 0.18); focus, by arrow keys or by the pointer resting 120 ms: the poster lifts, shadow deepens, title turns lilac, the play disc fades in, and the room light follows. No ring. Single click focuses; double click or Return opens the title's page; Space or the play disc plays. Watched titles carry a quiet hueless check in the top-right corner (graphite disc, ink check), never a colour. Hovering never scrolls; only keyboard moves scroll to the focused card. Pointer cursor stays the arrow, not the pointing hand.
 
 ### Hero
 Backdrop right, logo or title card left at the bottom of the block, one 48 pt hairline, one caption line, then Play (primary) and Details (secondary). Title change crossfades in 0.32 s; Home prefetches every shelf title's backdrop and logo so the swap never waits on the server. Details toggle with I.
@@ -215,7 +215,7 @@ Opens from the hero or poster frame, then fills the window; the room light drops
 - **Reduce Motion:** objects become a 0.2 s crossfade, no lift or scale; light keeps crossfading. **Reduce Transparency:** room light drops to 0.36.
 
 ### Keyboard
-Arrows move focus and scroll; Return or Space plays; I toggles details; ⌘F searches; ⌘1 Home, ⌘2 to ⌘9 libraries (Go menu); ⌘= and ⌘− resize posters. In the player: Esc closes, Space or K pauses, J and L seek 10 s, arrows seek 10 s, S or Return skips, F toggles full screen. Every key is also a menu item.
+Arrows move focus and scroll (← at the first column returns to the sidebar; Home/End jump); Return opens, Space plays; I toggles the summary on Home; ⌘[ or Esc goes back; ⌘↑ goes to the enclosing folder; ⌃⌘1–⌃⌘4 switch layout; ⌘F searches; ⌘1 Home, ⌘2 to ⌘9 libraries (Go menu); ⌘= and ⌘− resize posters. In the player: Esc closes, Space or K pauses, J and L seek 10 s, arrows seek 10 s, S or Return skips, F toggles full screen. Every key is also a menu item.
 
 ## Do's and Don'ts
 
@@ -239,3 +239,13 @@ Arrows move focus and scroll; Return or Space plays; I toggles details; ⌘F sea
 - **Don't** scroll on hover; only keyboard moves scroll.
 - **Don't** add a second accent, a coloured badge, or tint chrome with a film's colour.
 - **Don't** use Big Shoulders for anything but a logo-less title card.
+
+## Library layouts
+
+- **Posters** (2:3, density 110–260 pt), **Wide** (16:9 backdrop with the clear logo at bottom-left), **List** (56 pt rows: 32×48 poster, title, then right-aligned tabular columns Year · Length · Rating · Quality), **Folders** (personal-media libraries: one click opens a folder; rows carry "N sections · M videos").
+- The toolbar item set is constant across layouts (Layout · Filter · Sort · Poster size); items that don't apply are disabled, never removed, so nothing shifts.
+- Filters live in one menu (Watch State, Genre, Decade, Resolution as single-choice submenus showing their value; HDR and 5.1 or More as toggles). Active filters show as removable chips under the toolbar with Clear All pinned at the end.
+
+## Onboarding
+
+A solid graphite column (40 %) beside a wall of the library's own posters (edge to edge, under the title bar). The MEZZANINE wordmark sits at a fixed 38 % height; each step's content grows below it. Cells resolve blur-to-sharp in a diagonal sweep as the index reads; the room light takes a new poster's colours every 4 s (held still under Reduce Motion). The window hides its title (buttons stay) during onboarding and hides all chrome while a film plays.

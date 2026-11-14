@@ -25,7 +25,8 @@ struct HomeView: View {
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: Theme.Space.xl) {
                         if let item = model.focusedItem {
-                            HeroView(item: item, showsDetails: $showsDetails, play: { play(item, from: heroFrame) })
+                            HeroView(item: item, showsDetails: $showsDetails, play: { play(item, from: heroFrame) },
+                                     open: { commands.open(item) })
                                 .frame(minHeight: heroHeight(geo.size.height), alignment: .bottom)
                                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { heroFrame = $0 }
                                 .id("hero")
@@ -59,9 +60,15 @@ struct HomeView: View {
         .focused(contentFocus)
         .onMoveCommand { direction in
             keyboardMoved = true
+            // At the first poster of a shelf, ← hands focus back to the sidebar.
+            if direction == .left && model.focus.column == 0 { commands.focusSidebar(); return }
             model.move(direction)
         }
-        .onKeyPress(.return) { playFocused() }
+        .onKeyPress(.return) {
+            guard let item = model.focusedItem else { return .ignored }
+            commands.open(item)
+            return .handled
+        }
         .onKeyPress(.space) { playFocused() }
         .onKeyPress(characters: CharacterSet(charactersIn: "iI")) { _ in
             withAnimation(Theme.Motion.object(reduceMotion)) { showsDetails.toggle() }

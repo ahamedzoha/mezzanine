@@ -15,8 +15,8 @@ enum LibraryLayout: String, CaseIterable, Identifiable {
     }
     var symbol: String {
         switch self {
-        case .posters: return "square.grid.3x2"
-        case .wide: return "rectangle.grid.2x2"
+        case .posters: return "rectangle.portrait.on.rectangle.portrait"
+        case .wide: return "rectangle.grid.1x2"
         case .list: return "list.bullet"
         case .folders: return "folder"
         }
@@ -25,6 +25,9 @@ enum LibraryLayout: String, CaseIterable, Identifiable {
 
 /// One library, answered from the local index: instant sort, filter and
 /// layout changes. Personal-media libraries (Courses) also browse by folder.
+///
+/// Keys: arrows move (← at the first column returns to the sidebar), Home/End
+/// jump, Return opens, Space plays. Double-click opens; the play disc plays.
 struct LibraryView: View {
     let section: PlexLibrarySection
     var contentFocus: FocusState<Bool>.Binding
@@ -58,6 +61,7 @@ struct LibraryView: View {
     private var sort: LibraryQuery.Sort { LibraryQuery.Sort(rawValue: sortRaw) ?? .title }
     private var layout: LibraryLayout { LibraryLayout(rawValue: layoutRaw) ?? .posters }
     private var kinds: [String] { section.kind == .show ? ["show"] : ["movie"] }
+    private var layouts: [LibraryLayout] { section.isPersonalMedia ? LibraryLayout.allCases : [.posters, .wide, .list] }
 
     private var query: LibraryQuery {
         var q = LibraryQuery(section: section.key, kinds: kinds, sort: sort)
@@ -75,9 +79,22 @@ struct LibraryView: View {
         }
         .navigationTitle(section.title)
         .navigationSubtitle(subtitle)
-        .toolbar { toolbar }
-        .tint(Theme.ink)
+        .toolbar(id: "library") { toolbar }
         .task(id: "\(section.key)|\(sortRaw)|\(filters.hashValue)|\(library.revision)") { await load() }
+        .onChange(of: layoutRaw, initial: true) { _, raw in
+            commands.currentLayout = raw
+            commands.isFolderBrowserVisible = raw == LibraryLayout.folders.rawValue
+        }
+        .onChange(of: sortRaw, initial: true) { _, raw in commands.currentSort = raw }
+        .onChange(of: commands.layoutRequest.count) { _, _ in
+            let raw = commands.layoutRequest.layout
+            if layouts.contains(where: { $0.rawValue == raw }) { layoutRaw = raw }
+        }
+        .onChange(of: commands.sortRequest.count) { _, _ in sortRaw = commands.sortRequest.sort }
+        .onDisappear {
+            commands.currentLayout = nil
+            commands.isFolderBrowserVisible = false
+        }
     }
 
     // MARK: Titles (posters, wide, list)
@@ -92,14 +109,11 @@ struct LibraryView: View {
                     ScrollView {
                         switch layout {
                         case .wide:
-                            WideGrid(items: items, width: density * 1.6, focused: focused,
-                                     onFocus: { setFocus($0, byKeyboard: false) }, onPlay: play)
+                            WideGrid(items: items, width: density * 1.6, focused: focused, actions: actions)
                         case .list:
-                            TitleList(items: items, focused: focused,
-                                      onFocus: { setFocus($0, byKeyboard: false) }, onPlay: play)
+                            TitleList(items: items, focused: focused, actions: actions)
                         default:
-                            PosterGrid(items: items, density: density, focused: focused,
-                                       onFocus: { setFocus($0, byKeyboard: false) }, onPlay: play)
+                            PosterGrid(items: items, density: density, focused: focused, actions: actions)
                         }
                     }
                     .onChange(of: focused) { _, index in
@@ -117,8 +131,10 @@ struct LibraryView: View {
         .focusEffectDisabled()
         .focused(contentFocus)
         .onMoveCommand(perform: move)
-        .onKeyPress(.return) { playFocused() }
+        .onKeyPress(.return) { openFocused() }
         .onKeyPress(.space) { playFocused() }
+        .onKeyPress(.home) { jump(to: 0) }
+        .onKeyPress(.end) { jump(to: items.count - 1) }
         .onChange(of: focused, initial: true) { _, index in commands.hasFocusedTitle = index != nil }
         .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }
         .onChange(of: commands.densitySteps.count) { _, _ in
@@ -128,17 +144,23 @@ struct LibraryView: View {
         }
     }
 
+    private var actions: CardActions {
+        CardActions(focus: { setFocus($0, byKeyboard: false) },
+                    open: { commands.open($0) },
+                    play: { item, frame in Task { await playback.play(item, from: frame) } })
+    }
+
     private var subtitle: String {
         guard layout != .folders, loaded else { return "" }
         let n = items.count
         let noun = section.kind == .show ? (n == 1 ? "show" : "shows") : (n == 1 ? "title" : "titles")
-        return filters.isActive ? "\(n) \(noun), filtered" : "\(n) \(noun)"
+        return filters.isActive ? "\(n.formatted()) \(noun), filtered" : "\(n.formatted()) \(noun)"
     }
 
     @ViewBuilder private var state: some View {
         if items.isEmpty && layout != .folders {
             if case .syncing(let name, let done, let total) = library.syncState, library.count(section: section.key) == 0 {
-                RoomMessage(title: "Reading \(name)", detail: total > 0 ? "\(done) of \(total) titles" : nil) {
+                RoomMessage(title: "Reading \(name)", detail: total > 0 ? "\(done.formatted()) of \(total.formatted()) titles" : nil) {
                     ProgressView(value: total > 0 ? Double(done) / Double(total) : nil).frame(width: 220).accessibilityLabel("Reading library")
                 }
             } else if case .failed(let message) = library.syncState, library.count(section: section.key) == 0 {
@@ -151,50 +173,45 @@ struct LibraryView: View {
         }
     }
 
-    // MARK: Toolbar
+    // MARK: Toolbar (a constant set, so nothing shifts when the layout changes)
 
-    @ToolbarContentBuilder private var toolbar: some ToolbarContent {
+    @ToolbarContentBuilder private var toolbar: some CustomizableToolbarContent {
         ToolbarItem(id: "layout") {
             Picker("Layout", selection: $layoutRaw) {
                 ForEach(layouts) { Label($0.label, systemImage: $0.symbol).tag($0.rawValue) }
             }
             .pickerStyle(.segmented)
-            .help("Layout")
+            .labelStyle(.iconOnly)
+            .help("Layout (View ▸ Layout, ⌃⌘1–⌃⌘4)")
+            .accessibilityLabel("Layout")
         }
-        if layout != .folders {
-            ToolbarItem(id: "filter") {
-                FilterMenu(filters: $filters, genres: library.genres(section: section.key, kinds: kinds))
-            }
-            ToolbarItem(id: "sort") {
-                Menu {
-                    Picker("Sort", selection: $sortRaw) {
-                        Text("Title").tag(LibraryQuery.Sort.title.rawValue)
-                        Text("Recently Added").tag(LibraryQuery.Sort.addedNewest.rawValue)
-                        Text("Newest Release").tag(LibraryQuery.Sort.releasedNewest.rawValue)
-                        Text("Oldest Release").tag(LibraryQuery.Sort.releasedOldest.rawValue)
-                        Text("Rating").tag(LibraryQuery.Sort.rating.rawValue)
-                        Text("Recently Watched").tag(LibraryQuery.Sort.lastWatched.rawValue)
-                        Text("Longest").tag(LibraryQuery.Sort.duration.rawValue)
-                    }
-                    .pickerStyle(.inline)
-                } label: {
-                    Label("Sort", systemImage: "arrow.up.arrow.down")
+        ToolbarItem(id: "filter") {
+            FilterMenu(filters: $filters, genres: library.genres(section: section.key, kinds: kinds))
+                .disabled(layout == .folders)
+        }
+        ToolbarItem(id: "sort") {
+            Menu {
+                Picker("Sort By", selection: $sortRaw) {
+                    ForEach(LibraryQuery.Sort.allCases, id: \.self) { Text($0.label).tag($0.rawValue) }
                 }
-                .help("Sort")
+                .pickerStyle(.inline)
+            } label: {
+                Label("Sort: \(sort.label)", systemImage: "arrow.up.arrow.down")
             }
+            .help("Sort (View ▸ Sort By)")
+            .disabled(layout == .folders)
         }
-        if layout == .posters || layout == .wide {
-            ToolbarItem(id: "posterSize") {
+        ToolbarItem(id: "posterSize") {
+            HStack(spacing: 4) {
+                Image(systemName: "photo").font(.system(size: 9)).foregroundStyle(.secondary)
                 Slider(value: $density, in: Self.densityRange) { Text("Poster Size") }
                     .labelsHidden()
-                    .frame(width: 100)
-                    .help("Poster size (View ▸ Larger Posters ⌘=, Smaller Posters ⌘−)")
+                    .frame(width: 88)
+                Image(systemName: "photo").font(.system(size: 13)).foregroundStyle(.secondary)
             }
+            .help("Poster size (View ▸ Larger Posters ⌘=, Smaller Posters ⌘−)")
+            .disabled(layout == .list || layout == .folders)
         }
-    }
-
-    private var layouts: [LibraryLayout] {
-        section.isPersonalMedia ? LibraryLayout.allCases : [.posters, .wide, .list]
     }
 
     // MARK: Data & keys
@@ -223,47 +240,76 @@ struct LibraryView: View {
 
     private func move(_ direction: MoveCommandDirection) {
         guard !items.isEmpty else { return }
-        let current = focused ?? 0
+        guard let current = focused else { setFocus(0, byKeyboard: true); return }
         var next = current
         switch direction {
-        case .left: next = current - 1
+        case .left:
+            // At the first column, ← hands focus back to the sidebar.
+            if current % max(1, columns) == 0 { commands.focusSidebar(); return }
+            next = current - 1
         case .right: next = current + 1
         case .up: next = current - columns
         case .down: next = current + columns
         @unknown default: break
         }
-        if focused == nil { next = 0 }
         setFocus(min(max(0, next), items.count - 1), byKeyboard: true)
+    }
+
+    private func jump(to index: Int) -> KeyPress.Result {
+        guard !items.isEmpty else { return .ignored }
+        setFocus(max(0, min(index, items.count - 1)), byKeyboard: true)
+        return .handled
+    }
+
+    private func openFocused() -> KeyPress.Result {
+        guard let focused, items.indices.contains(focused) else { return .ignored }
+        commands.open(items[focused])
+        return .handled
     }
 
     private func playFocused() -> KeyPress.Result {
         guard let focused, items.indices.contains(focused) else { return .ignored }
-        play(items[focused], from: nil)
+        Task { await playback.play(items[focused], from: nil) }
         return .handled
     }
+}
 
-    private func play(_ item: PlexMetadata, from frame: CGRect?) {
-        Task { await playback.play(item, from: frame) }
-    }
+/// What a card can ask of its page.
+struct CardActions {
+    let focus: (Int) -> Void
+    let open: (PlexMetadata) -> Void
+    let play: (PlexMetadata, CGRect) -> Void
 }
 
 // MARK: - Filters
 
 /// The filters a library page can apply; answered by the index.
 struct LibraryFilters: Hashable {
-    var unwatched = false
-    var inProgress = false
+    enum WatchState: String, CaseIterable, Hashable {
+        case any, unwatched, inProgress, watched
+        var label: String {
+            switch self {
+            case .any: return "Any"
+            case .unwatched: return "Unwatched"
+            case .inProgress: return "In Progress"
+            case .watched: return "Watched"
+            }
+        }
+    }
+
+    var watch: WatchState = .any
     var genre: String?
     var decade: Int?
     var resolution: String?
     var hdr = false
     var surround = false
 
-    var isActive: Bool { unwatched || inProgress || genre != nil || decade != nil || resolution != nil || hdr || surround }
+    var isActive: Bool { watch != .any || genre != nil || decade != nil || resolution != nil || hdr || surround }
 
     func apply(to q: inout LibraryQuery) {
-        q.unwatchedOnly = unwatched
-        q.inProgressOnly = inProgress
+        q.unwatchedOnly = watch == .unwatched
+        q.inProgressOnly = watch == .inProgress
+        q.watchedOnly = watch == .watched
         q.genre = genre
         q.decade = decade
         q.resolution = resolution
@@ -274,13 +320,12 @@ struct LibraryFilters: Hashable {
     /// Labels for the chips row, each with the change that removes it.
     var chips: [(String, (inout LibraryFilters) -> Void)] {
         var out: [(String, (inout LibraryFilters) -> Void)] = []
-        if unwatched { out.append(("Unwatched", { $0.unwatched = false })) }
-        if inProgress { out.append(("In Progress", { $0.inProgress = false })) }
+        if watch != .any { out.append((watch.label, { $0.watch = .any })) }
         if let genre { out.append((genre, { $0.genre = nil })) }
         if let decade { out.append(("\(decade)s", { $0.decade = nil })) }
         if let resolution { out.append((Format.resolutionLabel(resolution), { $0.resolution = nil })) }
         if hdr { out.append(("HDR", { $0.hdr = false })) }
-        if surround { out.append(("5.1 or more", { $0.surround = false })) }
+        if surround { out.append(("5.1 or More", { $0.surround = false })) }
         return out
     }
 }
@@ -291,24 +336,29 @@ private struct FilterMenu: View {
 
     var body: some View {
         Menu {
-            Toggle("Unwatched", isOn: $filters.unwatched)
-            Toggle("In Progress", isOn: $filters.inProgress)
-            Divider()
-            Picker("Genre", selection: $filters.genre) {
-                Text("Any Genre").tag(String?.none)
+            Picker("Watch State: \(filters.watch.label)", selection: $filters.watch) {
+                ForEach(LibraryFilters.WatchState.allCases, id: \.self) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.menu)
+            Picker("Genre: \(filters.genre ?? "Any")", selection: $filters.genre) {
+                Text("Any").tag(String?.none)
                 ForEach(genres, id: \.self) { Text($0).tag(String?.some($0)) }
             }
-            Picker("Decade", selection: $filters.decade) {
-                Text("Any Decade").tag(Int?.none)
+            .pickerStyle(.menu)
+            Picker("Decade: \(filters.decade.map { "\($0)s" } ?? "Any")", selection: $filters.decade) {
+                Text("Any").tag(Int?.none)
                 ForEach(Array(stride(from: 2020, through: 1920, by: -10)), id: \.self) { Text("\($0)s").tag(Int?.some($0)) }
             }
-            Picker("Resolution", selection: $filters.resolution) {
-                Text("Any Resolution").tag(String?.none)
+            .pickerStyle(.menu)
+            Picker("Resolution: \(filters.resolution.map(Format.resolutionLabel) ?? "Any")", selection: $filters.resolution) {
+                Text("Any").tag(String?.none)
                 Text("4K").tag(String?.some("4k"))
                 Text("1080p").tag(String?.some("1080"))
                 Text("720p").tag(String?.some("720"))
                 Text("SD").tag(String?.some("sd"))
             }
+            .pickerStyle(.menu)
+            Divider()
             Toggle("HDR", isOn: $filters.hdr)
             Toggle("5.1 or More", isOn: $filters.surround)
             if filters.isActive {
@@ -319,44 +369,53 @@ private struct FilterMenu: View {
             Label("Filter", systemImage: filters.isActive ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
         }
         .help("Filter")
+        .accessibilityValue(filters.isActive ? "\(filters.chips.count) active" : "None")
     }
 }
 
-/// Active filters as removable chips under the toolbar.
+/// Active filters as removable chips under the toolbar; Clear All stays put.
 private struct FilterChips: View {
     @Binding var filters: LibraryFilters
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: Theme.Space.s) {
-                ForEach(Array(filters.chips.enumerated()), id: \.offset) { _, chip in
-                    Button {
-                        withAnimation(Theme.Motion.quick) { chip.1(&filters) }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text(chip.0)
-                            Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+        HStack(spacing: Theme.Space.s) {
+            ScrollView(.horizontal) {
+                HStack(spacing: Theme.Space.s) {
+                    ForEach(filters.chips, id: \.0) { chip in
+                        Button {
+                            withAnimation(Theme.Motion.quick) { chip.1(&filters) }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(chip.0)
+                                Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                            }
+                            .font(Theme.Typeface.caption)
+                            .foregroundStyle(Theme.ink)
+                            .padding(.horizontal, 12)
+                            .frame(height: 28)
+                            .background(Capsule().fill(Theme.raised))
+                            .contentShape(Capsule())
                         }
-                        .font(Theme.Typeface.caption)
-                        .foregroundStyle(Theme.ink)
-                        .padding(.horizontal, 12)
-                        .frame(height: 28)
-                        .background(Capsule().fill(Theme.raised))
-                        .contentShape(Capsule())
+                        .buttonStyle(.plain)
+                        .focusEffectDisabled(false)
+                        .help("Remove this filter")
+                        .accessibilityLabel("Remove filter \(chip.0)")
                     }
-                    .buttonStyle(.plain)
-                    .focusEffectDisabled(false)
-                    .help("Remove filter")
-                    .accessibilityLabel("Remove filter \(chip.0)")
                 }
-                Button("Clear All") { withAnimation(Theme.Motion.quick) { filters = LibraryFilters() } }
-                    .buttonStyle(.plain)
+            }
+            .scrollIndicators(.never)
+            Button { withAnimation(Theme.Motion.quick) { filters = LibraryFilters() } } label: {
+                Text("Clear All")
                     .font(Theme.Typeface.caption)
                     .foregroundStyle(Theme.inkSecondary)
-                    .padding(.leading, Theme.Space.s)
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .focusEffectDisabled(false)
+            .help("Remove every filter")
         }
-        .scrollIndicators(.never)
     }
 }
 
@@ -367,8 +426,7 @@ struct PosterGrid: View {
     let items: [PlexMetadata]
     let density: Double
     let focused: Int?
-    let onFocus: (Int) -> Void
-    let onPlay: (PlexMetadata, CGRect) -> Void
+    let actions: CardActions
 
     static func columnCount(width: CGFloat, density: Double) -> Int {
         let usable = width - Theme.Space.gutter * 2
@@ -379,8 +437,7 @@ struct PosterGrid: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: density, maximum: density * 1.25), spacing: Theme.Space.l, alignment: .top)],
                   alignment: .leading, spacing: Theme.Space.xl) {
             ForEach(Array(items.enumerated()), id: \.element.ratingKey) { index, item in
-                GridPoster(item: item, isFocused: focused == index,
-                           onFocus: { onFocus(index) }, onPlay: { frame in onPlay(item, frame) })
+                GridPoster(item: item, isFocused: focused == index, index: index, actions: actions)
                     .id(index)
             }
         }
@@ -394,15 +451,13 @@ private struct WideGrid: View {
     let items: [PlexMetadata]
     let width: Double
     let focused: Int?
-    let onFocus: (Int) -> Void
-    let onPlay: (PlexMetadata, CGRect) -> Void
+    let actions: CardActions
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: width, maximum: width * 1.3), spacing: Theme.Space.l, alignment: .top)],
                   alignment: .leading, spacing: Theme.Space.xl) {
             ForEach(Array(items.enumerated()), id: \.element.ratingKey) { index, item in
-                WideCard(item: item, isFocused: focused == index,
-                         onFocus: { onFocus(index) }, onPlay: { frame in onPlay(item, frame) })
+                WideCard(item: item, isFocused: focused == index, index: index, actions: actions)
                     .id(index)
             }
         }
@@ -411,11 +466,27 @@ private struct WideGrid: View {
     }
 }
 
+/// A quiet, hueless watched mark for a card corner.
+struct WatchedMark: View {
+    let item: PlexMetadata
+    var body: some View {
+        if item.isWatched {
+            Image(systemName: "checkmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(Theme.graphite.opacity(0.82)))
+                .padding(8)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
 private struct WideCard: View {
     let item: PlexMetadata
     let isFocused: Bool
-    let onFocus: () -> Void
-    let onPlay: (CGRect) -> Void
+    let index: Int
+    let actions: CardActions
 
     @Environment(SessionStore.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -440,8 +511,9 @@ private struct WideCard: View {
                             .padding(.horizontal, 12).padding(.bottom, 6)
                     }
                 }
+                .overlay(alignment: .topTrailing) { WatchedMark(item: item) }
                 .overlay(alignment: .bottomTrailing) {
-                    if lifted { PlayDisc { onPlay(frame) }.padding(10).transition(.opacity) }
+                    if lifted { PlayDisc { actions.play(item, frame) }.padding(10).transition(.opacity) }
                 }
             }
             .aspectRatio(16 / 9, contentMode: .fit)
@@ -458,23 +530,35 @@ private struct WideCard: View {
                     .foregroundStyle(Theme.inkSecondary).lineLimit(1)
             }
         }
-        .modifier(CardInteraction(item: item, frame: frame, isFocused: isFocused, hovering: $hovering,
-                                  dwell: $dwell, onFocus: onFocus, onPlay: onPlay))
+        .modifier(CardInteraction(item: item, frame: frame, isFocused: isFocused, hovering: $hovering, dwell: $dwell,
+                                  onFocus: { actions.focus(index) }, onOpen: { actions.open(item) },
+                                  onPlay: { actions.play(item, $0) }))
     }
 }
 
-/// Rows: small poster, title, the ruled facts, watched state.
+/// Rows: small poster, title and facts, then right-aligned columns.
 private struct TitleList: View {
     let items: [PlexMetadata]
     let focused: Int?
-    let onFocus: (Int) -> Void
-    let onPlay: (PlexMetadata, CGRect) -> Void
+    let actions: CardActions
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 2) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: Theme.Space.m) {
+                Text("Title").frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 44)
+                Text("Year").frame(width: 48, alignment: .trailing)
+                Text("Length").frame(width: 96, alignment: .trailing)
+                Text("Rating").frame(width: 52, alignment: .trailing)
+                Text("Quality").frame(width: 120, alignment: .trailing)
+                Color.clear.frame(width: 34 + 20)
+            }
+            .font(Theme.Typeface.cardMeta)
+            .foregroundStyle(Theme.inkTertiary)
+            .padding(.horizontal, Theme.Space.m)
+            .padding(.bottom, Theme.Space.s)
+            .accessibilityHidden(true)
             ForEach(Array(items.enumerated()), id: \.element.ratingKey) { index, item in
-                TitleRow(item: item, isFocused: focused == index,
-                         onFocus: { onFocus(index) }, onPlay: { frame in onPlay(item, frame) })
+                TitleRow(item: item, isFocused: focused == index, index: index, actions: actions)
                     .id(index)
             }
         }
@@ -486,8 +570,8 @@ private struct TitleList: View {
 private struct TitleRow: View {
     let item: PlexMetadata
     let isFocused: Bool
-    let onFocus: () -> Void
-    let onPlay: (CGRect) -> Void
+    let index: Int
+    let actions: CardActions
 
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
@@ -497,36 +581,52 @@ private struct TitleRow: View {
 
     var body: some View {
         HStack(spacing: Theme.Space.m) {
-            RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: 96), pixelWidth: 96)
-                .frame(width: 40, height: 60)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(Format.displayTitle(item)).font(Theme.Typeface.cardTitle)
-                    .foregroundStyle(isFocused ? Theme.lilac : Theme.ink).lineLimit(1)
-                Text(Format.heroCaption(item)).font(Theme.Typeface.cardMeta)
-                    .foregroundStyle(Theme.inkSecondary).lineLimit(1)
+            RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: 72), pixelWidth: 72)
+                .frame(width: 32, height: 48)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.badge, style: .continuous))
+            Text(Format.displayTitle(item)).font(Theme.Typeface.cardTitle)
+                .foregroundStyle(isFocused ? Theme.lilac : Theme.ink).lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Group {
+                Text(item.year.map(String.init) ?? "—").frame(width: 48, alignment: .trailing)
+                Text(length).frame(width: 96, alignment: .trailing)
+                Text((item.audienceRating ?? item.rating).map { String(format: "%.1f", $0) } ?? "—").frame(width: 52, alignment: .trailing)
+                Text(quality).frame(width: 120, alignment: .trailing)
             }
-            Spacer(minLength: Theme.Space.m)
-            if let p = item.progress {
-                ProgressView(value: p).frame(width: 60).tint(Theme.ink).accessibilityHidden(true)
-            } else if item.isWatched {
-                Image(systemName: "checkmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
-                    .accessibilityLabel("Watched")
+            .font(Theme.Typeface.cardMeta)
+            .foregroundStyle(Theme.inkSecondary)
+            ZStack {
+                if hovering || isFocused { PlayDisc { actions.play(item, frame) } }
+                else if let p = item.progress { ProgressView(value: p).frame(width: 34).tint(Theme.ink).accessibilityHidden(true) }
+                else if item.isWatched { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.inkSecondary) }
             }
-            if hovering || isFocused { PlayDisc { onPlay(frame) } } else { Color.clear.frame(width: 34, height: 34) }
+            .frame(width: 34, height: 34)
         }
         .padding(.horizontal, Theme.Space.m)
-        .padding(.vertical, Theme.Space.s)
+        .frame(height: 56)
         .background(RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous)
             .fill(isFocused || hovering ? Theme.raised : .clear))
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         .task(id: item.ratingKey) { await library.resolveCleanPoster(for: item) }
-        .modifier(CardInteraction(item: item, frame: frame, isFocused: isFocused, hovering: $hovering,
-                                  dwell: $dwell, onFocus: onFocus, onPlay: onPlay))
+        .modifier(CardInteraction(item: item, frame: frame, isFocused: isFocused, hovering: $hovering, dwell: $dwell,
+                                  onFocus: { actions.focus(index) }, onOpen: { actions.open(item) },
+                                  onPlay: { actions.play(item, $0) }))
+    }
+
+    private var length: String {
+        if item.kind == .show, let n = item.childCount { return n == 1 ? "1 season" : "\(n) seasons" }
+        return item.duration.map(Format.duration) ?? "—"
+    }
+
+    private var quality: String {
+        guard let m = item.media.first else { return "—" }
+        return [m.videoResolution.map(Format.resolutionLabel), m.audioChannels.map(Format.channelLabel)].compactMap { $0 }.joined(separator: " · ")
     }
 }
 
-/// Shared pointer + accessibility behaviour for every card and row.
+/// Shared pointer, keyboard-state and accessibility behaviour for every card and row.
+/// Single click focuses, double click opens, the play disc (or VoiceOver's
+/// default action) plays.
 struct CardInteraction: ViewModifier {
     let item: PlexMetadata
     let frame: CGRect
@@ -534,6 +634,7 @@ struct CardInteraction: ViewModifier {
     @Binding var hovering: Bool
     @Binding var dwell: Task<Void, Never>?
     let onFocus: () -> Void
+    let onOpen: () -> Void
     let onPlay: (CGRect) -> Void
 
     func body(content: Content) -> some View {
@@ -549,13 +650,17 @@ struct CardInteraction: ViewModifier {
                 }
             }
             .simultaneousGesture(TapGesture().onEnded { onFocus() })
-            .simultaneousGesture(TapGesture(count: 2).onEnded { onPlay(frame) })
+            .simultaneousGesture(TapGesture(count: 2).onEnded { onOpen() })
             .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isButton)
+            .accessibilityAddTraits(isFocused ? [.isButton, .isSelected] : .isButton)
             .accessibilityValue(item.progress.map { "\(Int($0 * 100)) percent watched" } ?? (item.isWatched ? "Watched" : ""))
-            .accessibilityHint("Plays")
-            .accessibilityAction { onPlay(frame) }
-            .contextMenu { Button("Play") { onPlay(frame) } }
+            .accessibilityHint("Opens. Play with the Play action.")
+            .accessibilityAction { onOpen() }
+            .accessibilityAction(named: "Play") { onPlay(frame) }
+            .contextMenu {
+                Button("Play") { onPlay(frame) }
+                Button("Open") { onOpen() }
+            }
     }
 }
 
@@ -563,8 +668,8 @@ struct CardInteraction: ViewModifier {
 struct GridPoster: View {
     let item: PlexMetadata
     let isFocused: Bool
-    let onFocus: () -> Void
-    let onPlay: (CGRect) -> Void
+    let index: Int
+    let actions: CardActions
 
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
@@ -587,8 +692,9 @@ struct GridPoster: View {
                                 .padding(.horizontal, 10).padding(.bottom, lifted ? 54 : 10)
                         }
                     }
+                    .overlay(alignment: .topTrailing) { WatchedMark(item: item) }
                     .overlay(alignment: .bottomTrailing) {
-                        if lifted { PlayDisc { onPlay(frame) }.padding(10).transition(.opacity) }
+                        if lifted { PlayDisc { actions.play(item, frame) }.padding(10).transition(.opacity) }
                     }
             }
             .aspectRatio(2 / 3, contentMode: .fit)
@@ -607,7 +713,8 @@ struct GridPoster: View {
             }
         }
         .task(id: item.ratingKey) { await library.resolveCleanPoster(for: item) }
-        .modifier(CardInteraction(item: item, frame: frame, isFocused: isFocused, hovering: $hovering,
-                                  dwell: $dwell, onFocus: onFocus, onPlay: onPlay))
+        .modifier(CardInteraction(item: item, frame: frame, isFocused: isFocused, hovering: $hovering, dwell: $dwell,
+                                  onFocus: { actions.focus(index) }, onOpen: { actions.open(item) },
+                                  onPlay: { actions.play(item, $0) }))
     }
 }

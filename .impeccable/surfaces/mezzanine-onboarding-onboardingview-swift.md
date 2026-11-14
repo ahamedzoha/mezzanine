@@ -21,7 +21,7 @@ STORY: You see the app's name and one line, sign in once, and watch your own fil
 
 FIRST VIEWPORT: Left 40%: solid graphite column; content anchored to the lower third on the 40 pt gutter: MEZZANINE title card, one line, the step's single control (lilac). Right 60%: the poster wall, edge to edge, cells appearing blur-to-sharp as the index reads them, dimmed until the last step; a soft fade where wall meets column. Before sign-in the wall is empty graphite cells, no fake posters.
 
-FORM: Poster Wall (surface round: owner picked dealt structure #2 over Express and One Page). seed: none (unavailable). Signature: cells resolve in a slow diagonal sweep as titles sync; the room light crossfades to a newly arrived poster every few seconds; finishing brightens the whole wall, then the window becomes Home.
+FORM: Poster Wall (surface round: owner picked dealt structure #2 over Express and One Page). seed:0d9ae57aa20e6984. Signature: cells resolve in a slow diagonal sweep as titles sync; the room light crossfades to a newly arrived poster every few seconds; finishing brightens the whole wall, then the window becomes Home.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 

@@ -19,18 +19,24 @@ enum Theme {
     /// Type and icons.
     static let ink = Color(hex: 0xF2F2F0)
     /// Secondary type. 66 % ink on graphite ≈ 7:1, still AA over the room light.
-    /// Increase Contrast sets it in full ink.
-    static var inkSecondary: Color { increaseContrast ? ink : Color(hex: 0xF2F2F0).opacity(0.66) }
-    static var inkTertiary: Color { increaseContrast ? ink.opacity(0.85) : Color(hex: 0xF2F2F0).opacity(0.46) }
+    /// Increase Contrast resolves it to full ink at draw time.
+    static let inkSecondary = contrastAware(normal: NSColor(white: 0.949, alpha: 0.66), increased: NSColor(white: 0.949, alpha: 1))
+    static let inkTertiary = contrastAware(normal: NSColor(white: 0.949, alpha: 0.46), increased: NSColor(white: 0.949, alpha: 0.85))
     /// The one accent: primary action and current selection only.
     static let lilac = Color(hex: 0xA08CFF)
     /// Type set on lilac.
     static let onLilac = Color(hex: 0x0E0F11)
     /// Hairlines (the ruled caption, separators).
-    static var rule: Color { Color(hex: 0xF2F2F0).opacity(increaseContrast ? 0.4 : 0.14) }
+    static let rule = contrastAware(normal: NSColor(white: 0.949, alpha: 0.14), increased: NSColor(white: 0.949, alpha: 0.4))
 
-    /// Read at render time; AppShell rebuilds its content when the setting changes.
-    static var increaseContrast: Bool { NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast }
+    /// A colour that follows Increase Contrast when it is drawn (AppKit's
+    /// high-contrast appearances), so nothing has to rebuild to pick it up.
+    private static func contrastAware(normal: NSColor, increased: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.accessibilityHighContrastDarkAqua, .accessibilityHighContrastAqua, .darkAqua, .aqua])
+                .map { $0.rawValue.contains("HighContrast") } == true ? increased : normal
+        })
+    }
 
     // MARK: Shape & space
 

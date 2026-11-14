@@ -11,8 +11,10 @@ struct ShelfView: View {
     let scrollsToFocus: Bool
     let onFocus: (Int) -> Void
     let onPlay: (PlexMetadata, CGRect) -> Void
+    var onOpen: ((PlexMetadata) -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(AppCommandCenter.self) private var commands
     static let posterWidth: CGFloat = 150
 
     var body: some View {
@@ -28,7 +30,8 @@ struct ShelfView: View {
                     LazyHStack(alignment: .top, spacing: Theme.Space.l) {
                         ForEach(Array(shelf.items.enumerated()), id: \.element.ratingKey) { column, item in
                             PosterCard(item: item, width: Self.posterWidth, isFocused: focusedColumn == column,
-                                       onFocus: { onFocus(column) }, onPlay: { frame in onPlay(item, frame) })
+                                       onFocus: { onFocus(column) }, onPlay: { frame in onPlay(item, frame) },
+                                       onOpen: { (onOpen ?? commands.open)(item) })
                                 .id(column)
                         }
                     }
@@ -59,6 +62,7 @@ struct PosterCard: View {
     let isFocused: Bool
     let onFocus: () -> Void
     let onPlay: (CGRect) -> Void
+    let onOpen: () -> Void
 
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
@@ -85,27 +89,8 @@ struct PosterCard: View {
             }
             .frame(width: width, alignment: .leading)
         }
-        .contentShape(Rectangle())
-        .onHover { inside in
-            withAnimation(Theme.Motion.lift) { hovering = inside }
-            dwell?.cancel()
-            guard inside, !isFocused else { return }
-            dwell = Task {
-                try? await Task.sleep(for: Theme.Motion.hoverDwell)
-                if !Task.isCancelled { onFocus() }
-            }
-        }
-        // Single click focuses at once; a double click also plays.
-        .simultaneousGesture(TapGesture().onEnded { onFocus() })
-        .simultaneousGesture(TapGesture(count: 2).onEnded { onPlay(frame) })
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityValue(item.progress.map { "\(Int($0 * 100)) percent watched" } ?? "")
-        .accessibilityHint("Plays")
-        .accessibilityAction { onPlay(frame) }
-        .contextMenu {
-            Button("Play") { onPlay(frame) }
-        }
+        .modifier(CardInteraction(item: item, frame: frame, isFocused: isFocused, hovering: $hovering, dwell: $dwell,
+                                  onFocus: onFocus, onOpen: onOpen, onPlay: onPlay))
         .task(id: item.ratingKey) { await library.resolveCleanPoster(for: item) }
     }
 

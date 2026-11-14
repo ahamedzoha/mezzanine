@@ -7,6 +7,7 @@ struct HeroView: View {
     let item: PlexMetadata
     @Binding var showsDetails: Bool
     let play: () -> Void
+    var open: (() -> Void)? = nil
 
     @Environment(SessionStore.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -97,16 +98,16 @@ struct HeroView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .focusEffectDisabled(false)
-            .help("Play (Return)")
+            .help("Play (Space)")
 
             Button {
-                withAnimation(Theme.Motion.object(reduceMotion)) { showsDetails.toggle() }
+                if let open { open() } else { withAnimation(Theme.Motion.object(reduceMotion)) { showsDetails.toggle() } }
             } label: {
-                Text(showsDetails ? "Less" : "Details")
+                Text("Details")
             }
             .buttonStyle(SecondaryButtonStyle())
             .focusEffectDisabled(false)
-            .help("Details (I or ⌘I)")
+            .help("Open the page (Return). I shows a summary here.")
         }
     }
 

@@ -83,6 +83,12 @@ public actor PlexServerClient {
         return item
     }
 
+    /// "More like this": collection siblings and similar titles, as hubs.
+    public func related(_ ratingKey: String, count: Int = 16) async throws -> [PlexHub] {
+        let c: HubContainer = try await get("/library/metadata/\(ratingKey)/related", query: [URLQueryItem(name: "count", value: String(count))])
+        return c.hubs
+    }
+
     public func children(_ ratingKey: String) async throws -> [PlexMetadata] {
         let c: MetadataContainer = try await get("/library/metadata/\(ratingKey)/children")
         return c.metadata

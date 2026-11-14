@@ -66,6 +66,8 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
     public let media: [PlexMedia]
     public let markers: [PlexMarker]
     public let chapters: [PlexChapter]
+    /// Trailers, featurettes, scenes (present on detail fetches with includeExtras).
+    public let extras: [PlexMetadata]
 
     public var id: String { ratingKey }
 
@@ -126,7 +128,16 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
         case rating, audienceRating, userRating
         case genres = "Genre", directors = "Director", writers = "Writer", roles = "Role"
         case countries = "Country", collections = "Collection", guids = "Guid"
-        case media = "Media", markers = "Marker", chapters = "Chapter"
+        case media = "Media", markers = "Marker", chapters = "Chapter", extras = "Extras"
+    }
+
+    struct ExtrasContainer: Decodable {
+        let items: [PlexMetadata]
+        enum CodingKeys: String, CodingKey { case items = "Metadata" }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            items = c.list(PlexMetadata.self, .items)
+        }
     }
 
     struct GuidEntry: Decodable { let id: String }
@@ -185,6 +196,7 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
         media = c.list(PlexMedia.self, .media)
         markers = c.list(PlexMarker.self, .markers)
         chapters = c.list(PlexChapter.self, .chapters)
+        extras = (try? c.decodeIfPresent(ExtrasContainer.self, forKey: .extras))?.items ?? []
     }
 
     public static func == (lhs: PlexMetadata, rhs: PlexMetadata) -> Bool {
