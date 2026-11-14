@@ -164,6 +164,10 @@ struct AppShell: View {
                let match = commands.sections.first(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }) {
                 commands.selection = .library(match.key)
             }
+            // -MezzanineOpen <ratingKey> opens a title's page at launch.
+            if let key = UserDefaults.standard.string(forKey: "MezzanineOpen") {
+                commands.path = [DetailRoute(ratingKey: key)]
+            }
             #endif
         } catch {
             sectionsError = (error as? PlexError)?.userMessage ?? "\(error)"

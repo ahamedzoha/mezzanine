@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-11-15 — M1 done, M2/M3 underway
+
+- **M1 index:** GRDB mirror + FTS5 of every library (Movies 275, TV 65 shows / 4,352 episodes,
+  Courses 924). Full sync 3.2 s, incremental 0.17 s, search 1 ms. Libraries read only the index:
+  Posters / Wide / List / Folders, filter menu + chips, 7 sorts, per-library memory, watched marks.
+  Settings ▸ Library: show original (pre-Kometa) posters, resolved once per title and cached.
+- **M1 onboarding:** Poster Wall (owner's pick): sign in → server → Plex Home profile (PIN) →
+  library warm-up. Design review **fix** + HIG **Needs Work** → all material items fixed
+  (see commit f41daf6). Onboarding shows once (bug that reset it each launch fixed).
+- **M3 core:** play-history reporting (timeline heartbeat, stop on close/quit, watched past 90 %),
+  live-verified on a throwaway lesson and reverted; `-MezzanineNoActivity` disables it.
+- **M2 detail pages:** hero, facts, seasons/episodes, cast, extras, related; Return/double-click
+  open, Space plays, ⌘[ / Esc back. Still owed: M2 finish review + HIG pass.
+- Player: owns the whole window (no toolbar band), no 30 s resync flicker, snappier motion.
+
 Plan: `~/.claude/plans/eventual-plotting-storm.md` (M0 spikes → D design → M1–M13).
 
 ## 2026-11-14 — Design direction chosen
