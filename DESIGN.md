@@ -401,3 +401,10 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - Choosing a row loads it, selects it and returns to the Subtitles list, which opens scrolled to the track in use. A source that fails says why in one caption line ("Subdl: the API key was refused."); nothing blocks the rest.
 - The page ends with Subtitle Sources… (the searched languages as its value), opening Settings ▸ Subtitles. Without the free keys, a caption says what they add.
 - Settings ▸ Subtitles: Find Subtitles (language, also search in), Sources (Plex and Addic7ed toggles with one-line explanations; OpenSubtitles.com and Subdl rows with Set Up… / Edit…). Keys are typed in a small sheet (SecureField, Check, Done), never on the main form.
+
+## App icon
+
+- The mezzanine itself: a lit lilac screen at the top, three curved balcony tiers facing it (ink, stepping back 100 / 74 / 50 %), a soft bias-light glow behind the screen, on the graphite gradient. Owner's pick of three (over a glowing dark screen and an arches monogram).
+- `Mezzanine/AppIcon.icon` is an Icon Composer document: flat SVG layers in three depth groups (screen, tiers, glow; glow without glass), so the system draws the Liquid Glass and the Dark, Tinted and Clear appearances. No baked lighting, no rounded corners in the art.
+- Edit in Icon Composer (Xcode ▸ Open Developer Tool) or by hand; check with `ictool Mezzanine/AppIcon.icon --export-image --output-file out.png --platform macOS --rendition Default|Dark|TintedDark|ClearLight --width 512 --height 512 --scale 2` (inside Icon Composer.app ▸ Contents ▸ Executables).
+
