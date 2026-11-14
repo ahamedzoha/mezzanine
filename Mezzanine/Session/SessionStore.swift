@@ -20,6 +20,8 @@ final class SessionStore {
     private(set) var currentServer: PlexServerResource?
     private(set) var connection: ResolvedConnection?
     private(set) var client: PlexServerClient?
+    /// Plex Home members (empty when the account has no Home).
+    private(set) var homeUsers: [PlexHomeUser] = []
 
     let identity: PlexIdentity
     /// Every remote image in the app goes through this one pipeline.
@@ -31,6 +33,8 @@ final class SessionStore {
     private var lastPathGeneration = NetworkPath.shared.changeGeneration
 
     private static let accountKey = "account"
+    /// The active Plex Home profile's token, when it isn't the account owner.
+    private static let profileKey = "profile"
     private static let serverDefaultsKey = "selectedServer"
 
     init() {
@@ -41,7 +45,10 @@ final class SessionStore {
         }
     }
 
+    /// The signed-in plex.tv account's token.
     var token: String? { keychain.read(Self.accountKey) }
+    /// The token everything else uses: the active Home profile's, else the account's.
+    var activeToken: String? { keychain.read(Self.profileKey) ?? token }
 
     /// One identifier per install. plex.tv ties the token and the Authorized
     /// Devices entry to it; Plex ties playback sessions to it.
@@ -64,8 +71,8 @@ final class SessionStore {
             try? keychain.write(seeded, for: Self.accountKey)
         }
         #endif
-        guard let token else { phase = .signedOut; return }
-        await connect(token: token)
+        guard let active = activeToken else { phase = .signedOut; return }
+        await connect(token: active)
     }
 
     func signIn() {
@@ -77,6 +84,7 @@ final class SessionStore {
                 NSWorkspace.shared.open(tv.authURL(for: pin))
                 let token = try await tv.waitForToken(pin: pin)
                 try keychain.write(token, for: Self.accountKey)
+                keychain.delete(Self.profileKey)
                 await connect(token: token)
             } catch is CancellationError {
                 phase = .signedOut
@@ -94,6 +102,8 @@ final class SessionStore {
 
     func signOut() {
         keychain.delete(Self.accountKey)
+        keychain.delete(Self.profileKey)
+        homeUsers = []
         account = nil
         servers = []
         currentServer = nil
@@ -126,7 +136,7 @@ final class SessionStore {
     }
 
     func select(_ server: PlexServerResource) async {
-        guard let token else { return }
+        guard let token = activeToken else { return }
         do { try await select(server, token: token) } catch {
             phase = .failed((error as? PlexError)?.userMessage ?? error.localizedDescription)
         }
@@ -150,6 +160,31 @@ final class SessionStore {
         UserDefaults.standard.set(server.clientIdentifier, forKey: Self.serverDefaultsKey)
         await images.setToken(server.accessToken ?? token, host: won.baseURL.host(), serverID: server.clientIdentifier)
         phase = .ready
+    }
+
+    // MARK: Plex Home
+
+    /// Loads the Home's members (account token; only the owner can list them).
+    func loadHomeUsers() async {
+        guard let token else { return }
+        homeUsers = (try? await tv.homeUsers(token: token)) ?? []
+    }
+
+    /// The profile in use: the account itself, or a Home member.
+    var activeProfileUUID: String? { account?.uuid }
+
+    /// Switches to a Home member (PIN when the profile has one) and reconnects
+    /// as them. Switching back to the owner clears the profile token.
+    func switchProfile(to user: PlexHomeUser, pin: String?) async throws {
+        guard let token else { throw PlexError.unauthorized }
+        if user.admin {
+            keychain.delete(Self.profileKey)
+            await connect(token: token)
+            return
+        }
+        let userToken = try await tv.switchHomeUser(uuid: user.uuid, pin: pin, token: token)
+        try keychain.write(userToken, for: Self.profileKey)
+        await connect(token: userToken)
     }
 
     /// Every address failed. macOS reports a Local Network denial as "offline"
@@ -187,7 +222,7 @@ final class SessionStore {
     /// client only when a different address wins. Nothing on screen reloads
     /// unless the address actually changed.
     private func refreshConnection(_ server: PlexServerResource) async {
-        guard let token else { return }
+        guard let token = activeToken else { return }
         guard let won = await ConnectionRacer().race(server.candidates,
                                                      probe: ConnectionRacer.identityProbe(expectedMachineIdentifier: server.clientIdentifier)),
               won.connection != connection?.connection else { return }

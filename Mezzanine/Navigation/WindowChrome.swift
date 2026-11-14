@@ -1,24 +1,38 @@
 import SwiftUI
 import AppKit
 
-/// Hides the window's title bar chrome while a film plays. SwiftUI can hide the
-/// toolbar's items and background, but AppKit still draws the title bar strip
-/// (and the content column's scroll-edge material) above SwiftUI content, so
-/// the player would show a band across its top. This reaches the hosting
-/// NSWindow and makes the title bar fully transparent for the duration.
+/// Hides the window's title bar chrome (title, toolbar, toolbar material)
+/// while a film plays and during onboarding. SwiftUI can hide toolbar items,
+/// but AppKit still draws the title bar strip above SwiftUI content, so this
+/// reaches the hosting NSWindow directly. Applied when the view joins its
+/// window and on every change.
 struct WindowChrome: NSViewRepresentable {
     let hidden: Bool
+    /// Also hide the toolbar (and with it the window buttons). Only the player does this.
+    var hidesToolbar = false
 
-    func makeNSView(context: Context) -> NSView { NSView() }
+    func makeNSView(context: Context) -> ChromeView { ChromeView() }
 
-    func updateNSView(_ view: NSView, context: Context) {
-        // The window is attached after the first layout pass.
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
-            window.titlebarAppearsTransparent = hidden
-            window.titleVisibility = hidden ? .hidden : .visible
-            window.toolbar?.isVisible = !hidden
-            window.titlebarSeparatorStyle = hidden ? .none : .automatic
+    func updateNSView(_ view: ChromeView, context: Context) {
+        view.hidesToolbar = hidesToolbar
+        view.chromeHidden = hidden
+    }
+
+    final class ChromeView: NSView {
+        var hidesToolbar = false
+        var chromeHidden = false { didSet { if chromeHidden != oldValue { apply() } } }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+        }
+
+        private func apply() {
+            guard let window else { return }
+            window.titlebarAppearsTransparent = chromeHidden
+            window.titleVisibility = chromeHidden ? .hidden : .visible
+            window.toolbar?.isVisible = !(chromeHidden && hidesToolbar)
+            window.titlebarSeparatorStyle = chromeHidden ? .none : .automatic
         }
     }
 }

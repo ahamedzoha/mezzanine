@@ -22,16 +22,17 @@ struct AppShell: View {
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
     @State private var sectionsError: String?
+    @AppStorage("onboardingComplete") private var onboardingComplete = false
 
     var body: some View {
         Group {
             // Once connected, the library stays on screen through reconnects.
-            if session.phase == .ready || (session.client != nil && session.phase == .connecting) {
+            if showsLibrary {
                 split
                     .disabled(playback.isPresented)
                     .accessibilityHidden(playback.isPresented)
             } else {
-                SignInView()
+                OnboardingView().navigationTitle("")
             }
         }
         .overlay {
@@ -46,18 +47,31 @@ struct AppShell: View {
         // While a film plays the window is only the film: no toolbar, no toolbar
         // material, no title (AppKit draws those above SwiftUI content).
         .toolbarVisibility(playback.isPresented ? .hidden : .visible, for: .windowToolbar)
-        .toolbarBackgroundVisibility(playback.isPresented ? .hidden : .automatic, for: .windowToolbar)
-        .background(WindowChrome(hidden: playback.isPresented))
+        .toolbarBackgroundVisibility(chromeHidden ? .hidden : .automatic, for: .windowToolbar)
+        .background(WindowChrome(hidden: chromeHidden, hidesToolbar: playback.isPresented))
         // Theme reads Increase Contrast at render time; rebuild when it changes.
         .id(contrast)
         .frame(minWidth: 900, minHeight: 600)
         .containerBackground(Theme.graphite, for: .window)
         .preferredColorScheme(.dark)
-        .onChange(of: session.phase, initial: true) { _, phase in commands.isSignedIn = phase == .ready }
+        .onChange(of: session.phase, initial: true) { _, phase in
+            commands.isSignedIn = phase == .ready
+            if phase == .signedOut { onboardingComplete = false }
+        }
+        // Sections and the local library follow the connection, onboarding included.
+        .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(session.account?.uuid ?? "")") { await loadSections() }
         .onChange(of: playback.isPresented, initial: true) { _, presented in
             commands.isPlayerOpen = presented
             if !presented { contentFocused = true }
         }
+    }
+
+    /// The film, or onboarding, owns the whole window.
+    private var chromeHidden: Bool { playback.isPresented || !showsLibrary }
+
+    /// Onboarding until it's done; then the library, kept through reconnects.
+    private var showsLibrary: Bool {
+        onboardingComplete && (session.phase == .ready || (session.client != nil && session.phase == .connecting))
     }
 
     private var split: some View {
@@ -102,7 +116,6 @@ struct AppShell: View {
         .onChange(of: commands.searchRequests) { _, _ in searchFocused = true }
         .onChange(of: commands.contentFocusRequests) { _, _ in contentFocused = true }
         .task(id: session.currentServer?.clientIdentifier) {
-            await loadSections()
             #if DEBUG
             // -MezzanineSection "TV Shows" opens a library at launch (screenshots, manual tests).
             if let title = UserDefaults.standard.string(forKey: "MezzanineSection"),
@@ -149,60 +162,5 @@ struct AppShell: View {
     private func icon(for section: PlexLibrarySection) -> String {
         if section.isPersonalMedia { return "folder" }
         return section.kind == .show ? "tv" : "film"
-    }
-}
-
-/// Signed out or connecting. The full onboarding flow is its own surface (M1).
-struct SignInView: View {
-    @Environment(SessionStore.self) private var session
-
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            RoomLight(palette: .dark)
-            VStack(alignment: .leading, spacing: Theme.Space.l) {
-                Text("MEZZANINE")
-                    .font(TitleFont.font(size: 72))
-                    .foregroundStyle(Theme.ink)
-                    .accessibilityAddTraits(.isHeader)
-                Group {
-                    switch session.phase {
-                    case .signedOut:
-                        Text("Sign in with your Plex account to see your libraries.")
-                        Button("Sign In with Plex") { session.signIn() }
-                            .buttonStyle(PrimaryButtonStyle())
-                            .keyboardShortcut(.defaultAction)
-                    case .awaitingApproval(let code):
-                        Text("Approve Mezzanine in your browser. Code \(code).")
-                        Button("Cancel") { session.cancelSignIn() }
-                            .buttonStyle(SecondaryButtonStyle())
-                            .keyboardShortcut(.cancelAction)
-                    case .connecting:
-                        HStack(spacing: Theme.Space.s) {
-                            ProgressView().controlSize(.small).accessibilityLabel("Connecting")
-                            Text("Connecting to your server…")
-                        }
-                    case .failed(let message):
-                        Text(message).frame(maxWidth: 520, alignment: .leading)
-                        HStack(spacing: Theme.Space.m) {
-                            Button("Try Again") { Task { await session.restore() } }
-                                .buttonStyle(PrimaryButtonStyle())
-                                .keyboardShortcut(.defaultAction)
-                            if session.isLocalNetworkDenied {
-                                Button("Open Local Network Settings") {
-                                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")!)
-                                }
-                                .buttonStyle(SecondaryButtonStyle())
-                            }
-                        }
-                    case .ready:
-                        EmptyView()
-                    }
-                }
-                .font(Theme.Typeface.body)
-                .foregroundStyle(Theme.inkSecondary)
-            }
-            .padding(Theme.Space.gutter)
-            .padding(.bottom, Theme.Space.xxl)
-        }
     }
 }

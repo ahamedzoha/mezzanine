@@ -18,6 +18,11 @@ final class LibraryStore {
     private(set) var revision = 0
     /// Resolved clean (pre-Kometa) poster paths, by rating key.
     private(set) var cleanPosters: [String: String] = [:]
+    /// Per-library reading progress for onboarding, by section title.
+    private(set) var progress: [String: (done: Int, total: Int)] = [:]
+    /// Libraries fully read at least once this session.
+    private(set) var finishedSections: Set<String> = []
+    var sectionTitles: [String] { sections.filter { !LibrarySync.types(for: $0).isEmpty }.map(\.title) }
 
     /// Show the agent's original posters instead of the server's selected
     /// (overlaid) ones. Display only: nothing changes on the server.
@@ -67,7 +72,14 @@ final class LibraryStore {
                 let changed = try await sync.sync(section, force: force) { progress in
                     Task { @MainActor [weak self] in
                         self?.syncState = .syncing(section: progress.section, done: progress.done, total: progress.total)
+                        self?.progress[progress.section] = (progress.done, progress.total)
+                        self?.revision += 1
                     }
+                }
+                finishedSections.insert(section.title)
+                if progress[section.title] == nil {
+                    let n = count(section: section.key)
+                    progress[section.title] = (n, n)
                 }
                 if changed { revision += 1 }
             } catch is CancellationError {
@@ -95,11 +107,40 @@ final class LibraryStore {
         }.value
     }
 
+    /// Posters for the onboarding wall: recently added films and shows, mixed.
+    func wallItems(limit: Int) async -> [PlexMetadata] {
+        guard let index else { return [] }
+        let keys = sections.filter { !LibrarySync.types(for: $0).isEmpty && !$0.isPersonalMedia }
+        return await Task.detached(priority: .userInitiated) {
+            var all: [IndexedItem] = []
+            for section in keys {
+                var q = LibraryQuery(section: section.key, kinds: section.kind == .show ? ["show"] : ["movie"], sort: .addedNewest)
+                q.text = nil
+                all += (try? index.items(q))?.prefix(limit) ?? []
+            }
+            return all.sorted { ($0.addedAt ?? 0) > ($1.addedAt ?? 0) }.prefix(limit).compactMap { $0.metadata() }
+        }.value
+    }
+
     func genres(section: String, kinds: [String]) -> [String] {
         ((try? index?.genres(section: section, kinds: kinds)) ?? []).map(\.0)
     }
 
     func count(section: String) -> Int { (try? index?.count(section: section)) ?? 0 }
+
+    /// "275 films", "65 shows · 4,352 episodes", for a library by title.
+    func summary(sectionTitle: String) -> String? {
+        guard let index, let section = sections.first(where: { $0.title == sectionTitle }) else { return nil }
+        func n(_ kind: String) -> Int { (try? index.items(LibraryQuery(section: section.key, kinds: [kind])).count) ?? 0 }
+        let f = { (v: Int) in v.formatted(.number) }
+        if section.kind == .show {
+            let shows = n("show"), episodes = n("episode")
+            return "\(f(shows)) \(shows == 1 ? "show" : "shows") · \(f(episodes)) \(episodes == 1 ? "episode" : "episodes")"
+        }
+        let films = n("movie")
+        let noun = section.isPersonalMedia ? (films == 1 ? "video" : "videos") : (films == 1 ? "film" : "films")
+        return "\(f(films)) \(noun)"
+    }
 
     /// Applies a finished playback session to the index (resume point, or watched past 90 %).
     func recordStop(_ item: PlexMetadata, at time: TimeInterval, duration: TimeInterval) {
