@@ -208,6 +208,25 @@ public actor PlexServerClient {
     }
 
     /// Marks watched.
+    /// Asks Plex to decide on a transcode session before it starts (Plex refuses `start.m3u8`
+    /// for a session without a decision). Throws when Plex can neither play nor convert it.
+    public func decideTranscode(_ url: URL) async throws {
+        var request = URLRequest(url: url)
+        for (k, v) in requestHeaders { request.setValue(v, forHTTPHeaderField: k) }
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let data = try await perform(request)
+        struct Decision: Decodable { let generalDecisionCode: Int? }
+        struct Envelope: Decodable { let MediaContainer: Decision }
+        if let code = (try? JSONDecoder().decode(Envelope.self, from: data))?.MediaContainer.generalDecisionCode, code >= 2000 {
+            throw PlexError.http(status: 415)
+        }
+    }
+
+    /// Ends a transcode session (best effort; Plex also reaps idle ones).
+    public func stopTranscode(session id: String) async {
+        _ = try? await write("GET", "/video/:/transcode/universal/stop", query: [URLQueryItem(name: "session", value: id)])
+    }
+
     public func scrobble(ratingKey: String) async throws {
         try await write("GET", "/:/scrobble", query: [
             URLQueryItem(name: "key", value: ratingKey),

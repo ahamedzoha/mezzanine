@@ -48,6 +48,17 @@ final class PlaybackCoordinator {
     private(set) var sessionStart = Date()
     private var episodesCache: [String: [PlexMetadata]] = [:]
 
+    // MARK: Delivery
+
+    /// How the file reaches the engine. Direct play always comes first; Plex remuxes or
+    /// converts only when direct play fails, or when a quality cap is picked.
+    private(set) var mode: PlaybackMode = .direct
+    /// Set when direct play failed and Mezzanine fell back on its own (shown once).
+    private(set) var fallbackNotice: String?
+    /// Which file of a multi-version title plays (index into `media`).
+    private(set) var mediaIndex = 0
+    private var transcodeSession: String?
+
     init(player: MezzaninePlayer, session: SessionStore) {
         self.player = player
         self.session = session
@@ -55,7 +66,8 @@ final class PlaybackCoordinator {
 
     /// Plays a movie or episode (resuming), or the next unwatched episode of
     /// a season or show.
-    func play(_ item: PlexMetadata, from origin: CGRect?) async {
+    func play(_ item: PlexMetadata, from origin: CGRect?, mediaIndex: Int = 0) async {
+        self.mediaIndex = mediaIndex
         await play(item, from: origin, autoplayed: false)
     }
 
@@ -80,7 +92,8 @@ final class PlaybackCoordinator {
         do {
             let playable = try await resolvePlayable(item, client: client)
             let detail = try await client.metadata(playable.ratingKey)
-            guard let key = detail.media.first?.parts.first?.key, let url = client.urls.part(key: key) else {
+            if detail.ratingKey != item.ratingKey || !detail.media.indices.contains(mediaIndex) { mediaIndex = 0 }
+            guard detail.media.indices.contains(mediaIndex), detail.media[mediaIndex].parts.first?.key != nil else {
                 error = "This item has no playable file."
                 return
             }
@@ -88,22 +101,22 @@ final class PlaybackCoordinator {
             withAnimation(Theme.Motion.object) { self.item = detail }
             if let reporter { await reporter.stop(at: player.currentTime, duration: player.duration) }
             let start = detail.viewOffset.map { Double($0) / 1000 }
-            let streams = detail.media.first?.parts.first?.streams ?? []
-            // Follow what Plex has stored for this title (the owner's last choices),
-            // and pass sidecar subtitle files so the engine can show them too.
-            let audio = streams.first { $0.streamType == .audio && $0.selected == true }?.languageCode
-            let subtitle = streams.first { $0.streamType == .subtitle && $0.selected == true }?.languageCode
-            sidecarStreamIDs = streams.filter { $0.streamType == .subtitle && $0.key != nil }.map(\.id)
-            let sidecars: [ExternalSubtitle] = streams.compactMap { stream in
-                guard stream.streamType == .subtitle, let key = stream.key,
-                      let url = client.urls.subtitle(streamKey: key) else { return nil }
-                return ExternalSubtitle(url: url, name: stream.label, language: stream.languageCode,
-                                        format: stream.codec, isForced: stream.forced, isHearingImpaired: stream.hearingImpaired)
+            fallbackNotice = nil
+            // Direct play first; if the file won't open, let Plex remux it, then convert it.
+            var lastError: Error?
+            for candidate in [PlaybackMode.direct, .remux, .convert(nil)] {
+                do {
+                    try await load(detail, mode: candidate, start: start, client: client)
+                    lastError = nil
+                    if candidate != .direct { fallbackNotice = "Direct play failed · \(candidate.label.lowercased())" }
+                    break
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    lastError = error
+                }
             }
-            try await player.load(PlaybackRequest(url: url, headers: client.requestHeaders, startPosition: start,
-                                                  preferredAudioLanguages: audio.map { [$0] } ?? [],
-                                                  preferredSubtitleLanguages: subtitle.map { [$0] } ?? [],
-                                                  externalSubtitles: sidecars))
+            if let lastError { throw lastError }
             let reporter = ActivityReporter(client: client, item: detail, player: player)
             self.reporter = reporter
             reporter.start()
@@ -116,6 +129,84 @@ final class PlaybackCoordinator {
         } catch {
             self.error = (error as? PlexError)?.userMessage ?? "Couldn’t start playback."
         }
+    }
+
+    /// Loads `detail` into the engine as `mode` asks, at `start`.
+    private func load(_ detail: PlexMetadata, mode: PlaybackMode, start: Double?, client: PlexServerClient) async throws {
+        let media = detail.media[mediaIndex]
+        let streams = media.parts.first?.streams ?? []
+        // Follow what Plex has stored for this title (the owner's last choices),
+        // and pass sidecar subtitle files so the engine can show them too.
+        let audio = streams.first { $0.streamType == .audio && $0.selected == true }?.languageCode
+        let subtitle = streams.first { $0.streamType == .subtitle && $0.selected == true }?.languageCode
+        sidecarStreamIDs = streams.filter { $0.streamType == .subtitle && $0.key != nil }.map(\.id)
+        let sidecars: [ExternalSubtitle] = streams.compactMap { stream in
+            guard stream.streamType == .subtitle, let key = stream.key,
+                  let url = client.urls.subtitle(streamKey: key) else { return nil }
+            return ExternalSubtitle(url: url, name: stream.label, language: stream.languageCode,
+                                    format: stream.codec, isForced: stream.forced, isHearingImpaired: stream.hearingImpaired)
+        }
+        let previousSession = transcodeSession
+        let url: URL?
+        switch mode {
+        case .direct:
+            url = media.parts.first?.key.flatMap { client.urls.part(key: $0) }
+            transcodeSession = nil
+        case .remux, .convert:
+            let options = mode.transcodeOptions(mediaIndex: mediaIndex,
+                                                isLocal: session.connection?.connection.route == .local)
+            if let decision = client.urls.transcodeDecision(ratingKey: detail.ratingKey, options) {
+                try await client.decideTranscode(decision)
+            }
+            url = client.urls.transcode(ratingKey: detail.ratingKey, options)
+            transcodeSession = options.session
+        }
+        guard let url else { throw PlexError.notFound }
+        #if DEBUG
+        // -ForceDirectFail YES: direct play "fails", to exercise the fallback ladder.
+        if mode == .direct, UserDefaults.standard.bool(forKey: "ForceDirectFail") { throw PlexError.http(status: 415) }
+        #endif
+        if let previousSession, previousSession != transcodeSession {
+            Task { await client.stopTranscode(session: previousSession) }
+        }
+        do {
+            try await player.load(PlaybackRequest(url: url, headers: client.requestHeaders, startPosition: start,
+                                                  preferredAudioLanguages: audio.map { [$0] } ?? [],
+                                                  preferredSubtitleLanguages: subtitle.map { [$0] } ?? [],
+                                                  externalSubtitles: sidecars))
+        } catch {
+            #if DEBUG
+            print("LOADFAIL mode=\(mode) url=\(PlexURLs.redacted(url)) error=\(error)")
+            #endif
+            throw error
+        }
+        self.mode = mode
+    }
+
+    /// Switches delivery for the playing title (Quality in the ⋯ panel, or the failure
+    /// panel's Convert), keeping the position.
+    func setMode(_ newMode: PlaybackMode) async {
+        guard let item, let client = session.client, newMode != mode || isFailed else { return }
+        let at = player.currentTime > 1 ? player.currentTime : item.viewOffset.map { Double($0) / 1000 }
+        error = nil
+        fallbackNotice = nil
+        do {
+            try await load(item, mode: newMode, start: at, client: client)
+        } catch is CancellationError {
+        } catch {
+            self.error = (error as? PlexError)?.userMessage ?? "Couldn’t switch to \(newMode.label.lowercased())."
+        }
+    }
+
+    private var isFailed: Bool {
+        if case .failed = player.status { return true }
+        return error != nil
+    }
+
+    private func stopTranscode() {
+        guard let id = transcodeSession, let client = session.client else { return }
+        transcodeSession = nil
+        Task { await client.stopTranscode(session: id) }
     }
 
     // MARK: Tracks (remembered on the server)
@@ -160,6 +251,8 @@ final class PlaybackCoordinator {
             if let item { onStopped?(item, time, duration) }
         }
         player.stop()
+        stopTranscode()
+        mode = .direct
         withAnimation(Theme.Motion.object) { self.item = nil }
     }
 
@@ -167,6 +260,7 @@ final class PlaybackCoordinator {
     func finishForQuit() async {
         await reporter?.stop()
         reporter = nil
+        if let id = transcodeSession, let client = session.client { await client.stopTranscode(session: id) }
     }
 
     /// Control Centre / media-key title, with the poster as artwork.
@@ -234,6 +328,43 @@ final class PlaybackCoordinator {
             return episodes.first { ($0.viewOffset ?? 0) > 0 } ?? episodes.first { !$0.isWatched } ?? episodes.first ?? item
         default:
             return item
+        }
+    }
+}
+
+/// How the playing file reaches the engine.
+enum PlaybackMode: Hashable {
+    /// The original file, untouched (the server does nothing).
+    case direct
+    /// Plex copies the streams into HLS (cheap; for files the engine can't open directly).
+    case remux
+    /// Plex re-encodes, optionally capped (kbps) for slow links.
+    case convert(Int?)
+
+    var label: String {
+        switch self {
+        case .direct: "Original"
+        case .remux: "Remuxed by the server"
+        case .convert(nil): "Converted by the server"
+        case .convert(let kbps?): "\(Self.bitrateLabel(kbps)) · \(kbps >= 8000 ? "1080p" : "720p")"
+        }
+    }
+
+    static func bitrateLabel(_ kbps: Int) -> String {
+        kbps >= 1000 ? String(format: "%g Mbps", Double(kbps) / 1000) : "\(kbps) kbps"
+    }
+
+    /// The quality caps offered in the ⋯ panel, best first.
+    static let caps: [Int] = [20000, 12000, 8000, 4000, 2000]
+
+    func transcodeOptions(mediaIndex: Int, isLocal: Bool) -> TranscodeOptions {
+        switch self {
+        case .direct, .remux:
+            return TranscodeOptions(directStream: true, mediaIndex: mediaIndex, isLocal: isLocal)
+        case .convert(let kbps):
+            return TranscodeOptions(directStream: false, maxVideoBitrate: kbps,
+                                    videoResolution: kbps.map { $0 >= 8000 ? "1920x1080" : "1280x720" },
+                                    mediaIndex: mediaIndex, isLocal: isLocal)
         }
     }
 }

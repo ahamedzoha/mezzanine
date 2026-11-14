@@ -9,6 +9,8 @@ struct DetailHero: View {
     let play: () -> Void
     let playTrailer: (() -> Void)?
     let toggleWatched: () -> Void
+    /// Plays one file of a multi-version title (shown only when there's a choice).
+    var playVersion: ((Int) -> Void)? = nil
 
     @Environment(SessionStore.self) private var session
     @State private var width: CGFloat = 1200
@@ -40,6 +42,20 @@ struct DetailHero: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .focusEffectDisabled(false)
                     .help("Play (Space)")
+                if let playVersion, item.media.count > 1 {
+                    Menu {
+                        ForEach(Array(item.media.enumerated()), id: \.offset) { i, media in
+                            Button(Format.versionLabel(media)) { playVersion(i) }
+                        }
+                    } label: {
+                        Label("Version", systemImage: "square.stack")
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(SecondaryButtonStyle())
+                    .fixedSize()
+                    .help("This title has \(item.media.count) files. Play a particular one.")
+                    .accessibilityLabel("Play a version, \(item.media.count) available")
+                }
                 if let playTrailer {
                     Button("Trailer", action: playTrailer)
                         .buttonStyle(SecondaryButtonStyle())
@@ -127,6 +143,7 @@ struct EpisodeRow: View {
     let onFocus: () -> Void
     let onPlay: (CGRect) -> Void
     let onToggleWatched: () -> Void
+    var onPlayVersion: ((Int) -> Void)? = nil
 
     @Environment(SessionStore.self) private var session
     @State private var hovering = false
@@ -187,6 +204,13 @@ struct EpisodeRow: View {
         .accessibilityAction(named: episode.isWatched ? "Mark as unwatched" : "Mark as watched") { onToggleWatched() }
         .contextMenu {
             Button("Play") { onPlay(frame) }
+            if let onPlayVersion, episode.media.count > 1 {
+                Menu("Play Version") {
+                    ForEach(Array(episode.media.enumerated()), id: \.offset) { i, media in
+                        Button(Format.versionLabel(media)) { onPlayVersion(i) }
+                    }
+                }
+            }
             Button(episode.isWatched ? "Mark as Unwatched" : "Mark as Watched", action: onToggleWatched)
         }
     }

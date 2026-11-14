@@ -72,6 +72,7 @@ struct PlayerStage: View {
             if let message = failure {
                 PlaybackFailure(message: message,
                                 retry: { Task { await playback.retry() } },
+                                convert: playback.mode == .direct ? { Task { await playback.setMode(.convert(nil)) } } : nil,
                                 close: { playback.clearError(); _ = perform(.close) })
             }
             if let toast { SoundToast(text: toast, volume: sound.current.volumePercent).transition(.opacity) }
@@ -98,6 +99,11 @@ struct PlayerStage: View {
                     }
                 }
             }
+            // -PlayerQuality remux|convert|8000: switch delivery after 3 s (fallback tests).
+            if let q = UserDefaults.standard.string(forKey: "PlayerQuality") {
+                let mode: PlaybackMode = q == "remux" ? .remux : (q == "convert" ? .convert(nil) : .convert(Int(q)))
+                Task { try? await Task.sleep(for: .seconds(3)); await playback.setMode(mode) }
+            }
             if UserDefaults.standard.bool(forKey: "PlayerFullScreen") {
                 Task { try? await Task.sleep(for: .seconds(1)); NSApp.windows.first { $0.isVisible && $0.canBecomeMain }?.toggleFullScreen(nil) }
             }
@@ -117,6 +123,10 @@ struct PlayerStage: View {
         .onChange(of: playback.nextEpisode?.ratingKey, initial: true) { _, k in commands.hasNextEpisode = k != nil }
         .onChange(of: playback.previousEpisode?.ratingKey, initial: true) { _, k in commands.hasPreviousEpisode = k != nil }
         .onChange(of: player.isMuted, initial: true) { _, v in commands.isMuted = v }
+        .onChange(of: playback.fallbackNotice) { _, notice in if let notice { showToast(notice) } }
+        .onChange(of: playback.mode) { old, new in
+            if playback.fallbackNotice == nil, old != new { showToast("Quality: " + new.label) }
+        }
         .onChange(of: statsVisible, initial: true) { _, v in commands.statsVisible = v }
         .onChange(of: player.canPictureInPicture, initial: true) { _, v in commands.canPictureInPicture = v }
         .onChange(of: player.rate, initial: true) { _, r in commands.playbackRate = r }
@@ -435,6 +445,7 @@ struct PlayerStage: View {
 
     /// Esc steps out one layer at a time: panel page, panel, Up Next, full screen, player.
     private func escape() {
+        if failure != nil { playback.clearError(); _ = perform(.close); return }
         if optionsOpen {
             if optionsPage != .root { optionsPage = optionsPage == .search ? .subtitles : .root } else { setOptions(open: false) }
             return
@@ -444,8 +455,9 @@ struct PlayerStage: View {
         _ = perform(.close)
     }
 
-    /// Return: Up Next plays now, Still Watching resumes, else skip the active marker.
+    /// Return: Try Again on a failure, Up Next plays now, Still Watching resumes, else skip.
     private func returnKey() {
+        if failure != nil { Task { await playback.retry() }; return }
         switch upNext {
         case .counting, .stillWatching: Task { await playback.playNext(autoplayed: false) }
         default: _ = perform(.key(.skipMarker))
@@ -937,6 +949,8 @@ private struct SoundToast: View {
 private struct PlaybackFailure: View {
     let message: String
     let retry: () -> Void
+    /// Offered while playing the original file: let Plex convert it instead.
+    let convert: (() -> Void)?
     let close: () -> Void
 
     var body: some View {
@@ -946,8 +960,14 @@ private struct PlaybackFailure: View {
                 .accessibilityAddTraits(.isHeader)
             Text(message).font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary).frame(maxWidth: 420, alignment: .leading)
             HStack(spacing: Theme.Space.m) {
-                Button("Try Again", action: retry).buttonStyle(PrimaryButtonStyle()).keyboardShortcut(.defaultAction).focusEffectDisabled(false)
+                Button("Try Again", action: retry).buttonStyle(PrimaryButtonStyle()).focusEffectDisabled(false)
+                    .help("Try again (Return)")
+                if let convert {
+                    Button("Convert on the Server", action: convert).buttonStyle(SecondaryButtonStyle()).focusEffectDisabled(false)
+                        .help("Plex converts the file as it plays. Uses the server’s processor.")
+                }
                 Button("Close", action: close).buttonStyle(SecondaryButtonStyle()).focusEffectDisabled(false)
+                    .help("Close (Esc)")
             }
         }
         .padding(Theme.Space.xl)

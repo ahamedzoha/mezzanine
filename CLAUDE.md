@@ -55,7 +55,9 @@ Build output goes to `build.noindex/` (Spotlight skips it).
 (real key events through the router; menus ignore keys while the app is in the background, so
 ⌘ items use `!action`) `-ScrubHoverAt 0.6` `-SnapshotNoClipboard YES`; detail:
 `-MezzanineOpen <ratingKey>` `-DetailSection cast`; windows: `-MezzanineOpenWindow shortcuts|settings`
-with `-settingsTab shortcuts`. Player tests that change settings (stats, subtitle offset) write to
+with `-settingsTab shortcuts`; delivery: `-PlayerQuality remux|convert|8000` `-ForceDirectFail YES`
+(each starts a real transcode on the server: keep runs short, let the player close itself
+(`-MezzanineAutoClose`) so the session stops, and check `Scripts/plex.sh pms /transcode/sessions`). Player tests that change settings (stats, subtitle offset) write to
 the same defaults as the installed app: reset them afterwards.
 
 Full screen: AppKit keeps the title/toolbar strip as an opaque band over the content even with

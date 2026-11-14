@@ -46,6 +46,64 @@ public struct PlexURLs: Sendable {
         URL(string: path, relativeTo: baseURL)?.absoluteURL
     }
 
+    /// A Plex universal-transcode HLS stream: the fallback when direct play fails, and the
+    /// quality caps for slow remote links. Subtitles are left out (Mezzanine draws its own;
+    /// sidecar files still load). Start position is the player's seek, not `offset`, so the
+    /// stream's clock matches the film's.
+    public func transcode(ratingKey: String, _ options: TranscodeOptions) -> URL? {
+        transcodeURL("start.m3u8", ratingKey: ratingKey, options)
+    }
+
+    /// The decision for the same session; Plex answers 400 to `start.m3u8` until it has made one.
+    public func transcodeDecision(ratingKey: String, _ options: TranscodeOptions) -> URL? {
+        transcodeURL("decision", ratingKey: ratingKey, options)
+    }
+
+    private func transcodeURL(_ endpoint: String, ratingKey: String, _ options: TranscodeOptions) -> URL? {
+        var c = URLComponents(url: baseURL.appending(path: "video/:/transcode/universal/\(endpoint)"), resolvingAgainstBaseURL: false)!
+        c.percentEncodedPath = c.percentEncodedPath.replacingOccurrences(of: "%3A", with: ":")
+        var items: [(String, String)] = [
+            ("hasMDE", "1"),
+            ("path", "/library/metadata/\(ratingKey)"),
+            ("mediaIndex", String(options.mediaIndex)),
+            ("partIndex", "0"),
+            ("protocol", "hls"),
+            ("fastSeek", "1"),
+            ("directPlay", "0"),
+            ("directStream", options.directStream ? "1" : "0"),
+            ("directStreamAudio", options.directStream ? "1" : "0"),
+            ("subtitles", "none"),
+            ("copyts", "1"),
+            ("mediaBufferSize", "102400"),
+            ("autoAdjustQuality", "0"),
+            ("location", options.isLocal ? "lan" : "wan"),
+            ("session", options.session),
+            ("X-Plex-Session-Identifier", options.session),
+            // Plex has no transcode profile for platform "macOS" (it answers 400); the Generic
+            // profile plus Mezzanine's own target declaration is accepted.
+            ("X-Plex-Client-Profile-Name", "Generic"),
+            ("X-Plex-Client-Profile-Extra", TranscodeOptions.profileExtra),
+        ]
+        if let kbps = options.maxVideoBitrate {
+            items += [("videoQuality", "100"), ("maxVideoBitrate", String(kbps))]
+        } else {
+            items += [("videoQuality", "100")]
+        }
+        if let resolution = options.videoResolution { items.append(("videoResolution", resolution)) }
+        c.percentEncodedQueryItems = items.map {
+            URLQueryItem(name: $0.0, value: $0.1.addingPercentEncoding(withAllowedCharacters: .plexQueryAllowed))
+        }
+        return c.url
+    }
+
+    /// Ends a transcode session (on close, or when switching back to direct play).
+    public func stopTranscode(session: String) -> URL? {
+        var c = URLComponents(url: baseURL.appending(path: "video/:/transcode/universal/stop"), resolvingAgainstBaseURL: false)!
+        c.percentEncodedPath = c.percentEncodedPath.replacingOccurrences(of: "%3A", with: ":")
+        c.queryItems = [URLQueryItem(name: "session", value: session)]
+        return c.url
+    }
+
     /// BIF scrub thumbnails for a part.
     public func previewIndex(partID: Int) -> URL {
         baseURL.appending(path: "library/parts/\(partID)/indexes/sd")
@@ -78,4 +136,31 @@ public struct PlexURLs: Sendable {
         }
         return c.url?.absoluteString ?? url.absoluteString
     }
+}
+
+/// How to ask Plex for a converted stream.
+public struct TranscodeOptions: Sendable, Equatable {
+    /// Copy the video and audio when they fit (a remux); false re-encodes.
+    public var directStream: Bool
+    /// kbps cap; nil keeps the original quality.
+    public var maxVideoBitrate: Int?
+    /// "1920x1080"; nil keeps the original size.
+    public var videoResolution: String?
+    public var mediaIndex: Int
+    public var isLocal: Bool
+    public var session: String
+
+    public init(directStream: Bool, maxVideoBitrate: Int? = nil, videoResolution: String? = nil,
+                mediaIndex: Int = 0, isLocal: Bool = true, session: String = UUID().uuidString) {
+        self.directStream = directStream
+        self.maxVideoBitrate = maxVideoBitrate
+        self.videoResolution = videoResolution
+        self.mediaIndex = mediaIndex
+        self.isLocal = isLocal
+        self.session = session
+    }
+
+    /// What Mezzanine's engine plays: HLS in MPEG-TS with H.264/HEVC and AAC/AC-3/E-AC-3.
+    public static let profileExtra =
+        "add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264,hevc&audioCodec=aac,ac3,eac3&replace=true)"
 }

@@ -21,7 +21,7 @@ struct PlayerOptions: View {
     @State private var searchError: String?
     @State private var downloading: String?
 
-    enum Page { case root, audio, subtitles, search, sound, speed }
+    enum Page { case root, audio, subtitles, search, sound, speed, quality }
 
     private var player: MezzaninePlayer { playback.player }
 
@@ -34,6 +34,7 @@ struct PlayerOptions: View {
             case .search: search
             case .sound: soundPage
             case .speed: speed
+            case .quality: quality
             }
         }
         .padding(Theme.Space.s)
@@ -55,6 +56,7 @@ struct PlayerOptions: View {
             row("Subtitles", value: currentSubtitle) { page = .subtitles }
             row("Sound", value: soundSummary) { page = .sound }
             row("Speed", value: speedLabel(player.rate)) { page = .speed }
+            row("Quality", value: playback.mode.label) { page = .quality }
         }
     }
 
@@ -148,6 +150,26 @@ struct PlayerOptions: View {
             header("Speed")
             ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
                 choice(speedLabel(rate), detail: nil, selected: abs(player.rate - rate) < 0.01) { player.setRate(rate) }
+            }
+        }
+    }
+
+    /// Original first (direct play: the server does nothing); conversions only for slow
+    /// links or files that won't open.
+    private var quality: some View {
+        Group {
+            header("Quality")
+            choice("Original", detail: "Direct play · the server does no work", selected: playback.mode == .direct) {
+                Task { await playback.setMode(.direct) }
+            }
+            choice("Original, converted", detail: "Plex re-encodes at full quality", selected: playback.mode == .convert(nil) || playback.mode == .remux) {
+                Task { await playback.setMode(.convert(nil)) }
+            }
+            ForEach(PlaybackMode.caps, id: \.self) { kbps in
+                let mode = PlaybackMode.convert(kbps)
+                choice(mode.label, detail: "For slow connections · Plex converts", selected: playback.mode == mode) {
+                    Task { await playback.setMode(mode) }
+                }
             }
         }
     }

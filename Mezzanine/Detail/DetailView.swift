@@ -45,7 +45,8 @@ struct DetailView: View {
                     VStack(alignment: .leading, spacing: Theme.Space.xl - Self.sectionLead) {
                         DetailHero(item: item, nextEpisode: nextEpisode, play: { play(nextEpisode ?? item, from: heroFrame) },
                                    playTrailer: trailer.map { t in { play(t, from: heroFrame) } },
-                                   toggleWatched: { requestToggleWatched(item) })
+                                   toggleWatched: { requestToggleWatched(item) },
+                                   playVersion: { i in Task { await playback.play(item, from: heroFrame, mediaIndex: i) } })
                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { heroFrame = $0 }
                             .id("hero")
                         about(item).padding(.top, Self.sectionLead).id("about")
@@ -183,7 +184,8 @@ struct DetailView: View {
                     EpisodeRow(episode: episode, isFocused: focusedEpisode == i,
                                onFocus: { focusedEpisode = i; if let e = sectionIDs.firstIndex(of: "episodes") { section = e } },
                                onPlay: { frame in play(episode, from: frame) },
-                               onToggleWatched: { requestToggleWatched(episode) })
+                               onToggleWatched: { requestToggleWatched(episode) },
+                               onPlayVersion: { v in Task { await playback.play(episode, from: nil, mediaIndex: v) } })
                         .id("ep-\(i)")
                 }
             }

@@ -280,3 +280,11 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - Playback info (I): a solid graphite card top-left under the title mark — route, video, decoder, audio path, output device and profile, volume, start and seek times.
 - Scrub hover: a 200 pt frame preview above the bar (the engine's cached segments near the playhead, a second reader's nearest keyframe elsewhere), with the chapter name and time; chapter starts are small gaps in the bar.
 - Help ▸ Keyboard Shortcuts (⌘/) lists every key, read-only, with Change Keys… into Settings.
+
+## Delivery (direct play first)
+
+- Mezzanine always plays the original file. If it won't open, it asks Plex to remux it (streams copied into HLS), then to convert it, and says so once ("Direct play failed · remuxed by the server").
+- ⋯ ▸ Quality: Original (the server does no work), Original converted, and caps for slow links (20 / 12 / 8 Mbps 1080p, 4 / 2 Mbps 720p). Switching keeps the position. Playback info names the delivery.
+- The failure panel offers Convert on the Server while the original was playing.
+- Multi-version titles (rare here): Version menu beside Play on movie pages; Play Version in an episode's context menu.
+- Plex has no transcode profile for platform "macOS": transcode URLs carry `X-Plex-Client-Profile-Name=Generic` plus Mezzanine's target (HLS/MPEG-TS, H.264/HEVC, AAC/AC-3/E-AC-3), and a decision request precedes `start.m3u8`. Closing (or quitting) stops the session.

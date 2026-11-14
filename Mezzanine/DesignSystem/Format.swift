@@ -49,6 +49,16 @@ enum Format {
     }
 
     /// The ruled caption under the hero title: what it is, then every part of the file.
+    /// One file of a multi-version title: "4K · HEVC · E-AC-3 5.1 · 42 Mb/s".
+    static func versionLabel(_ media: PlexMedia) -> String {
+        var parts: [String] = []
+        if let r = media.videoResolution { parts.append(resolutionLabel(r)) }
+        if let v = media.videoCodec { parts.append(codecLabel(v)) }
+        if let a = media.audioCodec { parts.append([codecLabel(a), media.audioChannels.map(channelLabel)].compactMap { $0 }.joined(separator: " ")) }
+        if let kbps = media.bitrate, kbps > 0 { parts.append(String(format: "%.0f Mb/s", Double(kbps) / 1000)) }
+        return parts.isEmpty ? "Version \(media.id)" : parts.joined(separator: " · ")
+    }
+
     static func heroCaption(_ item: PlexMetadata) -> String {
         var parts: [String] = []
         switch item.kind {

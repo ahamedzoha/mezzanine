@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-11-15 (night) — player keys, previews, fallback
+
+- Rebindable player keys (28) with Playback menu items, Settings ▸ Shortcuts, Help ▸ Keyboard
+  Shortcuts (⌘/); router ahead of the menus (typing in fields is safe). New: 1-min jumps,
+  chapters, frame step, speed keys, previous episode, mute, A/C track cycling, G/H subtitle
+  timing, 0–9 jumps, playback info (I), ⌘⇧S snapshot to Pictures ▸ Mezzanine.
+- Scrub hover previews anywhere in the film (second reader), chapter names and ticks.
+- Full screen: no title-bar band over the picture.
+- Delivery: direct play → Plex remux → Plex convert, automatically; ⋯ ▸ Quality caps for slow
+  links; Convert on the Server in the failure panel; version picker for multi-file titles.
+  Live-verified: remux copy/copy, 8 Mbps hardware convert, sessions stop on close.
+- Next: HIG leftovers (⌘] forward, semantic fonts), then M7 (Home shelves, ⌘K).
+
 ## 2026-11-15 (later) — M2 detail + M3/M6 player reviewed and fixed
 
 - Design finish review (**fix**) and HIG review (**Needs Work**) of the detail page and the Bare

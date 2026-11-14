@@ -80,7 +80,8 @@ struct PlayerStats: View {
         case "software": path = "software renderer"
         default: path = d.route
         }
-        return "Direct play · \(path)\(player.isBuffering ? " · buffering" : "")"
+        let delivery = playback.mode == .direct ? "Direct play" : playback.mode.label
+        return "\(delivery) · \(path)\(player.isBuffering ? " · buffering" : "")"
     }
 
     private var video: String {
