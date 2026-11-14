@@ -12,6 +12,8 @@ struct DetailHero: View {
     /// Plays one file of a multi-version title (shown only when there's a choice).
     var playVersion: ((Int) -> Void)? = nil
     var chooseArtwork: ((ArtworkKind) -> Void)? = nil
+    /// The season on screen, for the Download menu's "All of Season N".
+    var season: PlexMetadata? = nil
 
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
@@ -70,6 +72,7 @@ struct DetailHero: View {
                 .buttonStyle(SecondaryButtonStyle())
                 .focusEffectDisabled(false)
                 .help(watchedHelp)
+                DownloadButton(item: item, season: season)
                 if let chooseArtwork {
                     Menu {
                         Button("Choose Poster…") { chooseArtwork(.poster) }
@@ -162,6 +165,7 @@ struct EpisodeRow: View {
     let onToggleWatched: () -> Void
     var onPlayVersion: ((Int) -> Void)? = nil
 
+    @Environment(DownloadStore.self) private var downloads
     @Environment(SessionStore.self) private var session
     @State private var hovering = false
     @State private var frame: CGRect = .zero
@@ -195,6 +199,7 @@ struct EpisodeRow: View {
                         Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.inkTertiary)
                             .accessibilityLabel("Watched")
                     }
+                    DownloadMark(ratingKey: episode.ratingKey)
                 }
                 Text([episode.duration.map(Format.duration), episode.originallyAvailableAt, Format.timeLeft(episode)]
                         .compactMap { $0 }.joined(separator: " · "))
@@ -229,6 +234,12 @@ struct EpisodeRow: View {
                 }
             }
             Button(episode.isWatched ? "Mark as Unwatched" : "Mark as Watched", action: onToggleWatched)
+            Divider()
+            if let record = downloads.record(episode.ratingKey) {
+                Button(record.isDone ? "Remove Download" : "Cancel Download", role: .destructive) { downloads.remove(record.id) }
+            } else {
+                Button("Download Episode") { downloads.download(episode) }
+            }
         }
     }
 }

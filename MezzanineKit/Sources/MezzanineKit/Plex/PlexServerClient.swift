@@ -160,6 +160,21 @@ public actor PlexServerClient {
 
     /// One page of a section with each item's own JSON kept, so the index can
     /// store it and decode the full model later without the network.
+    /// One title with markers and chapters, plus its own JSON (kept with a download so the title
+    /// shows and plays offline).
+    public func metadataWithJSON(_ ratingKey: String) async throws -> (PlexMetadata, Data) {
+        let request = makeRequest("GET", "/library/metadata/\(ratingKey)", query: [
+            URLQueryItem(name: "includeMarkers", value: "1"),
+            URLQueryItem(name: "includeChapters", value: "1"),
+        ])
+        let data = try await perform(request)
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rows = (root["MediaContainer"] as? [String: Any])?["Metadata"] as? [[String: Any]],
+              let row = rows.first else { throw PlexError.decoding("no Metadata") }
+        let json = try JSONSerialization.data(withJSONObject: row)
+        return (try JSONDecoder().decode(PlexMetadata.self, from: json), json)
+    }
+
     public func rawItems(section: String, type: Int, offset: Int, limit: Int,
                          filters: [URLQueryItem] = []) async throws -> (items: [(PlexMetadata, Data)], totalSize: Int?) {
         var q = [URLQueryItem(name: "type", value: String(type)), URLQueryItem(name: "includeGuids", value: "1")]

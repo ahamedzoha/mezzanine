@@ -26,6 +26,7 @@ struct MezzanineApp: App {
     @State private var commands = AppCommandCenter()
     @State private var library = LibraryStore()
     @State private var layouts = HomeLayoutStore()
+    @State private var downloads = DownloadStore()
     @State private var sound: SoundSettings
 
     init() {
@@ -47,9 +48,14 @@ struct MezzanineApp: App {
                 .environment(commands)
                 .environment(library)
                 .environment(layouts)
+                .environment(downloads)
                 .environment(sound)
                 .task {
-                    appDelegate.beforeQuit = { [playback] in await playback.finishForQuit() }
+                    playback.downloads = downloads
+                    appDelegate.beforeQuit = { [playback, downloads] in
+                        await playback.finishForQuit()
+                        await downloads.suspendForQuit()
+                    }
                     playback.onStopped = { [library] item, time, duration in
                         library.recordStop(item, at: time, duration: duration)
                     }
@@ -61,7 +67,7 @@ struct MezzanineApp: App {
         }
         .defaultSize(width: 1440, height: 900)
         .windowResizability(.contentMinSize)
-        .commands { MezzanineCommands(center: commands, sound: sound, session: session) }
+        .commands { MezzanineCommands(center: commands, sound: sound, session: session, downloads: downloads) }
 
         Settings {
             SettingsView()
@@ -69,6 +75,7 @@ struct MezzanineApp: App {
                 .environment(session)
                 .environment(library)
                 .environment(layouts)
+                .environment(downloads)
                 .environment(sound)
         }
 
@@ -95,6 +102,7 @@ struct MezzanineApp: App {
                 .environment(commands)
                 .environment(library)
                 .environment(layouts)
+                .environment(downloads)
         }
         .defaultSize(width: 1200, height: 800)
         #endif

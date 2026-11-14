@@ -22,6 +22,10 @@ final class PlaybackCoordinator {
 
     let player: MezzaninePlayer
     private let session: SessionStore
+    /// Downloaded copies play instead of the server's file (set at launch).
+    weak var downloads: DownloadStore?
+    /// The title on screen is playing from its download (Playback info says so).
+    private(set) var playingDownload = false
     private(set) var reporter: ActivityReporter?
     /// Called after a session ends with the item and where it stopped, so the
     /// local library reflects the new resume point at once.
@@ -92,7 +96,11 @@ final class PlaybackCoordinator {
     }
 
     private func play(_ item: PlexMetadata, from origin: CGRect?, autoplayed: Bool) async {
-        guard let client = session.client else { return }
+        // Offline: a downloaded film or episode still plays, from its saved details.
+        guard let client = session.client else {
+            await playOffline(item, from: origin)
+            return
+        }
         if self.item == nil { sessionStart = Date(); episodesThisSession = 0 }
         lastRequest = item
         autoplayedInARow = autoplayed ? autoplayedInARow + 1 : 0
@@ -156,10 +164,21 @@ final class PlaybackCoordinator {
                                     format: stream.codec, isForced: stream.forced, isHearingImpaired: stream.hearingImpaired)
         }
         let previousSession = transcodeSession
-        let url: URL?
+        var url: URL?
+        var headers = client.requestHeaders
+        var subtitleFiles = sidecars
         switch mode {
         case .direct:
-            url = media.parts.first?.key.flatMap { client.urls.part(key: $0) }
+            if let local = downloads?.localFile(for: detail.ratingKey), let record = downloads?.record(detail.ratingKey) {
+                // Downloaded: the server does nothing at all.
+                url = local
+                headers = [:]
+                subtitleFiles = Self.localSubtitles(record, downloads: downloads)
+                playingDownload = true
+            } else {
+                url = media.parts.first?.key.flatMap { client.urls.part(key: $0) }
+                playingDownload = false
+            }
             transcodeSession = nil
         case .remux, .convert:
             let options = mode.transcodeOptions(mediaIndex: mediaIndex,
@@ -179,10 +198,10 @@ final class PlaybackCoordinator {
             Task { await client.stopTranscode(session: previousSession) }
         }
         do {
-            try await player.load(PlaybackRequest(url: url, headers: client.requestHeaders, startPosition: start,
+            try await player.load(PlaybackRequest(url: url, headers: headers, startPosition: start,
                                                   preferredAudioLanguages: audio.map { [$0] } ?? [],
                                                   preferredSubtitleLanguages: subtitle.map { [$0] } ?? [],
-                                                  externalSubtitles: sidecars))
+                                                  externalSubtitles: subtitleFiles))
         } catch {
             #if DEBUG
             print("LOADFAIL mode=\(mode) url=\(PlexURLs.redacted(url)) error=\(error)")
@@ -190,6 +209,46 @@ final class PlaybackCoordinator {
             throw error
         }
         self.mode = mode
+    }
+
+    /// A downloaded title with no server: its saved details, the local file, no activity
+    /// reports (Plex can't hear them).
+    private func playOffline(_ item: PlexMetadata, from origin: CGRect?) async {
+        guard let downloads, let record = downloads.record(item.ratingKey), let file = downloads.localFile(for: item.ratingKey),
+              let detail = record.decoded() else {
+            error = "Not connected to the server, and this title isn’t downloaded."
+            return
+        }
+        lastRequest = item
+        error = nil
+        self.origin = origin
+        withAnimation(Theme.Motion.object) { self.item = detail }
+        let streams = detail.media.first?.parts.first?.streams ?? []
+        do {
+            try await player.load(PlaybackRequest(
+                url: file, headers: [:], startPosition: detail.viewOffset.map { Double($0) / 1000 },
+                preferredAudioLanguages: streams.first { $0.streamType == .audio && $0.selected == true }?.languageCode.map { [$0] } ?? [],
+                preferredSubtitleLanguages: streams.first { $0.streamType == .subtitle && $0.selected == true }?.languageCode.map { [$0] } ?? [],
+                externalSubtitles: Self.localSubtitles(record, downloads: downloads)))
+            mode = .direct
+            playingDownload = true
+            reporter = nil
+            nextEpisode = nil
+            previousEpisode = nil
+            publishNowPlaying(detail)
+        } catch is CancellationError {
+        } catch {
+            self.error = "This download couldn’t be played."
+        }
+    }
+
+    /// A download's subtitle files, for the engine.
+    private static func localSubtitles(_ record: DownloadRecord, downloads: DownloadStore?) -> [ExternalSubtitle] {
+        record.subtitles.compactMap { sub in
+            guard let url = downloads?.url(sub.file), FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return ExternalSubtitle(url: url, name: sub.name, language: sub.language, format: sub.codec,
+                                    isForced: sub.forced, isHearingImpaired: sub.hearingImpaired)
+        }
     }
 
     /// Switches delivery for the playing title (Quality in the ⋯ panel, or the failure

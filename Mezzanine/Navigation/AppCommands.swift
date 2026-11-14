@@ -156,6 +156,15 @@ struct MezzanineCommands: Commands {
     let center: AppCommandCenter
     let sound: SoundSettings
     let session: SessionStore
+    let downloads: DownloadStore
+
+    private var downloadTitle: String {
+        switch center.currentDetailItem?.kind {
+        case .show: "Download Next 3 Episodes"
+        case .season: "Download Season"
+        default: "Download"
+        }
+    }
     @Environment(\.openWindow) private var openWindow
 
     private var shortcuts: PlayerShortcuts { .shared }
@@ -193,6 +202,15 @@ struct MezzanineCommands: Commands {
                 .disabled(!center.isShelvesPageVisible || center.isBlocked)
             Button("Add Collection…") { center.shelf(.addCollection) }
                 .disabled(!center.isShelvesPageVisible || center.isBlocked)
+            Divider()
+            Button(downloadTitle) {
+                guard let item = center.currentDetailItem else { return }
+                if item.kind == .movie { downloads.download(item) } else if item.kind == .show { downloads.downloadNext(3, of: item) }
+                else if item.kind == .season { downloads.downloadSeason(item) }
+            }
+            .keyboardShortcut("d", modifiers: [.command, .option])
+            .disabled(center.currentDetailItem == nil || center.isBlocked
+                      || (center.currentDetailItem?.kind == .movie && downloads.record(center.currentDetailItem!.ratingKey) != nil))
         }
         CommandGroup(after: .toolbar) {
             Button(center.isEditingShelves ? "Done Editing Shelves" : "Edit Shelves") { center.toggleEditShelves() }
@@ -267,6 +285,9 @@ struct MezzanineCommands: Commands {
             Button("Home") { center.go(to: .home) }
                 .keyboardShortcut("1", modifiers: .command)
                 .disabled(!center.isSignedIn || center.isPlayerOpen)
+            Button("Downloads") { center.go(to: .downloads) }
+                .keyboardShortcut("l", modifiers: [.command, .option])
+                .disabled(center.isPlayerOpen)
             ForEach(Array(center.sections.prefix(8).enumerated()), id: \.element.key) { index, section in
                 Button(section.title) { center.go(to: .library(section.key)) }
                     .keyboardShortcut(KeyEquivalent(Character(String(index + 2))), modifiers: .command)

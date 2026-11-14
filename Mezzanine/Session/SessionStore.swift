@@ -76,6 +76,10 @@ final class SessionStore {
         }
         #endif
         guard let active = activeToken else { phase = .signedOut; return }
+        #if DEBUG
+        // -ForceOffline YES: behave as if Plex can't be reached (offline downloads tests).
+        if UserDefaults.standard.bool(forKey: "ForceOffline") { phase = .failed(PlexError.noReachableConnection.userMessage); return }
+        #endif
         await connect(token: active)
     }
 

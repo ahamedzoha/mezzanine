@@ -1,0 +1,63 @@
+{
+  "title": "M11 · Downloads",
+  "question": "The Downloads page for offline viewing. All three share the same rest: a Download button on title pages (this episode, the season, next 3 unwatched, or keep N unwatched downloaded), Original or a smaller converted copy, files in Movies ▸ Mezzanine, and an offline Home that shows only what's downloaded. This picks how the page itself works. Lock one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "by-title",
+      "kind": "assigned",
+      "label": "By Title",
+      "kicker": "THE ROLL",
+      "lineage": "Music's album/track split, applied to shows and films",
+      "thesis": "A list of downloaded titles on the left; the selected title on the right with its episodes, sizes and its keep rule.",
+      "palette": ["#0E0F11", "#1A1C20", "#F2F2F0", "#A08CFF"],
+      "materials": ["title list with posters and size", "detail pane: episodes, progress, keep rule", "storage line in the header"],
+      "viewport": "Left (300 pt): every downloaded title, poster thumb, name, \"6 episodes · 4.2 GB\", a thin progress line while downloading. Right: the selected title's backdrop strip, its episodes as rows (play, size, quality, status, remove), and the rule \"Keep the next 3 unwatched episodes\" as a pop-up. Header: \"38 GB on this Mac · 112 GB free\".",
+      "risk": "Two panes for what may be a handful of files; a one-film download still opens a detail pane.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "sidebar", "x": 0, "y": 0, "w": 2, "h": 10},
+        {"label": "toolbar · 38 GB used", "x": 2, "y": 0, "w": 10, "h": 1},
+        {"label": "downloaded titles list", "x": 2, "y": 1, "w": 3, "h": 9, "accent": true},
+        {"label": "selected title: backdrop strip", "x": 5, "y": 1, "w": 7, "h": 2},
+        {"label": "episodes · size · status · remove", "x": 5, "y": 3, "w": 7, "h": 5},
+        {"label": "keep rule pop-up", "x": 5, "y": 8, "w": 7, "h": 2}
+      ]}
+    },
+    {
+      "id": "queue-and-shelf",
+      "kind": "dealt",
+      "label": "Queue and Shelf",
+      "lineage": "Safari's Downloads list over a library grid",
+      "thesis": "What's downloading sits on top as rows you can pause; everything ready waits below as posters you play.",
+      "palette": ["#0E0F11", "#1A1C20", "#F2F2F0", "#A08CFF"],
+      "materials": ["queue rows with progress and pause", "poster grid of ready titles", "storage line"],
+      "viewport": "Header: \"Downloads\" and \"38 GB on this Mac · 112 GB free\". Downloading: one 56 pt row per file (thumb, title, \"S2 E4 · 1.1 of 2.3 GB · 3 min left\", pause, cancel). Below, On This Mac: the posters grid (same cards as libraries, with a size line), shows grouped as one poster with \"6 episodes\". Selecting a show poster opens its page with the downloaded episodes marked.",
+      "risk": "The queue empties most of the time, so the page is usually just a grid; keep rules live on title pages, not here.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "sidebar", "x": 0, "y": 0, "w": 2, "h": 10},
+        {"label": "toolbar", "x": 2, "y": 0, "w": 10, "h": 1},
+        {"label": "Downloading: rows with progress", "x": 2, "y": 1, "w": 10, "h": 3, "accent": true},
+        {"label": "On This Mac: poster grid", "x": 2, "y": 4, "w": 10, "h": 6}
+      ]}
+    },
+    {
+      "id": "storage-first",
+      "kind": "dealt",
+      "label": "Storage First",
+      "lineage": "System Settings ▸ Storage, with the films as the bars",
+      "thesis": "The page is about space: a large meter of what Mezzanine holds, then every title as a bar sized by its gigabytes, watched ones flagged to clear.",
+      "palette": ["#0E0F11", "#1A1C20", "#F2F2F0", "#A08CFF"],
+      "materials": ["storage meter", "rows with size bars", "watched badge and Clear Watched"],
+      "viewport": "Top: a full-width meter (Mezzanine's downloads, other, free) with \"38 GB of 512 GB\". Below: one row per title, sorted by size, each with its poster thumb, name, episodes and a proportional bar; watched titles carry \"Watched\" and a Clear Watched button removes them all. In-flight downloads show as growing bars.",
+      "risk": "Treats downloads as a cleanup chore; less inviting as a place to start watching offline.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "sidebar", "x": 0, "y": 0, "w": 2, "h": 10},
+        {"label": "toolbar", "x": 2, "y": 0, "w": 10, "h": 1},
+        {"label": "storage meter", "x": 2, "y": 1, "w": 10, "h": 2, "accent": true},
+        {"label": "titles by size · bars · Clear Watched", "x": 2, "y": 3, "w": 10, "h": 7}
+      ]}
+    }
+  ],
+  "reroll": true,
+  "buildPath": {"value": "code", "toggle": false},
+  "steer": true
+}

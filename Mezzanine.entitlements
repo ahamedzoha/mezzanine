@@ -13,5 +13,8 @@
 	<!-- Playback ▸ Take Snapshot saves into Pictures ▸ Mezzanine. -->
 	<key>com.apple.security.assets.pictures.read-write</key>
 	<true/>
+	<!-- Downloads for offline viewing live in Movies ▸ Mezzanine. -->
+	<key>com.apple.security.assets.movies.read-write</key>
+	<true/>
 </dict>
 </plist>

@@ -4,6 +4,7 @@ import MezzanineKit
 enum SidebarItem: Hashable {
     case home
     case library(String)
+    case downloads
 }
 
 /// The window: sidebar (system glass), the room, and the player stage above both.
@@ -19,6 +20,7 @@ struct AppShell: View {
     @Environment(AppCommandCenter.self) private var commands
     @Environment(LibraryStore.self) private var library
     @Environment(HomeLayoutStore.self) private var layouts
+    @Environment(DownloadStore.self) private var downloads
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
     @FocusState private var sidebarFocused: Bool
@@ -68,6 +70,7 @@ struct AppShell: View {
         }
         // Sections and the local library follow the connection, onboarding included.
         .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(session.account?.uuid ?? "")") { await loadSections() }
+        .onChange(of: isOffline, initial: true) { _, offline in if offline { commands.selection = .downloads } }
         .onChange(of: playback.isPresented, initial: true) { _, presented in
             commands.isPlayerOpen = presented
             if !presented { contentFocused = true }
@@ -77,23 +80,47 @@ struct AppShell: View {
     /// The film, or onboarding, owns the whole window.
     private var chromeHidden: Bool { playback.isPresented || !showsLibrary }
 
-    /// Onboarding until it's done; then the library, kept through reconnects.
+    /// Onboarding until it's done; then the library, kept through reconnects (and the
+    /// Downloads page alone when Plex can't be reached).
     private var showsLibrary: Bool {
-        onboardingComplete && (session.phase == .ready || (session.client != nil && session.phase == .connecting))
+        onboardingComplete && (session.phase == .ready || (session.client != nil && session.phase == .connecting) || isOffline)
+    }
+
+    /// Signed in before, Plex unreachable now, and something downloaded to watch.
+    private var isOffline: Bool {
+        guard onboardingComplete, session.client == nil, !downloads.records.isEmpty else { return false }
+        if case .failed = session.phase { return true }
+        return false
     }
 
     private var split: some View {
         @Bindable var commands = commands
         return NavigationSplitView {
             List(selection: $commands.selection) {
-                Label("Home", systemImage: "house").tag(SidebarItem.home)
-                Section("Libraries") {
-                    ForEach(commands.sections) { section in
-                        Label(section.title, systemImage: icon(for: section)).tag(SidebarItem.library(section.key))
+                if isOffline {
+                    // Offline: only what's on this Mac.
+                    Label("Downloads", systemImage: "arrow.down.circle").tag(SidebarItem.downloads)
+                    Section {
+                        Text("Plex can’t be reached. Downloads still play.")
+                            .font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Try Again") { Task { await session.restore() } }
+                    } header: {
+                        Text("Offline")
                     }
-                    if let sectionsError {
-                        Button("Libraries didn’t load. Try Again") { Task { await loadSections() } }
-                            .help(sectionsError)
+                } else {
+                    Label("Home", systemImage: "house").tag(SidebarItem.home)
+                    Section("Libraries") {
+                        ForEach(commands.sections) { section in
+                            Label(section.title, systemImage: icon(for: section)).tag(SidebarItem.library(section.key))
+                        }
+                        if let sectionsError {
+                            Button("Libraries didn’t load. Try Again") { Task { await loadSections() } }
+                                .help(sectionsError)
+                        }
+                    }
+                    Section("On This Mac") {
+                        Label("Downloads", systemImage: "arrow.down.circle").tag(SidebarItem.downloads)
                     }
                 }
             }
@@ -170,6 +197,8 @@ struct AppShell: View {
             SearchView(query: commands.query, contentFocus: $contentFocused)
         } else {
             switch commands.selection {
+            case .downloads:
+                DownloadsView(contentFocus: $contentFocused)
             case .library(let key):
                 if let section = commands.sections.first(where: { $0.key == key }) {
                     LibraryView(section: section, contentFocus: $contentFocused).id(key)
@@ -192,6 +221,16 @@ struct AppShell: View {
                                 userID: session.account?.uuid ?? "owner", sections: commands.sections)
                 layouts.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
                 commands.layoutsReady = true
+                downloads.use(client: client, images: session.images, serverID: server.clientIdentifier,
+                              userID: session.account?.uuid ?? "owner")
+                downloads.applyKeepRules()
+                #if DEBUG
+                // -DownloadKey <ratingKey> queues a download; -OpenDownloads YES opens the page (tests).
+                if let key = UserDefaults.standard.string(forKey: "DownloadKey"), let meta = try? await client.metadata(key) {
+                    downloads.download(meta)
+                }
+                if UserDefaults.standard.bool(forKey: "OpenDownloads") { commands.selection = .downloads }
+                #endif
                 if session.homeUsers.isEmpty { await session.loadHomeUsers() }
             }
             #if DEBUG
