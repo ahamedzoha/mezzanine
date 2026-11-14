@@ -149,18 +149,8 @@ struct HeroView: View {
 
 // MARK: - Buttons
 
-/// Keyboard focus on a capsule button: a 2 pt ink outline just outside it
-/// (Full Keyboard Access / Tab). Posters use lift and the room light instead.
-private struct CapsuleFocusOutline: ViewModifier {
-    @Environment(\.isFocused) private var isFocused
-    func body(content: Content) -> some View {
-        content.overlay {
-            Capsule().strokeBorder(Theme.ink, lineWidth: 2).padding(-4).opacity(isFocused ? 1 : 0)
-        }
-    }
-}
-
 /// Lilac capsule: the one primary action on a screen. The whole capsule is the target.
+/// Keyboard focus (Tab / Full Keyboard Access) uses the system focus ring.
 struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
@@ -175,7 +165,6 @@ struct PrimaryButtonStyle: ButtonStyle {
             .opacity(isEnabled ? 1 : 0.5)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(Theme.Motion.quick, value: configuration.isPressed)
-            .modifier(CapsuleFocusOutline())
     }
 }
 
@@ -195,6 +184,5 @@ struct SecondaryButtonStyle: ButtonStyle {
             .contentShape(Capsule())
             .onHover { hovering = $0 }
             .animation(Theme.Motion.quick, value: hovering)
-            .modifier(CapsuleFocusOutline())
     }
 }

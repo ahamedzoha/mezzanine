@@ -155,10 +155,18 @@ struct SignInView: View {
                             Text("Connecting to your server…")
                         }
                     case .failed(let message):
-                        Text(message)
-                        Button("Try Again") { Task { await session.restore() } }
-                            .buttonStyle(PrimaryButtonStyle())
-                            .keyboardShortcut(.defaultAction)
+                        Text(message).frame(maxWidth: 520, alignment: .leading)
+                        HStack(spacing: Theme.Space.m) {
+                            Button("Try Again") { Task { await session.restore() } }
+                                .buttonStyle(PrimaryButtonStyle())
+                                .keyboardShortcut(.defaultAction)
+                            if session.isLocalNetworkDenied {
+                                Button("Open Local Network Settings") {
+                                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")!)
+                                }
+                                .buttonStyle(SecondaryButtonStyle())
+                            }
+                        }
                     case .ready:
                         EmptyView()
                     }

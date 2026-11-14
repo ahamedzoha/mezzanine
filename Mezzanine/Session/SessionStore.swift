@@ -137,7 +137,7 @@ final class SessionStore {
         let racer = ConnectionRacer()
         guard let won = await racer.race(server.candidates,
                                          probe: ConnectionRacer.identityProbe(expectedMachineIdentifier: server.clientIdentifier)) else {
-            throw PlexError.noReachableConnection
+            throw await diagnoseUnreachable(server)
         }
         currentServer = server
         connection = won
@@ -146,6 +146,29 @@ final class SessionStore {
         UserDefaults.standard.set(server.clientIdentifier, forKey: Self.serverDefaultsKey)
         await images.setToken(server.accessToken ?? token, host: won.baseURL.host(), serverID: server.clientIdentifier)
         phase = .ready
+    }
+
+    /// Every address failed. macOS reports a Local Network denial as "offline"
+    /// (-1009) while the Mac is online; ask one LAN address directly to tell the
+    /// two apart, because the fix (System Settings) is entirely different.
+    private func diagnoseUnreachable(_ server: PlexServerResource) async -> PlexError {
+        guard NetworkPath.shared.isSatisfied,
+              let lan = server.candidates.first(where: { $0.local })?.url?.appending(path: "identity") else {
+            return .noReachableConnection
+        }
+        do {
+            _ = try await Transport.makeProbeSession().data(from: lan)
+            return .noReachableConnection
+        } catch {
+            let ns = error as NSError
+            return ns.domain == NSURLErrorDomain && ns.code == NSURLErrorNotConnectedToInternet
+                ? .localNetworkDenied : .noReachableConnection
+        }
+    }
+
+    var isLocalNetworkDenied: Bool {
+        if case .failed(let message) = phase { return message == PlexError.localNetworkDenied.userMessage }
+        return false
     }
 
     /// Wi-Fi switch, VPN up or down: the best address may have changed.
