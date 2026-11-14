@@ -18,6 +18,7 @@ struct AppShell: View {
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(AppCommandCenter.self) private var commands
     @Environment(LibraryStore.self) private var library
+    @Environment(HomeLayoutStore.self) private var layouts
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
     @FocusState private var sidebarFocused: Bool
@@ -110,6 +111,12 @@ struct AppShell: View {
             .background {
                 RoomLight(palette: playback.roomPalette, intensity: playback.isPresented ? 0 : 1)
             }
+            .overlay(alignment: .topLeading) {
+                if commands.isQuickOpenShown && !playback.isPresented {
+                    QuickOpen().transition(.opacity)
+                }
+            }
+            .animation(Theme.Motion.quick, value: commands.isQuickOpenShown)
         }
         .searchable(text: $commands.query, placement: .toolbar, prompt: "Titles, people, collections")
         .searchFocused($searchFocused)
@@ -170,12 +177,17 @@ struct AppShell: View {
             if let server = session.currentServer {
                 library.connect(client: client, serverID: server.clientIdentifier,
                                 userID: session.account?.uuid ?? "owner", sections: commands.sections)
+                layouts.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
             }
             #if DEBUG
             // -MezzanineSection "TV Shows" opens a library at launch (screenshots, manual tests).
             if let title = UserDefaults.standard.string(forKey: "MezzanineSection"),
                let match = commands.sections.first(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame }) {
                 commands.selection = .library(match.key)
+            }
+            // -QuickOpenQuery "after" (or "_" for empty) opens ⌘K at launch.
+            if UserDefaults.standard.string(forKey: "QuickOpenQuery") != nil {
+                Task { try? await Task.sleep(for: .seconds(3)); commands.isQuickOpenShown = true }
             }
             // -MezzanineOpen <ratingKey> opens a title's page at launch.
             if let key = UserDefaults.standard.string(forKey: "MezzanineOpen") {

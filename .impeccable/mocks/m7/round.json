@@ -1,0 +1,71 @@
+{
+  "title": "M7 · How you build Home",
+  "question": "Three ways to shape your own shelves, write smart rules and quick-open with ⌘K. All keep Bias Light; this picks the working model. Lock one, steer it, or re-roll.",
+  "options": [
+    {
+      "id": "say-it",
+      "kind": "assigned",
+      "label": "Say It",
+      "kicker": "THE ROLL",
+      "lineage": "Spotlight and Raycast, with Mail's smart-mailbox rules underneath",
+      "thesis": "⌘K is where shelves are born: type what you want, it becomes rule chips, ⌘S pins it to Home.",
+      "palette": ["#0E0F11", "#1A1C20", "#F2F2F0", "#A08CFF"],
+      "materials": ["solid graphite palette under the toolbar", "rule chips", "live poster strip"],
+      "viewport": "⌘K drops a solid panel from under the toolbar, left-aligned on the 40 pt gutter: a field, then sections (Titles, People, Collections, Go to, Commands). Typing \"unwatched comedy 90s\" turns words into lilac-outlined chips (Unwatched · Genre Comedy · 1990s) with a live poster strip and count beneath; Return opens the results as a grid, ⌘S saves them as a Home shelf. Home itself gains Edit Home (⌘E): shelves fold to 72 pt strips with a grip, a hide switch and the rule summary; drag or ⌥↑/⌥↓ to reorder.",
+      "risk": "Typed rules need a forgiving parser; anything it can't read must fall back to an explicit chip picker so the wife isn't stuck.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "sidebar", "x": 0, "y": 0, "w": 2, "h": 10},
+        {"label": "toolbar", "x": 2, "y": 0, "w": 10, "h": 1},
+        {"label": "⌘K field + rule chips", "x": 2, "y": 1, "w": 6, "h": 1, "accent": true},
+        {"label": "live poster strip · 38 titles", "x": 2, "y": 2, "w": 6, "h": 2},
+        {"label": "Titles · People · Go to · Commands", "x": 2, "y": 4, "w": 6, "h": 3},
+        {"label": "Home (dimmed, room light follows top result)", "x": 8, "y": 1, "w": 4, "h": 9},
+        {"label": "Home shelves behind", "x": 2, "y": 7, "w": 6, "h": 3}
+      ]},
+      "comp": ".impeccable/mocks/m7/say-it.webp"
+    },
+    {
+      "id": "edit-in-place",
+      "kind": "dealt",
+      "label": "Edit in Place",
+      "lineage": "macOS Edit Toolbar and Control Centre customisation",
+      "thesis": "Home rearranges itself: ⌘E folds every shelf to a strip you drag, hide or open; smart shelves get a rule sheet with a live preview.",
+      "palette": ["#0E0F11", "#1A1C20", "#F2F2F0", "#A08CFF"],
+      "materials": ["folded shelf strips", "native pop-up rule rows", "sheet with live preview"],
+      "viewport": "Edit Home (⌘E, or the toolbar's Edit button) folds the hero away and shows shelves as 72 pt strips: grip, title, source (Plex hub, Collection, Smart), a poster peek, hide switch, ⋯. Add Shelf at the end opens a menu: Plex rows, a Collection…, a Playlist…, New Smart Shelf…. The smart shelf sheet is native rule rows (Genre · is · Comedy) with + / −, Sort, Limit, and a live poster row with the count at the bottom. ⌘K is a plain list palette for titles, people, places and commands.",
+      "risk": "The most expected of the three; the craft has to be in the folding motion and the live preview or it reads as a settings form.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "sidebar", "x": 0, "y": 0, "w": 2, "h": 10},
+        {"label": "toolbar · Done", "x": 2, "y": 0, "w": 10, "h": 1},
+        {"label": "≡ Continue Watching · Plex", "x": 2, "y": 1, "w": 10, "h": 1, "accent": true},
+        {"label": "≡ Recently Added Movies · Plex", "x": 2, "y": 2, "w": 10, "h": 1},
+        {"label": "≡ 90s Comedies · Smart", "x": 2, "y": 3, "w": 10, "h": 1},
+        {"label": "≡ Marvel · Collection (hidden)", "x": 2, "y": 4, "w": 10, "h": 1},
+        {"label": "+ Add Shelf", "x": 2, "y": 5, "w": 3, "h": 1},
+        {"label": "rule sheet: rows + live preview", "x": 5, "y": 5, "w": 6, "h": 5}
+      ]},
+      "comp": ".impeccable/mocks/m7/edit-in-place.webp"
+    },
+    {
+      "id": "composer",
+      "kind": "dealt",
+      "label": "Shelf Composer",
+      "lineage": "Mail's Smart Mailbox editor grown into a two-pane workbench",
+      "thesis": "Home stays pure watching; a Composer window (⌥⌘H) holds the shelf list on the left and the selected shelf's rules and live grid on the right.",
+      "palette": ["#0E0F11", "#1A1C20", "#F2F2F0", "#A08CFF"],
+      "materials": ["two-pane window", "source list with checkboxes", "rule editor over a live grid"],
+      "viewport": "A separate window: left, a source list of shelves per Home (Home, Movies, TV Shows, Courses), each with a checkbox and drag order; right, the selected shelf: name, source, rule rows, sort and limit on top, the live poster grid it produces below. Changes appear on Home behind it as you type. ⌘K is a plain list palette.",
+      "risk": "A second window is one more place to learn; quick tweaks (hide this shelf) also need a right-click on Home itself.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "window toolbar", "x": 0, "y": 0, "w": 12, "h": 1},
+        {"label": "Home · Movies · TV · Courses shelf list", "x": 0, "y": 1, "w": 3, "h": 9, "accent": true},
+        {"label": "name · source · rules · sort · limit", "x": 3, "y": 1, "w": 9, "h": 3},
+        {"label": "live poster grid · 38 titles", "x": 3, "y": 4, "w": 9, "h": 6}
+      ]},
+      "comp": ".impeccable/mocks/m7/composer.webp"
+    }
+  ],
+  "reroll": true,
+  "buildPath": {"value": "code", "toggle": false},
+  "steer": true
+}

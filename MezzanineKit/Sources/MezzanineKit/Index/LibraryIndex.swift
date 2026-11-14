@@ -30,7 +30,9 @@ public struct IndexedItem: Codable, Sendable, Hashable, FetchableRecord, Persist
     public var audioChannels: Int?
     /// "|Drama|Crime|" — pipe-wrapped so `LIKE '%|Drama|%'` matches whole names.
     public var genres: String
+    /// "|Tom Hanks|Nora Ephron|" (directors, writers, first 15 cast), pipe-wrapped like genres.
     public var people: String
+    /// "|IMDb Top 250|Action Movies|", pipe-wrapped like genres.
     public var collections: String
     public var summary: String
     public var parentRatingKey: String?
@@ -186,6 +188,11 @@ public final class LibraryIndex: Sendable {
                 t.column("lastFullSyncAt", .double).notNull()
                 t.column("itemCount", .integer).notNull()
             }
+        }
+        // v2: people and collections became pipe-wrapped for exact smart-shelf matches; the
+        // next sync of each section runs in full to rewrite them.
+        m.registerMigration("v2") { db in
+            try db.execute(sql: "UPDATE sectionSync SET lastFullSyncAt = 0")
         }
         return m
     }
@@ -353,8 +360,8 @@ extension IndexedItem {
         isHDR = video?.isHDR == true || video?.isDolbyVision == true
         audioChannels = media?.audioChannels
         genres = m.genres.isEmpty ? "" : "|" + m.genres.map(\.tag).joined(separator: "|") + "|"
-        people = (m.directors + m.writers).map(\.tag).joined(separator: " ") + " " + m.roles.prefix(15).map(\.tag).joined(separator: " ")
-        collections = m.collections.map(\.tag).joined(separator: " ")
+        people = Self.wrapped((m.directors + m.writers).map(\.tag) + m.roles.prefix(15).map(\.tag))
+        collections = Self.wrapped(m.collections.map(\.tag))
         summary = m.summary ?? ""
         parentRatingKey = m.parentRatingKey
         grandparentRatingKey = m.grandparentRatingKey
@@ -362,6 +369,11 @@ extension IndexedItem {
         parentIndex = m.parentIndex
         cleanPosterPath = nil
         self.json = json
+    }
+
+    /// "|A|B|", or "" for none: whole-name matching with `LIKE '%|A|%'`.
+    static func wrapped(_ names: [String]) -> String {
+        names.isEmpty ? "" : "|" + names.joined(separator: "|") + "|"
     }
 
     /// "The Uprising" sorts under U, like Plex.

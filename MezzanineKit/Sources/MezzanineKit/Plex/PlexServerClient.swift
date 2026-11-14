@@ -105,6 +105,18 @@ public actor PlexServerClient {
         return c.metadata
     }
 
+    /// A collection's titles, in the collection's own order.
+    public func collectionItems(_ ratingKey: String) async throws -> [PlexMetadata] {
+        let c: MetadataContainer = try await get("/library/collections/\(ratingKey)/children")
+        return c.metadata
+    }
+
+    /// A playlist's entries, in order.
+    public func playlistItems(_ ratingKey: String) async throws -> [PlexMetadata] {
+        let c: MetadataContainer = try await get("/playlists/\(ratingKey)/items")
+        return c.metadata
+    }
+
     public func playlists() async throws -> [PlexMetadata] {
         let c: MetadataContainer = try await get("/playlists", query: [URLQueryItem(name: "playlistType", value: "video")])
         return c.metadata

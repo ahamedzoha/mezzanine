@@ -12,6 +12,8 @@ struct ShelfView: View {
     let onFocus: (Int) -> Void
     let onPlay: (PlexMetadata, CGRect) -> Void
     var onOpen: ((PlexMetadata) -> Void)? = nil
+    /// Edit Home's fold: the first posters morph into the shelf strip's peek.
+    var fold: Namespace.ID? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppCommandCenter.self) private var commands
@@ -31,7 +33,8 @@ struct ShelfView: View {
                         ForEach(Array(shelf.items.enumerated()), id: \.element.ratingKey) { column, item in
                             PosterCard(item: item, width: Self.posterWidth, isFocused: focusedColumn == column,
                                        onFocus: { onFocus(column) }, onPlay: { frame in onPlay(item, frame) },
-                                       onOpen: { (onOpen ?? commands.open)(item) })
+                                       onOpen: { (onOpen ?? commands.open)(item) },
+                                       fold: column < 5 ? fold.map { FoldID(id: "\(shelf.id)-\(column)", namespace: $0) } : nil)
                                 .id(column)
                         }
                     }
@@ -63,6 +66,7 @@ struct PosterCard: View {
     let onFocus: () -> Void
     let onPlay: (CGRect) -> Void
     let onOpen: () -> Void
+    var fold: FoldID? = nil
 
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
@@ -98,6 +102,7 @@ struct PosterCard: View {
         let pixelWidth = Int(width * 2)
         return RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: pixelWidth), pixelWidth: pixelWidth)
             .frame(width: width, height: width * 1.5)
+            .modifier(FoldMatch(fold: fold))
             .overlay(alignment: .bottom) { progress }
             .overlay(alignment: .bottomTrailing) {
                 if lifted { PlayDisc { onPlay(frame) }.padding(10).transition(.opacity) }
@@ -122,6 +127,19 @@ struct PosterCard: View {
             .padding(.horizontal, 10)
             .padding(.bottom, lifted ? 54 : 10)
         }
+    }
+}
+
+/// Ties a poster to its peek in Edit Home's strip, so the shelf folds into the strip and back.
+struct FoldID {
+    let id: String
+    let namespace: Namespace.ID
+}
+
+struct FoldMatch: ViewModifier {
+    let fold: FoldID?
+    func body(content: Content) -> some View {
+        if let fold { content.matchedGeometryEffect(id: fold.id, in: fold.namespace) } else { content }
     }
 }
 

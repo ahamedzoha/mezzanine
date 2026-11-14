@@ -3,7 +3,7 @@ import MezzanineKit
 
 /// How a library page lays its titles out. Remembered per library.
 enum LibraryLayout: String, CaseIterable, Identifiable {
-    case posters, wide, list, folders
+    case posters, wide, list, folders, shelves
     var id: String { rawValue }
     var label: String {
         switch self {
@@ -11,6 +11,7 @@ enum LibraryLayout: String, CaseIterable, Identifiable {
         case .wide: return "Wide"
         case .list: return "List"
         case .folders: return "Folders"
+        case .shelves: return "Shelves"
         }
     }
     var symbol: String {
@@ -19,6 +20,7 @@ enum LibraryLayout: String, CaseIterable, Identifiable {
         case .wide: return "rectangle.grid.1x2"
         case .list: return "list.bullet"
         case .folders: return "folder"
+        case .shelves: return "rectangle.stack"
         }
     }
 }
@@ -61,7 +63,7 @@ struct LibraryView: View {
     private var sort: LibraryQuery.Sort { LibraryQuery.Sort(rawValue: sortRaw) ?? .title }
     private var layout: LibraryLayout { LibraryLayout(rawValue: layoutRaw) ?? .posters }
     private var kinds: [String] { section.kind == .show ? ["show"] : ["movie"] }
-    private var layouts: [LibraryLayout] { section.isPersonalMedia ? LibraryLayout.allCases : [.posters, .wide, .list] }
+    private var layouts: [LibraryLayout] { section.isPersonalMedia ? LibraryLayout.allCases : [.posters, .wide, .list, .shelves] }
 
     private var query: LibraryQuery {
         var q = LibraryQuery(section: section.key, kinds: kinds, sort: sort)
@@ -73,6 +75,8 @@ struct LibraryView: View {
         Group {
             if layout == .folders {
                 FolderBrowser(section: section, contentFocus: contentFocus)
+            } else if layout == .shelves {
+                HomeView(contentFocus: contentFocus, scope: section.key)
             } else {
                 titles
             }
@@ -182,12 +186,12 @@ struct LibraryView: View {
             }
             .pickerStyle(.segmented)
             .labelStyle(.iconOnly)
-            .help("Layout (View ▸ Layout, ⌃⌘1–⌃⌘4)")
+            .help("Layout (View ▸ Layout, ⌃⌘1–⌃⌘5)")
             .accessibilityLabel("Layout")
         }
         ToolbarItem(id: "filter") {
             FilterMenu(filters: $filters, genres: library.genres(section: section.key, kinds: kinds))
-                .disabled(layout == .folders)
+                .disabled(layout == .folders || layout == .shelves)
         }
         ToolbarItem(id: "sort") {
             Menu {
@@ -199,7 +203,7 @@ struct LibraryView: View {
                 Label("Sort: \(sort.label)", systemImage: "arrow.up.arrow.down")
             }
             .help("Sort (View ▸ Sort By)")
-            .disabled(layout == .folders)
+            .disabled(layout == .folders || layout == .shelves)
         }
         ToolbarItem(id: "posterSize") {
             HStack(spacing: 4) {
@@ -210,7 +214,12 @@ struct LibraryView: View {
                 Image(systemName: "photo").font(.system(size: 13)).foregroundStyle(.secondary)
             }
             .help("Poster size (View ▸ Larger Posters ⌘=, Smaller Posters ⌘−)")
-            .disabled(layout == .list || layout == .folders)
+            .disabled(layout == .list || layout == .folders || layout == .shelves)
+        }
+        ToolbarItem(id: "editShelves") {
+            Button(commands.isEditingShelves ? "Done" : "Edit Shelves") { commands.toggleEditShelves() }
+                .help("Reorder, hide and add this library’s shelves (⌘E)")
+                .disabled(layout != .shelves)
         }
     }
 
@@ -225,7 +234,7 @@ struct LibraryView: View {
 
     private func columnCount(_ width: CGFloat) -> Int {
         switch layout {
-        case .list, .folders: return 1
+        case .list, .folders, .shelves: return 1
         case .wide: return PosterGrid.columnCount(width: width, density: density * 1.6)
         case .posters: return PosterGrid.columnCount(width: width, density: density)
         }

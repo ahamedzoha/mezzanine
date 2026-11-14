@@ -25,6 +25,7 @@ struct MezzanineApp: App {
     @State private var playback: PlaybackCoordinator
     @State private var commands = AppCommandCenter()
     @State private var library = LibraryStore()
+    @State private var layouts = HomeLayoutStore()
     @State private var sound: SoundSettings
 
     init() {
@@ -45,6 +46,7 @@ struct MezzanineApp: App {
                 .environment(playback)
                 .environment(commands)
                 .environment(library)
+                .environment(layouts)
                 .environment(sound)
                 .task {
                     appDelegate.beforeQuit = { [playback] in await playback.finishForQuit() }
@@ -66,6 +68,7 @@ struct MezzanineApp: App {
                 .environment(playback)
                 .environment(session)
                 .environment(library)
+                .environment(layouts)
                 .environment(sound)
         }
 
@@ -83,6 +86,7 @@ struct MezzanineApp: App {
                 .environment(playback)
                 .environment(commands)
                 .environment(library)
+                .environment(layouts)
         }
         .defaultSize(width: 1200, height: 800)
         #endif

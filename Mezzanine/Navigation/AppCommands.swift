@@ -63,6 +63,17 @@ final class AppCommandCenter {
     var isMuted = false
     var statsVisible = false
 
+    // Shelves (Home, or a library's Shelves layout).
+    var isShelvesPageVisible = false
+    var isEditingShelves = false
+    private(set) var editShelvesRequests = 0
+    private(set) var newSmartShelfRequests = 0
+    /// ⌘K.
+    var isQuickOpenShown = false
+
+    func toggleEditShelves() { editShelvesRequests += 1 }
+    func newSmartShelf() { newSmartShelfRequests += 1 }
+
     func requestSearch() { searchRequests += 1 }
     func focusContent() { contentFocusRequests += 1 }
     func stepDensity(_ delta: Double) { densitySteps = (densitySteps.count + 1, delta) }
@@ -149,6 +160,13 @@ struct MezzanineCommands: Commands {
                 .disabled(!center.isSignedIn || center.isPlayerOpen)
         }
         CommandGroup(after: .toolbar) {
+            Button(center.isEditingShelves ? "Done Editing Shelves" : "Edit Shelves") { center.toggleEditShelves() }
+                .keyboardShortcut("e", modifiers: .command)
+                .disabled(!center.isShelvesPageVisible || center.isPlayerOpen)
+            Button("New Smart Shelf…") { center.newSmartShelf() }
+                .keyboardShortcut("n", modifiers: .command)
+                .disabled(!center.isShelvesPageVisible || center.isPlayerOpen)
+            Divider()
             Button("Show Details") { center.toggleDetails() }
                 .keyboardShortcut("i", modifiers: .command)
                 .disabled(!center.isHomeVisible || center.isPlayerOpen)
@@ -175,6 +193,10 @@ struct MezzanineCommands: Commands {
             Divider()
         }
         CommandMenu("Go") {
+            Button("Quick Open…") { center.isQuickOpenShown.toggle() }
+                .keyboardShortcut("k", modifiers: .command)
+                .disabled(!center.isSignedIn || center.isPlayerOpen)
+            Divider()
             Button("Back") { center.goBack() }
                 .keyboardShortcut("[", modifiers: .command)
                 .disabled(!center.canGoBack || center.isPlayerOpen)
