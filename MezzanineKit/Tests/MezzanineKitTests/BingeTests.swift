@@ -48,4 +48,13 @@ import Testing
         #expect(next?.index == (first.index ?? 0) + 1)
         #expect(BingePlanner.nextEpisode(after: try #require(episodes.last), in: episodes) == nil)
     }
+
+    @Test func previousEpisodeMirrorsNext() throws {
+        let data = try DecodingTests.fixture("season-episodes")
+        let episodes = try JSONDecoder().decode(MediaContainerEnvelope<MetadataContainer>.self, from: data).container.metadata
+        let first = try #require(episodes.first)
+        #expect(BingePlanner.previousEpisode(before: first, in: episodes) == nil)
+        let second = try #require(BingePlanner.nextEpisode(after: first, in: episodes))
+        #expect(BingePlanner.previousEpisode(before: second, in: episodes)?.ratingKey == first.ratingKey)
+    }
 }

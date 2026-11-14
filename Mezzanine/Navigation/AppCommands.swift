@@ -36,7 +36,7 @@ final class AppCommandCenter {
     private(set) var contentFocusRequests = 0
     private(set) var playFocusedRequests = 0
     private(set) var detailsRequests = 0
-    private(set) var playerRequests: (count: Int, action: PlayerAction) = (0, .togglePlay)
+    private(set) var playerRequests: (count: Int, action: PlayerAction) = (0, .key(.playPause))
     private(set) var sidebarFocusRequests = 0
     private(set) var enclosingFolderRequests = 0
     /// View ▸ Layout / Sort By, applied by the visible library.
@@ -47,12 +47,16 @@ final class AppCommandCenter {
     var currentSort: String?
     var isFolderBrowserVisible = false
 
-    enum PlayerAction: Equatable { case togglePlay, back, forward, skipMarker, close, nextEpisode, pictureInPicture, speed(Double) }
-    // Player state the Playback menu enables items from.
+    /// A Playback menu item or key: a rebindable player key, or one of the fixed ones.
+    enum PlayerAction: Equatable { case key(PlayerKey), speed(Double), jump(Int), snapshot, close }
+    // Player state the Playback menu enables and checks items from.
     var hasActiveMarker = false
     var hasNextEpisode = false
+    var hasPreviousEpisode = false
     var canPictureInPicture = false
     var playbackRate: Double = 1
+    var isMuted = false
+    var statsVisible = false
 
     func requestSearch() { searchRequests += 1 }
     func focusContent() { contentFocusRequests += 1 }
@@ -93,8 +97,28 @@ final class AppCommandCenter {
 struct MezzanineCommands: Commands {
     let center: AppCommandCenter
     let sound: SoundSettings
+    @Environment(\.openWindow) private var openWindow
+
+    private var shortcuts: PlayerShortcuts { .shared }
+
+    /// A player key as a menu item, showing its current (rebindable) key. The key router
+    /// handles the key itself first, so these never fire while typing in a field.
+    private func item(_ key: PlayerKey, disabled: Bool = false) -> some View {
+        Button(key.menuTitle) { center.player(.key(key)) }
+            .keyboardShortcut(shortcuts.menuShortcut(key))
+            .disabled(disabled)
+    }
+
+    private func toggle(_ key: PlayerKey, isOn: Bool) -> some View {
+        Toggle(key.menuTitle, isOn: Binding(get: { isOn }, set: { _ in center.player(.key(key)) }))
+            .keyboardShortcut(shortcuts.menuShortcut(key))
+    }
 
     var body: some Commands {
+        CommandGroup(replacing: .help) {
+            Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
+                .keyboardShortcut("/", modifiers: .command)
+        }
         CommandGroup(after: .textEditing) {
             Button("Find…") { center.requestSearch() }
                 .keyboardShortcut("f", modifiers: .command)
@@ -145,41 +169,56 @@ struct MezzanineCommands: Commands {
         }
         CommandMenu("Playback") {
             if center.isPlayerOpen {
-                Button("Play/Pause") { center.player(.togglePlay) }
-                    .keyboardShortcut(.space, modifiers: [])
-                Button("Back 10 Seconds") { center.player(.back) }
-                    .keyboardShortcut(.leftArrow, modifiers: [])
-                Button("Forward 10 Seconds") { center.player(.forward) }
-                    .keyboardShortcut(.rightArrow, modifiers: [])
-                Button("Skip Intro or Credits") { center.player(.skipMarker) }
-                    .keyboardShortcut("s", modifiers: [])
-                    .disabled(!center.hasActiveMarker)
-                Button("Next Episode") { center.player(.nextEpisode) }
-                    .keyboardShortcut("n", modifiers: [])
-                    .disabled(!center.hasNextEpisode)
-                Button("Picture in Picture") { center.player(.pictureInPicture) }
-                    .keyboardShortcut("p", modifiers: .option)
-                    .disabled(!center.canPictureInPicture)
+                item(.playPause)
+                item(.back10)
+                item(.forward10)
+                item(.back60)
+                item(.forward60)
+                item(.previousChapter)
+                item(.nextChapter)
+                Menu("Jump To") {
+                    ForEach(0..<10, id: \.self) { d in
+                        Button(d == 0 ? "Start" : "\(d * 10) %") { center.player(.jump(d)) }
+                            .keyboardShortcut(KeyEquivalent(Character(String(d))), modifiers: [])
+                    }
+                }
+                item(.previousFrame)
+                item(.nextFrame)
                 Menu("Speed") {
-                    ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
+                    item(.slower)
+                    item(.faster)
+                    Divider()
+                    ForEach(PlayerSpeeds.all, id: \.self) { rate in
                         Toggle(rate == 1 ? "Normal" : String(format: "%g×", rate),
                                isOn: Binding(get: { abs(center.playbackRate - rate) < 0.01 }, set: { _ in center.player(.speed(rate)) }))
                     }
                 }
                 Divider()
-                Button("Volume Up") { sound.stepVolume(10) }
-                    .keyboardShortcut(.upArrow, modifiers: [])
-                Button("Volume Down") { sound.stepVolume(-10) }
-                    .keyboardShortcut(.downArrow, modifiers: [])
-                Toggle("Dialogue Boost", isOn: Binding(get: { sound.current.profile.dialogueGainDB > 0 }, set: { _ in sound.toggleDialogue() }))
-                    .keyboardShortcut("d", modifiers: [])
-                Toggle("Night Mode", isOn: Binding(get: { sound.current.profile.nightMode }, set: { _ in sound.toggleNight() }))
-                    .keyboardShortcut("n", modifiers: .option)
+                item(.skipMarker, disabled: !center.hasActiveMarker)
+                item(.nextEpisode, disabled: !center.hasNextEpisode)
+                item(.previousEpisode, disabled: !center.hasPreviousEpisode)
+                Divider()
+                item(.cycleAudio)
+                item(.cycleSubtitles)
+                item(.subtitleOptions)
+                item(.subtitlesEarlier)
+                item(.subtitlesLater)
+                Divider()
+                item(.volumeUp)
+                item(.volumeDown)
+                toggle(.mute, isOn: center.isMuted)
+                toggle(.dialogueBoost, isOn: sound.current.profile.dialogueGainDB > 0)
+                toggle(.nightMode, isOn: sound.current.profile.nightMode)
+                Divider()
+                item(.fullScreen)
+                item(.pictureInPicture, disabled: !center.canPictureInPicture)
+                item(.options)
+                toggle(.stats, isOn: center.statsVisible)
+                Button("Take Snapshot") { center.player(.snapshot) }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
                 Divider()
                 Button("Close Player") { center.player(.close) }
                     .keyboardShortcut(.escape, modifiers: [])
-                Divider()
-                Text("Also: K play/pause · J back · L forward · F full screen · ↑ ↓ volume to 400 %")
             }
             Divider()
             Menu("Sound Profile for \(sound.deviceName)") {
@@ -198,5 +237,15 @@ struct MezzanineCommands: Commands {
                 Text("Also: Space plays the focused title; Return opens it")
             }
         }
+    }
+}
+
+/// The speeds the player offers, slowest first.
+enum PlayerSpeeds {
+    static let all: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+
+    static func step(from rate: Double, by delta: Int) -> Double {
+        let i = all.firstIndex { abs($0 - rate) < 0.01 } ?? all.firstIndex(of: 1.0)!
+        return all[min(max(0, i + delta), all.count - 1)]
     }
 }

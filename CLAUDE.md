@@ -51,8 +51,12 @@ Build output goes to `build.noindex/` (Spotlight skips it).
 `-MezzanineNoActivity YES` · `-ApplePersistenceIgnoreState YES` · Lab window: Window ▸ Lab
 (or the Open Lab button on the placeholder root). Player: `-MezzanineAutoplay <ratingKey>`
 `-MezzanineAutoSeek <s>` `-MezzanineAutoClose <s>` `-PlayerChromePinned YES`
-`-PlayerOptionsOpen YES` `-PlayerFullScreen YES`; detail: `-MezzanineOpen <ratingKey>`
-`-DetailSection cast`.
+`-PlayerOptionsOpen YES` `-PlayerFullScreen YES` `-PlayerKeyScript "i,c,shift+right,!snapshot"`
+(real key events through the router; menus ignore keys while the app is in the background, so
+⌘ items use `!action`) `-ScrubHoverAt 0.6` `-SnapshotNoClipboard YES`; detail:
+`-MezzanineOpen <ratingKey>` `-DetailSection cast`; windows: `-MezzanineOpenWindow shortcuts|settings`
+with `-settingsTab shortcuts`. Player tests that change settings (stats, subtitle offset) write to
+the same defaults as the installed app: reset them afterwards.
 
 Full screen: AppKit keeps the title/toolbar strip as an opaque band over the content even with
 the toolbar hidden; `WindowChrome` sets `.autoHideToolbar` while the player owns the window.

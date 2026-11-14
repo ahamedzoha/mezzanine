@@ -1,5 +1,6 @@
 import Foundation
 import MezzanineKit
+import MezzaninePlayback
 
 /// The words Mezzanine puts under titles. Quiet and precise: numbers, not adjectives.
 enum Format {
@@ -82,6 +83,16 @@ enum Format {
         case "sd": return "SD"
         default: return r.hasSuffix("p") ? r : r + "p"
         }
+    }
+
+    /// A track as a person names it: "English", else its title, else "Track 3".
+    static func trackName(_ t: PlayerTrack) -> String {
+        let language = t.language.flatMap { Locale.current.localizedString(forLanguageCode: $0) }
+        var name = language ?? (t.name.isEmpty ? "Track \(t.id)" : t.name)
+        if t.channels > 0 { name += " " + channelLabel(t.channels) }
+        if t.isForced { name += " (Forced)" }
+        if t.isHearingImpaired { name += " (SDH)" }
+        return name
     }
 
     static func codecLabel(_ c: String) -> String {

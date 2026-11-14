@@ -10,5 +10,8 @@
 	     inside the app; the sandbox needs this to accept those connections. -->
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- Playback ▸ Take Snapshot saves into Pictures ▸ Mezzanine. -->
+	<key>com.apple.security.assets.pictures.read-write</key>
+	<true/>
 </dict>
 </plist>

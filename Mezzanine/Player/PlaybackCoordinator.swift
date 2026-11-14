@@ -39,6 +39,8 @@ final class PlaybackCoordinator {
     }
     /// The episode after the one playing (episodes only), resolved at load.
     private(set) var nextEpisode: PlexMetadata?
+    /// The episode before it, for ⇧N.
+    private(set) var previousEpisode: PlexMetadata?
     /// Episodes played in this sitting (for "skip intro after the first episode").
     private(set) var episodesThisSession = 0
     /// Episodes started by autoplay in a row (for "Still watching?").
@@ -61,6 +63,12 @@ final class PlaybackCoordinator {
     func playNext(autoplayed: Bool) async {
         guard let next = nextEpisode else { return }
         await play(next, from: nil, autoplayed: autoplayed)
+    }
+
+    /// Starts the episode before this one, from its resume point.
+    func playPrevious() async {
+        guard let previous = previousEpisode else { return }
+        await play(previous, from: nil, autoplayed: false)
     }
 
     private func play(_ item: PlexMetadata, from origin: CGRect?, autoplayed: Bool) async {
@@ -102,6 +110,7 @@ final class PlaybackCoordinator {
             publishNowPlaying(detail)
             if detail.kind == .episode { episodesThisSession += 1 }
             nextEpisode = nil
+            previousEpisode = nil
             await resolveNext(after: detail, client: client)
         } catch is CancellationError {
         } catch {
@@ -187,8 +196,9 @@ final class PlaybackCoordinator {
     private func resolveNext(after episode: PlexMetadata, client: PlexServerClient) async {
         guard episode.kind == .episode, let show = episode.grandparentRatingKey else { return }
         if episodesCache[show] == nil { episodesCache[show] = try? await client.allLeaves(show) }
-        guard let next = BingePlanner.nextEpisode(after: episode, in: episodesCache[show] ?? []) else { return }
-        nextEpisode = next
+        let all = episodesCache[show] ?? []
+        previousEpisode = BingePlanner.previousEpisode(before: episode, in: all)
+        nextEpisode = BingePlanner.nextEpisode(after: episode, in: all)
     }
 
     /// Warms the next episode's file (called when Up Next appears).

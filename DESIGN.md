@@ -270,3 +270,13 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - Episode rows: one click plays (pointer-first), focus follows the click; the still's progress runs flush along its bottom edge (3 pt on a dark track) so the hover play disc never sits on it.
 - Keys: ↑/↓ walk the page section by section (hero, about, episodes, cast, extras, related) and episode by episode inside the list; ↑ from the first episode returns to the hero. ⌥←/⌥→ change season. Return plays the focused episode, Space plays the primary title. W toggles the focused episode, else the episode Play would start; never the whole series from a key.
 - Scrolled-to sections land with a 24 pt lead under the toolbar.
+
+## Player keys
+
+- Every player key is rebindable (Settings ▸ Shortcuts: click a key, press the new one; ⌫ removes, Esc cancels) and is a Playback menu item showing its current key. Defaults: Space/K play-pause · ←/J, →/L 10 s · ⇧←/⇧→ 1 min · ⌥←/⌥→ or Page Up/Down chapters · , . frames · [ ] speed · S skip · N / ⇧N next / previous episode · ↑ ↓ volume · M mute · D dialogue · ⌥N night · A audio track · C subtitle track · ⇧C subtitle options · G / H subtitles ∓0.1 s · F full screen · ⌥P PiP · O options panel · I playback info.
+- Fixed: Return skips (or plays Up Next now), Esc backs out one layer, 0–9 jump to 0–90 %, ⌘⇧S snapshot (Pictures ▸ Mezzanine, and the clipboard).
+- Keys reach the player through `PlayerKeyRouter` before the menus, so a letter typed into a field (Find Subtitles) always types. With Full Keyboard Access, Space/Return/arrows drive a focused control first.
+- Feedback: a top-right readout names what changed ("Subtitles: English (SDH)", "Chapter 3 · Title", "1.25× speed"), announced to VoiceOver.
+- Playback info (I): a solid graphite card top-left under the title mark — route, video, decoder, audio path, output device and profile, volume, start and seek times.
+- Scrub hover: a 200 pt frame preview above the bar (the engine's cached segments near the playhead, a second reader's nearest keyframe elsewhere), with the chapter name and time; chapter starts are small gaps in the bar.
+- Help ▸ Keyboard Shortcuts (⌘/) lists every key, read-only, with Change Keys… into Settings.

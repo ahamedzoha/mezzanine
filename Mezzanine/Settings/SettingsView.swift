@@ -1,18 +1,19 @@
 import SwiftUI
 import MezzanineKit
 
-/// Settings (⌘,). M13 fills the Playback, Audio, Subtitles and Shortcuts
-/// tabs; the account tab works now.
+/// Settings (⌘,): Account, Playback (binge rules), Sound (per-device setups),
+/// Shortcuts (every player key, rebindable), Library.
 struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
     @Environment(SoundSettings.self) private var sound
     @Environment(PlaybackCoordinator.self) private var playback
     @State private var confirmSignOut = false
+    @AppStorage("settingsTab") private var tab = "account"
 
     var body: some View {
-        TabView {
-            Tab("Account", systemImage: "person.crop.circle") {
+        TabView(selection: $tab) {
+            Tab("Account", systemImage: "person.crop.circle", value: "account") {
                 Form {
                     LabeledContent("Plex account", value: session.account?.displayName ?? "Not signed in")
                     LabeledContent("Server", value: session.currentServer?.name ?? "—")
@@ -30,7 +31,7 @@ struct SettingsView: View {
                 }
                 .formStyle(.grouped)
             }
-            Tab("Playback", systemImage: "play.rectangle") {
+            Tab("Playback", systemImage: "play.rectangle", value: "playback") {
                 @Bindable var playback = playback
                 Form {
                     Section("Episodes") {
@@ -56,7 +57,7 @@ struct SettingsView: View {
                 }
                 .formStyle(.grouped)
             }
-            Tab("Sound", systemImage: "speaker.wave.2") {
+            Tab("Sound", systemImage: "speaker.wave.2", value: "sound") {
                 Form {
                     Section {
                         LabeledContent("Output", value: sound.deviceName)
@@ -105,7 +106,10 @@ struct SettingsView: View {
                 }
                 .formStyle(.grouped)
             }
-            Tab("Library", systemImage: "books.vertical") {
+            Tab("Shortcuts", systemImage: "keyboard", value: "shortcuts") {
+                ShortcutSettings()
+            }
+            Tab("Library", systemImage: "books.vertical", value: "library") {
                 @Bindable var library = library
                 Form {
                     Section {

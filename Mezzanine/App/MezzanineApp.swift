@@ -69,6 +69,12 @@ struct MezzanineApp: App {
                 .environment(sound)
         }
 
+        Window("Keyboard Shortcuts", id: "shortcuts") {
+            ShortcutsWindow()
+        }
+        .defaultSize(width: 520, height: 720)
+        .windowResizability(.contentMinSize)
+
         #if DEBUG
         Window("Lab", id: "lab") {
             LabView()
@@ -87,8 +93,15 @@ struct MezzanineApp: App {
 /// Opens the Lab window for the scripted matrix (`-LabAutoMatrix YES`).
 private struct LabLauncher: ViewModifier {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     func body(content: Content) -> some View {
-        content.task { if LabAutoRunner.isEnabled { openWindow(id: "lab") } }
+        content.task {
+            if LabAutoRunner.isEnabled { openWindow(id: "lab") }
+            // -MezzanineOpenWindow shortcuts: open a window at launch, for review captures.
+            if let id = UserDefaults.standard.string(forKey: "MezzanineOpenWindow") {
+                if id == "settings" { openSettings() } else { openWindow(id: id) }
+            }
+        }
     }
 }
 #endif

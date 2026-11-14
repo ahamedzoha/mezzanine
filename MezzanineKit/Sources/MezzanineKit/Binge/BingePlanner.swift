@@ -67,10 +67,19 @@ public enum BingePlanner {
     /// The episode after `current` in a show's ordered episode list (crossing seasons;
     /// specials, season 0, are skipped unless the current episode is one).
     public static func nextEpisode(after current: PlexMetadata, in allEpisodes: [PlexMetadata]) -> PlexMetadata? {
+        neighbour(of: current, in: allEpisodes, offset: 1)
+    }
+
+    /// The episode before `current` (specials only when watching specials).
+    public static func previousEpisode(before current: PlexMetadata, in allEpisodes: [PlexMetadata]) -> PlexMetadata? {
+        neighbour(of: current, in: allEpisodes, offset: -1)
+    }
+
+    private static func neighbour(of current: PlexMetadata, in allEpisodes: [PlexMetadata], offset: Int) -> PlexMetadata? {
         let ordered = allEpisodes
             .filter { ($0.parentIndex ?? 0) > 0 || (current.parentIndex ?? 0) == 0 }
             .sorted { ($0.parentIndex ?? 0, $0.index ?? 0) < ($1.parentIndex ?? 0, $1.index ?? 0) }
         guard let i = ordered.firstIndex(where: { $0.ratingKey == current.ratingKey }) else { return nil }
-        return ordered.indices.contains(i + 1) ? ordered[i + 1] : nil
+        return ordered.indices.contains(i + offset) ? ordered[i + offset] : nil
     }
 }

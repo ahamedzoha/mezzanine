@@ -9,9 +9,10 @@ import MezzaninePlayback
 /// button. Up Next takes over at the credits: the picture shrinks into the
 /// corner and the next episode counts down beside it.
 ///
-/// Keys (also in the Playback menu): Space/K play-pause, ←/→ J/L 10 s,
-/// ↑/↓ volume to 400 %, S or Return skip, N next episode, D dialogue boost,
-/// ⌥N night mode, F full screen, Esc closes panels then the player.
+/// Keys: every player key is rebindable (`PlayerShortcuts`, Settings ▸ Shortcuts) and is
+/// also a Playback menu item. `PlayerKeyRouter` delivers them here ahead of the menus.
+/// Fixed: Return skips / plays Up Next now, Esc steps out (panel page, panel, Up Next,
+/// full screen, player), 0–9 jump through the film, ⌘⇧S takes a snapshot.
 struct PlayerStage: View {
     let item: PlexMetadata
     let origin: CGRect?
@@ -34,6 +35,9 @@ struct PlayerStage: View {
     @State private var autoSkipped = Set<String>()
     @State private var upNextTrigger: TimeInterval?
     @State private var pendingToggle: Task<Void, Never>?
+    @State private var optionsPage: PlayerOptions.Page = .root
+    @AppStorage("playerStatsVisible") private var statsVisible = false
+    @AppStorage("subtitleOffset") private var subtitleOffset: Double = 0
     @FocusState private var focused: Bool
 
     enum UpNextState: Equatable { case hidden, counting(Int), dismissed, stillWatching }
@@ -56,8 +60,9 @@ struct PlayerStage: View {
                 chrome.transition(.opacity)
             }
             if !upNextShown { skipButton }
+            if statsVisible && !upNextShown { PlayerStats(item: item).transition(.opacity) }
             if optionsOpen {
-                PlayerOptions(item: item, close: { withAnimation(Theme.Motion.quick) { optionsOpen = false } })
+                PlayerOptions(item: item, page: $optionsPage, close: { setOptions(open: false) })
                     .padding(.trailing, Theme.Space.gutter)
                     .padding(.bottom, 112)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -81,6 +86,18 @@ struct PlayerStage: View {
             scheduleHide()
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "PlayerOptionsOpen") { optionsOpen = true }
+            // -PlayerKeyScript "i,c,g,shift+c": posts real key events through the app's event
+            // queue (router, menus) after 4 s, 0.6 s apart, for review captures.
+            if let script = UserDefaults.standard.string(forKey: "PlayerKeyScript") {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(4))
+                    for token in script.split(separator: ",") {
+                        // "!snapshot": the menu action itself (menus ignore keys while the app is in the background).
+                        if token == "!snapshot" { _ = perform(.snapshot) } else { DebugKeys.post(String(token)) }
+                        try? await Task.sleep(for: .milliseconds(600))
+                    }
+                }
+            }
             if UserDefaults.standard.bool(forKey: "PlayerFullScreen") {
                 Task { try? await Task.sleep(for: .seconds(1)); NSApp.windows.first { $0.isVisible && $0.canBecomeMain }?.toggleFullScreen(nil) }
             }
@@ -91,34 +108,16 @@ struct PlayerStage: View {
         .focusable()
         .focusEffectDisabled()
         .focused($focused)
-        .onKeyPress(.escape) {
-            if optionsOpen { withAnimation(Theme.Motion.quick) { optionsOpen = false }; return .handled }
-            if upNextShown { dismissUpNext(); return .handled }
-            // In full screen, Esc leaves full screen first (macOS convention); the next Esc closes.
-            if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil); return .handled }
-            return perform(.close)
-        }
-        .onKeyPress(.space) { perform(.togglePlay) }
-        .onKeyPress(characters: CharacterSet(charactersIn: "kK")) { _ in perform(.togglePlay) }
-        .onKeyPress(.leftArrow) { perform(.back) }
-        .onKeyPress(.rightArrow) { perform(.forward) }
-        .onKeyPress(characters: CharacterSet(charactersIn: "jJ")) { _ in perform(.back) }
-        .onKeyPress(characters: CharacterSet(charactersIn: "lL")) { _ in perform(.forward) }
-        .onKeyPress(characters: CharacterSet(charactersIn: "sS")) { _ in perform(.skipMarker) }
-        .onKeyPress(characters: CharacterSet(charactersIn: "nN")) { press in
-            guard !press.modifiers.contains(.option), playback.nextEpisode != nil else { return .ignored }
-            Task { await playback.playNext(autoplayed: false) }
-            return .handled
-        }
-        .onKeyPress(characters: CharacterSet(charactersIn: "fF")) { _ in NSApp.keyWindow?.toggleFullScreen(nil); return .handled }
-        .onKeyPress(.return) {
-            if case .counting = upNext { Task { await playback.playNext(autoplayed: false) }; return .handled }
-            _ = perform(.skipMarker)
-            return .handled
-        }
+        .background(WindowReader { window in
+            PlayerKeyRouter.shared.attach(window: window) { event, key in handleKey(event, key) }
+        })
+        .onDisappear { PlayerKeyRouter.shared.detach() }
         .onChange(of: commands.playerRequests.count) { _, _ in _ = perform(commands.playerRequests.action) }
         .onChange(of: activeMarker != nil, initial: true) { _, v in commands.hasActiveMarker = v }
         .onChange(of: playback.nextEpisode?.ratingKey, initial: true) { _, k in commands.hasNextEpisode = k != nil }
+        .onChange(of: playback.previousEpisode?.ratingKey, initial: true) { _, k in commands.hasPreviousEpisode = k != nil }
+        .onChange(of: player.isMuted, initial: true) { _, v in commands.isMuted = v }
+        .onChange(of: statsVisible, initial: true) { _, v in commands.statsVisible = v }
         .onChange(of: player.canPictureInPicture, initial: true) { _, v in commands.canPictureInPicture = v }
         .onChange(of: player.rate, initial: true) { _, r in commands.playbackRate = r }
         .onChange(of: upNext) { _, state in
@@ -179,7 +178,7 @@ struct PlayerStage: View {
             pendingToggle = Task {
                 try? await Task.sleep(for: .seconds(NSEvent.doubleClickInterval))
                 guard !Task.isCancelled else { return }
-                _ = perform(.togglePlay)
+                _ = perform(.key(.playPause))
             }
         })
         .simultaneousGesture(TapGesture(count: 2).onEnded {
@@ -220,10 +219,11 @@ struct PlayerStage: View {
                     }
                     if player.canPictureInPicture {
                         GlassIconButton(symbol: player.isPictureInPicture ? "pip.exit" : "pip.enter",
-                                        label: "Picture in Picture", help: "Picture in Picture (⌥P)") { _ = perform(.pictureInPicture) }
+                                        label: "Picture in Picture", help: PlayerShortcuts.shared.help("Picture in Picture", .pictureInPicture)) { _ = perform(.key(.pictureInPicture)) }
                     }
-                    GlassIconButton(symbol: "ellipsis", label: "Audio, subtitles, sound and speed", help: "Audio, subtitles, sound, speed") {
-                        withAnimation(Theme.Motion.quick) { optionsOpen.toggle() }
+                    GlassIconButton(symbol: "ellipsis", label: "Audio, subtitles, sound and speed",
+                                    help: PlayerShortcuts.shared.help("Audio, subtitles, sound, speed", .options)) {
+                        setOptions(open: !optionsOpen)
                     }
                 }
                 .padding(.horizontal, Theme.Space.gutter)
@@ -242,7 +242,9 @@ struct PlayerStage: View {
                 .foregroundStyle(Theme.inkSecondary)
                 .padding(.horizontal, Theme.Space.gutter)
                 .padding(.bottom, -4)
-                HairlineScrub(current: player.currentTime, duration: player.duration, markers: item.markers) { t in
+                HairlineScrub(current: player.currentTime, duration: player.duration, markers: item.markers,
+                              chapters: chapterStarts,
+                              preview: { [player] t in await player.previewFrame(at: t, maxWidth: 400) }) { t in
                     Task { await player.seek(to: t) }
                 }
             }
@@ -411,26 +413,176 @@ struct PlayerStage: View {
         showChrome()
     }
 
+    /// A key from `PlayerKeyRouter`: the fixed keys first, then the rebindable table.
+    /// Returns false to hand the key to whatever has focus (a focused button's Space).
+    private func handleKey(_ event: NSEvent, _ key: PlayerKey?) -> Bool {
+        let navigation: Set<UInt16> = [KeyBinding.space, KeyBinding.left, KeyBinding.right, KeyBinding.up,
+                                       KeyBinding.down, KeyBinding.returnKey, KeyBinding.enter]
+        // Full Keyboard Access: with focus on a control, Space/Return/arrows drive the focus.
+        if NSApp.isFullKeyboardAccessEnabled, !focused, navigation.contains(event.keyCode) { return false }
+        switch event.keyCode {
+        case KeyBinding.escape: escape(); return true
+        case KeyBinding.returnKey, KeyBinding.enter: returnKey(); return true
+        default: break
+        }
+        if let key { return perform(.key(key)) == .handled }
+        if !event.modifierFlags.contains(.option), let c = event.charactersIgnoringModifiers,
+           c.count == 1, let digit = Int(c) {
+            return perform(.jump(digit)) == .handled
+        }
+        return false
+    }
+
+    /// Esc steps out one layer at a time: panel page, panel, Up Next, full screen, player.
+    private func escape() {
+        if optionsOpen {
+            if optionsPage != .root { optionsPage = optionsPage == .search ? .subtitles : .root } else { setOptions(open: false) }
+            return
+        }
+        if upNextShown { dismissUpNext(); return }
+        if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil); return }
+        _ = perform(.close)
+    }
+
+    /// Return: Up Next plays now, Still Watching resumes, else skip the active marker.
+    private func returnKey() {
+        switch upNext {
+        case .counting, .stillWatching: Task { await playback.playNext(autoplayed: false) }
+        default: _ = perform(.key(.skipMarker))
+        }
+    }
+
+    private func setOptions(open: Bool, page: PlayerOptions.Page = .root) {
+        withAnimation(Theme.Motion.quick) {
+            optionsPage = page
+            optionsOpen = open
+        }
+    }
+
     /// Every player key and Playback menu item lands here.
     @discardableResult
     private func perform(_ action: AppCommandCenter.PlayerAction) -> KeyPress.Result {
         showChrome()
         switch action {
-        case .togglePlay:
+        case .key(let key): return perform(key)
+        case .speed(let rate): setRate(rate)
+        case .jump(let digit):
+            guard player.duration > 0 else { return .ignored }
+            Task { await player.seek(to: player.duration * Double(digit) / 10) }
+            showToast(digit == 0 ? "Start" : "\(digit * 10) %")
+        case .snapshot: takeSnapshot()
+        case .close: close()
+        }
+        return .handled
+    }
+
+    private func perform(_ key: PlayerKey) -> KeyPress.Result {
+        switch key {
+        case .playPause:
             let willPlay = player.status != .playing
             player.togglePlayPause()
             flashGlyph(willPlay ? "play.fill" : "pause.fill")
-        case .back: Task { await player.seek(by: -10) }; flashGlyph("gobackward.10")
-        case .forward: Task { await player.seek(by: 10) }; flashGlyph("goforward.10")
+        case .back10: Task { await player.seek(by: -10) }; flashGlyph("gobackward.10")
+        case .forward10: Task { await player.seek(by: 10) }; flashGlyph("goforward.10")
+        case .back60: Task { await player.seek(by: -60) }; flashGlyph("gobackward.60")
+        case .forward60: Task { await player.seek(by: 60) }; flashGlyph("goforward.60")
+        case .previousChapter: jumpChapter(-1)
+        case .nextChapter: jumpChapter(1)
+        case .previousFrame: Task { await player.stepFrame(-1) }
+        case .nextFrame: Task { await player.stepFrame(1) }
+        case .slower: setRate(PlayerSpeeds.step(from: player.rate, by: -1))
+        case .faster: setRate(PlayerSpeeds.step(from: player.rate, by: 1))
         case .skipMarker: return skip() ? .handled : .ignored
-        case .close: close()
         case .nextEpisode:
-            guard playback.nextEpisode != nil else { return .ignored }
+            guard playback.nextEpisode != nil else { showToast("No next episode"); return .handled }
             Task { await playback.playNext(autoplayed: false) }
-        case .pictureInPicture: player.togglePictureInPicture()
-        case .speed(let rate): player.setRate(rate); showToast(rate == 1 ? "Normal speed" : String(format: "%g× speed", rate))
+        case .previousEpisode:
+            guard playback.previousEpisode != nil else { showToast("No previous episode"); return .handled }
+            Task { await playback.playPrevious() }
+        case .volumeUp: sound.stepVolume(10)
+        case .volumeDown: sound.stepVolume(-10)
+        case .mute:
+            player.setMuted(!player.isMuted)
+            showToast(player.isMuted ? "Muted" : "Sound on")
+        case .dialogueBoost: sound.toggleDialogue()
+        case .nightMode: sound.toggleNight()
+        case .cycleAudio: cycleAudio()
+        case .cycleSubtitles: cycleSubtitles()
+        case .subtitleOptions: setOptions(open: !(optionsOpen && optionsPage == .subtitles), page: .subtitles)
+        case .subtitlesEarlier: shiftSubtitles(by: -0.1)
+        case .subtitlesLater: shiftSubtitles(by: 0.1)
+        case .fullScreen: NSApp.keyWindow?.toggleFullScreen(nil)
+        case .pictureInPicture:
+            guard player.canPictureInPicture else { return .ignored }
+            player.togglePictureInPicture()
+        case .options: setOptions(open: !optionsOpen)
+        case .stats: withAnimation(Theme.Motion.quick) { statsVisible.toggle() }
         }
         return .handled
+    }
+
+    private func setRate(_ rate: Double) {
+        player.setRate(rate)
+        showToast(rate == 1 ? "Normal speed" : String(format: "%g× speed", rate))
+    }
+
+    /// Plex's chapter list, else the file's own.
+    private var chapterStarts: [(title: String, start: Double)] {
+        let plex = item.chapters.map { ($0.tag ?? "", $0.start) }
+        if !plex.isEmpty { return plex.sorted { $0.1 < $1.1 } }
+        return player.chapters.map { ($0.title, $0.start) }.sorted { $0.1 < $1.1 }
+    }
+
+    private func jumpChapter(_ direction: Int) {
+        let chapters = chapterStarts
+        guard !chapters.isEmpty else { showToast("No chapters"); return }
+        let now = player.currentTime
+        // Within 3 s of a chapter's start, ← goes to the one before (as on a disc player).
+        let target = direction > 0 ? chapters.firstIndex { $0.start > now + 1 }
+                                   : chapters.lastIndex { $0.start < now - 3 }
+        guard let i = target else {
+            if direction < 0 { Task { await player.seek(to: 0) }; showToast("Start") } else { showToast("Last chapter") }
+            return
+        }
+        Task { await player.seek(to: chapters[i].start, exact: true) }
+        let title = chapters[i].title
+        showToast(title.isEmpty || title.hasPrefix("Chapter") ? "Chapter \(i + 1)" : "Chapter \(i + 1) · \(title)")
+    }
+
+    private func cycleAudio() {
+        let tracks = player.audioTracks
+        guard tracks.count > 1 else { showToast(tracks.isEmpty ? "No audio tracks" : "Only one audio track"); return }
+        let i = tracks.firstIndex { $0.id == player.selectedAudioID } ?? -1
+        let next = tracks[(i + 1) % tracks.count]
+        playback.selectAudio(trackID: next.id)
+        showToast("Audio: " + Format.trackName(next))
+    }
+
+    private func cycleSubtitles() {
+        let options: [PlayerTrack?] = [nil] + player.subtitleTracks.map(Optional.some)
+        guard options.count > 1 else { showToast("No subtitles"); return }
+        let i = options.firstIndex { $0?.id == player.selectedSubtitleID } ?? 0
+        let next = options[(i + 1) % options.count]
+        playback.selectSubtitle(trackID: next?.id)
+        showToast("Subtitles: " + (next.map(Format.trackName) ?? "Off"))
+    }
+
+    private func shiftSubtitles(by delta: Double) {
+        subtitleOffset = ((subtitleOffset + delta) * 10).rounded() / 10
+        showToast(subtitleOffset == 0 ? "Subtitles on time" : String(format: "Subtitles %+.1f s", subtitleOffset))
+    }
+
+    /// Saves the frame on screen, full size, to Pictures ▸ Mezzanine and copies it.
+    private func takeSnapshot() {
+        let time = player.currentTime
+        let name = Snapshot.fileName(for: item, at: time)
+        Task {
+            guard let image = await player.snapshot() else { showToast("Couldn’t take a snapshot"); return }
+            switch Snapshot.save(image, named: name) {
+            case .success: showToast("Snapshot saved to Pictures ▸ Mezzanine")
+            case .failure: showToast("Snapshot copied (couldn’t save to Pictures)")
+            }
+        }
     }
 
     @discardableResult
@@ -546,8 +698,17 @@ struct HairlineScrub: View {
     let current: Double
     let duration: Double
     let markers: [PlexMarker]
+    var chapters: [(title: String, start: Double)] = []
+    /// A frame near a time, for the hover preview; nil shows the time alone.
+    var preview: ((Double) async -> CGImage?)? = nil
     let seek: (Double) -> Void
     @State private var hoverX: CGFloat?
+    @State private var thumb: (bucket: Int, image: CGImage)?
+    @State private var cache: [Int: CGImage] = [:]
+    @State private var fetch: Task<Void, Never>?
+
+    /// Previews are fetched per 5 s slice, so sweeping along the bar reuses them.
+    private static let slice = 5.0
 
     var body: some View {
         GeometryReader { geo in
@@ -564,27 +725,53 @@ struct HairlineScrub: View {
                     }
                 }
                 Rectangle().fill(Theme.ink).frame(width: max(2, w * p), height: thick)
-                if let x = hoverX, duration > 0 {
-                    Text(clock(Double(x / w) * duration))
-                        .font(Theme.Typeface.cardMeta)
-                        .foregroundStyle(Theme.ink)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .glassEffect(.regular.tint(.black.opacity(0.55)), in: Capsule())
-                        .offset(x: min(max(0, x - 28), w - 64), y: -16)
-                        .allowsHitTesting(false)
+                if duration > 0, chapters.count > 1, chapters.count < 80 {
+                    // Chapter starts: small gaps cut into the bar.
+                    ForEach(Array(chapters.enumerated()), id: \.offset) { _, c in
+                        if c.start > 1 {
+                            Rectangle().fill(.black.opacity(0.7)).frame(width: 2, height: thick)
+                                .offset(x: w * c.start / duration - 1)
+                        }
+                    }
                 }
             }
             .frame(maxHeight: .infinity, alignment: .bottom)
+            .overlay(alignment: .bottomLeading) {
+                // Anchored to the bar's bottom edge and lifted clear of it, growing upward.
+                if let x = hoverX, duration > 0 {
+                    let t = Double(x / w) * duration
+                    let cw = cardWidth(at: t) + (shownImage(at: t) == nil ? 0 : 8)
+                    hoverCard(at: t)
+                        .fixedSize()
+                        .offset(x: min(max(Theme.Space.s, x - cw / 2), w - cw - Theme.Space.s), y: -(thick + 10))
+                        .allowsHitTesting(false)
+                }
+            }
             .contentShape(Rectangle())
             .onContinuousHover { phase in
                 withAnimation(Theme.Motion.quick) {
                     if case .active(let point) = phase { hoverX = point.x } else { hoverX = nil }
+                }
+                if case .active(let point) = phase, w > 0 {
+                    requestPreview(Double(point.x / w) * duration)
+                } else {
+                    fetch?.cancel()
                 }
             }
             .gesture(DragGesture(minimumDistance: 0).onEnded { v in
                 guard duration > 0 else { return }
                 seek(max(0, min(duration, Double(v.location.x / w) * duration)))
             })
+            #if DEBUG
+            // -ScrubHoverAt 0.7: pretend the pointer rests on the bar there, for review captures.
+            .task(id: duration > 0) {
+                let f = UserDefaults.standard.double(forKey: "ScrubHoverAt")
+                guard f > 0, duration > 0 else { return }
+                try? await Task.sleep(for: .seconds(2))
+                hoverX = w * f
+                requestPreview(Double(f) * duration)
+            }
+            #endif
         }
         .frame(height: 24)
         .accessibilityElement()
@@ -606,6 +793,60 @@ struct HairlineScrub: View {
         let t = Int(s)
         return t >= 3600 ? String(format: "%d:%02d:%02d", t / 3600, (t / 60) % 60, t % 60)
                          : String(format: "%d:%02d", t / 60, t % 60)
+    }
+
+    // MARK: Hover preview
+
+    private func bucket(_ t: Double) -> Int { Int(max(0, t) / Self.slice) }
+
+    private func shownImage(at t: Double) -> CGImage? {
+        guard let thumb, thumb.bucket == bucket(t) else { return nil }
+        return thumb.image
+    }
+
+    private func cardWidth(at t: Double) -> CGFloat { shownImage(at: t) == nil ? 72 : 200 }
+
+    private func chapterTitle(at t: Double) -> String? {
+        guard chapters.count > 1, let i = chapters.lastIndex(where: { $0.start <= t }) else { return nil }
+        let title = chapters[i].title
+        return title.isEmpty || title.hasPrefix("Chapter") ? "Chapter \(i + 1)" : title
+    }
+
+    /// The frame (when one is ready), the chapter, and the time.
+    private func hoverCard(at t: Double) -> some View {
+        VStack(spacing: 4) {
+            if let image = shownImage(at: t) {
+                Image(decorative: image, scale: 2)
+                    .resizable()
+                    .aspectRatio(CGFloat(image.width) / CGFloat(max(1, image.height)), contentMode: .fit)
+                    .frame(width: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            if let chapter = chapterTitle(at: t), shownImage(at: t) != nil {
+                Text(chapter).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+            }
+            Text(clock(t)).font(Theme.Typeface.cardMeta.monospacedDigit()).foregroundStyle(Theme.ink)
+        }
+        .padding(shownImage(at: t) == nil ? EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8) : EdgeInsets(top: 4, leading: 4, bottom: 6, trailing: 4))
+        .frame(width: cardWidth(at: t) + (shownImage(at: t) == nil ? 0 : 8))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.graphite.opacity(0.92)))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.rule, lineWidth: 1))
+    }
+
+    private func requestPreview(_ t: Double) {
+        guard let preview, duration > 0 else { return }
+        let b = bucket(t)
+        if thumb?.bucket == b { return }
+        if let image = cache[b] { thumb = (b, image); return }
+        fetch?.cancel()
+        fetch = Task {
+            try? await Task.sleep(for: .milliseconds(70))
+            guard !Task.isCancelled else { return }
+            guard let image = await preview(min(duration - 1, (Double(b) + 0.5) * Self.slice)) else { return }
+            if cache.count > 240 { cache.removeAll() }
+            cache[b] = image
+            if !Task.isCancelled { thumb = (b, image) }
+        }
     }
 
     /// "1 hour 12 minutes 4 seconds", for VoiceOver.
@@ -744,3 +985,34 @@ struct UpNextLayout {
         max(gutter, (size.height - max(pictureHeight, Self.cardHeight)) / 2)
     }
 }
+
+#if DEBUG
+/// Builds and posts key events for `-PlayerKeyScript`.
+enum DebugKeys {
+    static func post(_ token: String) {
+        let parts = token.lowercased().split(separator: "+").map(String.init)
+        var flags: NSEvent.ModifierFlags = []
+        for p in parts.dropLast() {
+            switch p {
+            case "shift": flags.insert(.shift)
+            case "opt", "option": flags.insert(.option)
+            case "cmd": flags.insert(.command)
+            case "cmdshift": flags.formUnion([.command, .shift])
+            default: break
+            }
+        }
+        let key = parts.last ?? ""
+        let named: [String: (UInt16, String)] = [
+            "space": (49, " "), "left": (123, "\u{F702}"), "right": (124, "\u{F703}"), "up": (126, "\u{F700}"),
+            "down": (125, "\u{F701}"), "esc": (53, "\u{1B}"), "ret": (36, "\r"),
+        ]
+        let (code, base) = named[key] ?? (0, key)
+        let chars = flags.contains(.shift) && named[key] == nil ? base.uppercased() : base
+        guard let window = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }),
+              let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: window.windowNumber, context: nil, characters: chars,
+                                           charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code) else { return }
+        NSApp.postEvent(event, atStart: false)
+    }
+}
+#endif

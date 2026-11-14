@@ -39,6 +39,9 @@ public final class MezzaninePlayer {
     public private(set) var avPlayer: AVPlayer?
     /// Scrub thumbnails are available from data the session already holds.
     public var supportsScrubThumbnails: Bool { engine.supportsCacheBackedStills }
+    /// Chapters embedded in the file (Plex's own chapter list is preferred when it has one).
+    public private(set) var chapters: [PlayerChapter] = []
+    public private(set) var isMuted = false
 
     /// 0…400 %. Above 100 % becomes gain in front of the engine's limiter.
     public var volume = VolumeLevel(percent: 100) {
@@ -58,6 +61,10 @@ public final class MezzaninePlayer {
     @ObservationIgnored private var seekStartedAt: ContinuousClock.Instant?
     @ObservationIgnored private var pip: AVPictureInPictureController?
     @ObservationIgnored private var pipDelegate: PiPDelegate?
+    /// A second reader over the playing file, for scrub previews and snapshots far from
+    /// the playhead (the engine's own stills only cover bytes it already holds).
+    @ObservationIgnored private var stills: FrameExtractor?
+    @ObservationIgnored private var stillsSource: (url: URL, headers: [String: String])?
 
     public init() throws {
         engine = try AetherEngine()
@@ -132,6 +139,7 @@ public final class MezzaninePlayer {
         loadStartedAt = clock.now
         diagnostics = PlayerDiagnostics()
         firstFrameReady = false
+        resetStills(url: request.url, headers: request.headers)
         var options = LoadOptions(httpHeaders: request.headers)
         options.preferredAudioLanguages = request.preferredAudioLanguages
         options.preferredSubtitleLanguages = request.preferredSubtitleLanguages
@@ -150,7 +158,7 @@ public final class MezzaninePlayer {
             status = .failed(String(describing: error))
             throw error
         }
-        engine.volume = Float(volume.linearVolume)
+        engine.volume = isMuted ? 0 : Float(volume.linearVolume)
     }
 
     /// Fetches a file's opening bytes ahead of a `load` (the next episode), so it starts at once.
@@ -167,6 +175,7 @@ public final class MezzaninePlayer {
     public func stop() {
         engine.stop()
         cues = []
+        resetStills(url: nil, headers: [:])
     }
 
     public func seek(to seconds: Double, exact: Bool = false) async {
@@ -187,6 +196,48 @@ public final class MezzaninePlayer {
 
     public func setAudioDelay(_ seconds: Double) {
         engine.setAudioDelay(seconds)
+    }
+
+    public func setMuted(_ muted: Bool) {
+        isMuted = muted
+        applyVolumeAndShaping()
+    }
+
+    /// One frame back or forward, paused (pauses first if playing).
+    public func stepFrame(_ direction: Int) async {
+        if status == .playing { pause() }
+        let fps = diagnostics.frameRate ?? 24
+        await seek(to: currentTime + Double(direction) / max(1, fps), exact: true)
+    }
+
+    // MARK: Stills (scrub previews, snapshots)
+
+    /// A small frame near `seconds` for the scrub tooltip: the engine's cached segments when
+    /// they cover it, else the nearest keyframe from the second reader. Nil means time only.
+    public func previewFrame(at seconds: Double, maxWidth: Int = 320) async -> CGImage? {
+        if supportsScrubThumbnails, let image = await engine.scrubThumbnail(atSeconds: seconds, maxWidth: maxWidth) {
+            return image
+        }
+        return await stillsReader()?.thumbnail(at: seconds, maxWidth: maxWidth)
+    }
+
+    /// The exact frame on screen, full size, for Snapshot.
+    public func snapshot() async -> CGImage? {
+        await stillsReader()?.snapshot(at: currentTime)
+    }
+
+    private func stillsReader() -> FrameExtractor? {
+        if let stills { return stills }
+        guard let source = stillsSource else { return nil }
+        let reader = FrameExtractor(url: source.url, httpHeaders: source.headers)
+        stills = reader
+        return reader
+    }
+
+    private func resetStills(url: URL?, headers: [String: String]) {
+        if let old = stills { Task.detached(priority: .utility) { await old.shutdown() } }
+        stills = nil
+        stillsSource = url.map { ($0, headers) }
     }
 
     // MARK: Tracks
@@ -230,7 +281,7 @@ public final class MezzaninePlayer {
     }
 
     private func applyVolumeAndShaping() {
-        engine.volume = Float(volume.linearVolume)
+        engine.volume = isMuted ? 0 : Float(volume.linearVolume)
         let shaping = engineShaping()
         if shaping != engine.audioShaping { engine.setAudioShaping(shaping) }
     }
@@ -279,6 +330,10 @@ public final class MezzaninePlayer {
         engine.$sourceVideoCodecName.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.videoCodec = $0 }.store(in: &bag)
         engine.$sourceContainerFormat.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.container = $0 }.store(in: &bag)
         engine.$sourceVideoBitrate.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.videoBitrate = $0 }.store(in: &bag)
+        engine.$sourceVideoFrameRate.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.frameRate = $0 }.store(in: &bag)
+        engine.$mediaChapters.receive(on: DispatchQueue.main).sink { [weak self] in
+            self?.chapters = $0.map { PlayerChapter(title: $0.name, start: $0.startSeconds) }
+        }.store(in: &bag)
         engine.$currentAVPlayer.receive(on: DispatchQueue.main).sink { [weak self] in self?.avPlayer = $0 }.store(in: &bag)
         engine.$hasFirstFrameReadyForDisplay.receive(on: DispatchQueue.main).sink { [weak self] ready in
             if ready { self?.rebuildPiP() }
@@ -404,6 +459,16 @@ public struct PlayerCue: Identifiable, Sendable {
     }
 }
 
+/// A chapter: where it starts and what it's called.
+public struct PlayerChapter: Sendable, Equatable {
+    public var title: String
+    public var start: Double
+    public init(title: String, start: Double) {
+        self.title = title
+        self.start = start
+    }
+}
+
 /// What the stats overlay and the Lab matrix show.
 public struct PlayerDiagnostics: Sendable, Equatable {
     public var route: String = "none"
@@ -415,6 +480,7 @@ public struct PlayerDiagnostics: Sendable, Equatable {
     public var videoCodec: String?
     public var container: String?
     public var videoBitrate: Int64 = 0
+    public var frameRate: Double?
     public var timeToFirstFrame: Duration?
     public var lastSeekLatency: Duration?
 }

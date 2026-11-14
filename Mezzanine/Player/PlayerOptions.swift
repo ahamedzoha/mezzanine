@@ -6,6 +6,8 @@ import MezzaninePlayback
 /// choices in place. Dark glass, like every player control.
 struct PlayerOptions: View {
     let item: PlexMetadata
+    /// The open page; the stage owns it so Esc and the subtitle-options key can drive it.
+    @Binding var page: Page
     let close: () -> Void
 
     @Environment(PlaybackCoordinator.self) private var playback
@@ -14,7 +16,6 @@ struct PlayerOptions: View {
     @AppStorage("subtitleScale") private var subtitleScale: Double = 1
     @AppStorage("subtitleBackground") private var subtitleBackground = false
     @AppStorage("subtitleOffset") private var subtitleOffset: Double = 0
-    @State private var page: Page = .root
     @State private var results: [PlexStream] = []
     @State private var searching = false
     @State private var searchError: String?
@@ -42,11 +43,6 @@ struct PlayerOptions: View {
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.rule, lineWidth: 1))
         .animation(Theme.Motion.quick, value: page)
-        .onKeyPress(.escape) {
-            guard page != .root else { return .ignored }
-            page = page == .search ? .subtitles : .root
-            return .handled
-        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Playback options")
     }
