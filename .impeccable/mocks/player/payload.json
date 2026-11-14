@@ -1,0 +1,54 @@
+{
+  "title": "Choose the player's layout",
+  "question": "Three layouts for the player controls (scrub, tracks, sound to 400 %, skip intro/credits, Up Next). The world is set; this picks the composition.",
+  "options": [
+    {
+      "id": "bare",
+      "kind": "assigned",
+      "label": "Bare Picture",
+      "kicker": "THE ROLL",
+      "thesis": "Nothing but the film: a hairline scrub on the bottom edge, title in a corner, one ⋯ button for audio, subtitles, sound and speed; Skip Intro is the only real button.",
+      "palette": ["#0E0F11", "#F2F2F0", "#A08CFF"],
+      "materials": ["hairline scrub", "dark glass popover", "one lilac capsule"],
+      "viewport": "Full-bleed film; 2 pt scrub along the bottom with times above; title top-left; close top-right; ⋯ bottom-right opening a compact sound/tracks popover; lilac Skip Intro above the scrub.",
+      "risk": "Pointer-first viewers must find Play/Pause by clicking the picture; track controls are one click deeper.",
+      "html": ".impeccable/mocks/player/bare.html"
+    },
+    {
+      "id": "corners",
+      "kind": "dealt",
+      "label": "Corners",
+      "thesis": "Controls gather in the four corners and leave the middle to the picture; the scrub along the bottom thickens on hover and shows scrub thumbnails.",
+      "palette": ["#0E0F11", "#F2F2F0", "#A08CFF"],
+      "materials": ["glass corner clusters", "growing scrub bar"],
+      "viewport": "Top-left title, top-right close and PiP; bottom-left play, back 10, forward 10; bottom-right audio, subtitles, sound, full screen; edge scrub with thumbnail on hover.",
+      "risk": "Four clusters is more chrome than the picture strictly needs.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "film", "x": 0, "y": 0, "w": 12, "h": 10},
+        {"label": "title", "x": 0, "y": 0, "w": 4, "h": 1},
+        {"label": "close · PiP", "x": 10, "y": 0, "w": 2, "h": 1},
+        {"label": "play · ±10", "x": 0, "y": 8, "w": 3, "h": 1},
+        {"label": "audio · subs · sound", "x": 8, "y": 8, "w": 4, "h": 1},
+        {"label": "scrub (grows on hover)", "x": 0, "y": 9, "w": 12, "h": 1, "accent": true}
+      ]}
+    },
+    {
+      "id": "pill",
+      "kind": "dealt",
+      "label": "Floating Pill",
+      "thesis": "One compact glass controller floats above the bottom edge, everything in a single row: play, ±10, scrub, time, tracks, sound; drag it anywhere.",
+      "palette": ["#0E0F11", "#F2F2F0", "#A08CFF"],
+      "materials": ["single glass pill", "inline scrub"],
+      "viewport": "A 640 pt pill centred near the bottom: ▶ ⟲10 ⟳10 | scrub | 41:02 | tracks | sound; title fades in top-left.",
+      "risk": "Closest to QuickTime; least distinct, and the scrub is short on wide windows.",
+      "wireframe": {"cols": 12, "rows": 10, "regions": [
+        {"label": "film", "x": 0, "y": 0, "w": 12, "h": 10},
+        {"label": "title", "x": 0, "y": 0, "w": 4, "h": 1},
+        {"label": "pill: play ±10 | scrub | time | tracks | sound", "x": 2, "y": 8, "w": 8, "h": 1, "accent": true}
+      ]}
+    }
+  ],
+  "reroll": true,
+  "buildPath": {"value": "code", "toggle": false},
+  "steer": true
+}

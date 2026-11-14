@@ -198,6 +198,15 @@ public actor PlexServerClient {
         _ = try await perform(request)
     }
 
+    /// Remembers the chosen audio and subtitle streams for a file on the server
+    /// (every Plex app then starts with them). `subtitleStreamID` 0 means off.
+    public func setStreams(partID: Int, audioStreamID: Int? = nil, subtitleStreamID: Int? = nil) async throws {
+        var q = [URLQueryItem(name: "allParts", value: "1")]
+        if let audioStreamID { q.append(URLQueryItem(name: "audioStreamID", value: String(audioStreamID))) }
+        if let subtitleStreamID { q.append(URLQueryItem(name: "subtitleStreamID", value: String(subtitleStreamID))) }
+        try await write("PUT", "/library/parts/\(partID)", query: q)
+    }
+
     /// Marks watched.
     public func scrobble(ratingKey: String) async throws {
         try await write("GET", "/:/scrobble", query: [
@@ -287,6 +296,18 @@ public actor PlexServerClient {
             else if let key = entry.key { folders.append(.init(key: key, title: entry.title ?? "Folder")) }
         }
         return FolderListing(folders: folders, items: items)
+    }
+
+    /// Downloads a subtitle found by `searchSubtitles` and stores it on the server
+    /// as a sidecar for the item (every Plex app sees it afterwards).
+    public func downloadSubtitle(ratingKey: String, result: PlexStream) async throws {
+        var q = [URLQueryItem(name: "key", value: result.key ?? "")]
+        if let codec = result.codec { q.append(URLQueryItem(name: "codec", value: codec)) }
+        if let language = result.languageCode { q.append(URLQueryItem(name: "language", value: language)) }
+        q.append(URLQueryItem(name: "hearingImpaired", value: result.hearingImpaired ? "1" : "0"))
+        q.append(URLQueryItem(name: "forced", value: result.forced ? "1" : "0"))
+        if let provider = result.providerTitle { q.append(URLQueryItem(name: "providerTitle", value: provider)) }
+        try await write("PUT", "/library/metadata/\(ratingKey)/subtitles", query: q)
     }
 
     // MARK: Plumbing

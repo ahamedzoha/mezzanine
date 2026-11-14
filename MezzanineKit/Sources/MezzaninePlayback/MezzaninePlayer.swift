@@ -127,6 +127,16 @@ public final class MezzaninePlayer {
         engine.selectAudioTrack(index: id)
     }
 
+    /// Adds a subtitle file to the playing session (for example one just
+    /// downloaded) and returns its track.
+    @discardableResult
+    public func addExternalSubtitle(_ sub: ExternalSubtitle, headers: [String: String]) -> PlayerTrack {
+        let info = engine.addExternalSubtitleTrack(ExternalSubtitleTrack(
+            url: sub.url, name: sub.name, language: sub.language, isForced: sub.isForced,
+            isHearingImpaired: sub.isHearingImpaired, isDefault: false, httpHeaders: headers, formatHint: sub.format))
+        return PlayerTrack(info)
+    }
+
     public func selectSubtitle(id: Int?) {
         if let id { engine.selectSubtitleTrack(index: id) } else { engine.clearSubtitle() }
     }

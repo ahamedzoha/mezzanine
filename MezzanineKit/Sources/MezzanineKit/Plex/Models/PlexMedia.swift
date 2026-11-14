@@ -104,6 +104,8 @@ public struct PlexStream: Decodable, Sendable, Hashable, Identifiable {
 
     public let id: Int
     public let streamType: StreamType
+    /// The stream's index inside the file (what a demuxer calls it); nil for sidecars.
+    public let index: Int?
     public let codec: String?
     public let language: String?
     public let languageCode: String?
@@ -145,7 +147,7 @@ public struct PlexStream: Decodable, Sendable, Hashable, Identifiable {
     public var label: String { extendedDisplayTitle ?? displayTitle ?? title ?? language ?? "Track \(id)" }
 
     enum CodingKeys: String, CodingKey {
-        case id, streamType, codec, language, languageCode, languageTag, title, displayTitle
+        case id, streamType, index, codec, language, languageCode, languageTag, title, displayTitle
         case extendedDisplayTitle, channels, audioChannelLayout, profile, bitrate, selected
         case isDefault = "default", forced, hearingImpaired, key, format
         case colorTrc, colorPrimaries, DOVIProfile, bitDepth, frameRate
@@ -156,6 +158,7 @@ public struct PlexStream: Decodable, Sendable, Hashable, Identifiable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = c.lenientInt(.id) ?? 0
         streamType = StreamType(rawValue: c.lenientInt(.streamType) ?? 0) ?? .unknown
+        index = c.lenientInt(.index)
         codec = try? c.decodeIfPresent(String.self, forKey: .codec)
         language = try? c.decodeIfPresent(String.self, forKey: .language)
         languageCode = try? c.decodeIfPresent(String.self, forKey: .languageCode)

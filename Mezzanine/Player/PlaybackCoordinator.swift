@@ -48,8 +48,22 @@ final class PlaybackCoordinator {
             withAnimation(Theme.Motion.object) { self.item = detail }
             if let reporter { await reporter.stop(at: player.currentTime, duration: player.duration) }
             let start = detail.viewOffset.map { Double($0) / 1000 }
+            let streams = detail.media.first?.parts.first?.streams ?? []
+            // Follow what Plex has stored for this title (the owner's last choices),
+            // and pass sidecar subtitle files so the engine can show them too.
+            let audio = streams.first { $0.streamType == .audio && $0.selected == true }?.languageCode
+            let subtitle = streams.first { $0.streamType == .subtitle && $0.selected == true }?.languageCode
+            sidecarStreamIDs = streams.filter { $0.streamType == .subtitle && $0.key != nil }.map(\.id)
+            let sidecars: [ExternalSubtitle] = streams.compactMap { stream in
+                guard stream.streamType == .subtitle, let key = stream.key,
+                      let url = client.urls.subtitle(streamKey: key) else { return nil }
+                return ExternalSubtitle(url: url, name: stream.label, language: stream.languageCode,
+                                        format: stream.codec, isForced: stream.forced, isHearingImpaired: stream.hearingImpaired)
+            }
             try await player.load(PlaybackRequest(url: url, headers: client.requestHeaders, startPosition: start,
-                                                  preferredAudioLanguages: ["eng"], preferredSubtitleLanguages: ["eng"]))
+                                                  preferredAudioLanguages: audio.map { [$0] } ?? [],
+                                                  preferredSubtitleLanguages: subtitle.map { [$0] } ?? [],
+                                                  externalSubtitles: sidecars))
             let reporter = ActivityReporter(client: client, item: detail, player: player)
             self.reporter = reporter
             reporter.start()
@@ -57,6 +71,38 @@ final class PlaybackCoordinator {
         } catch {
             self.error = (error as? PlexError)?.userMessage ?? "Couldn’t start playback."
         }
+    }
+
+    // MARK: Tracks (remembered on the server)
+
+    /// Sidecar subtitle streams in the order they were handed to the engine.
+    private var sidecarStreamIDs: [Int] = []
+
+    func selectAudio(trackID: Int) {
+        player.selectAudio(id: trackID)
+        guard let part = item?.media.first?.parts.first,
+              let stream = part.streams.first(where: { $0.streamType == .audio && $0.index == trackID }) else { return }
+        remember(partID: part.id, audio: stream.id, subtitle: nil)
+    }
+
+    func selectSubtitle(trackID: Int?) {
+        player.selectSubtitle(id: trackID)
+        guard let part = item?.media.first?.parts.first else { return }
+        guard let trackID else { remember(partID: part.id, audio: nil, subtitle: 0); return }
+        let externalBase = 100_000
+        let streamID: Int?
+        if trackID >= externalBase {
+            let n = trackID - externalBase
+            streamID = sidecarStreamIDs.indices.contains(n) ? sidecarStreamIDs[n] : nil
+        } else {
+            streamID = part.streams.first { $0.streamType == .subtitle && $0.index == trackID }?.id
+        }
+        if let streamID { remember(partID: part.id, audio: nil, subtitle: streamID) }
+    }
+
+    private func remember(partID: Int, audio: Int?, subtitle: Int?) {
+        guard !ActivityReporter.isDisabled, let client = session.client else { return }
+        Task { try? await client.setStreams(partID: partID, audioStreamID: audio, subtitleStreamID: subtitle) }
     }
 
     func close() {
