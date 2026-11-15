@@ -196,6 +196,9 @@ struct AppShell: View {
             // -MezzanineAutoplay <ratingKey> starts a title at launch (player tests).
             if let key = UserDefaults.standard.string(forKey: "MezzanineAutoplay"), let client = session.client,
                let item = try? await client.metadata(key) {
+                // -MezzanineAutoplayDelay 5: wait first (prewarm measurements: open the page, then play).
+                let delay = UserDefaults.standard.integer(forKey: "MezzanineAutoplayDelay")
+                if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
                 if UserDefaults.standard.bool(forKey: "playerMuted") { playback.player.volume = VolumeLevel(percent: 0) }
                 await playback.play(item, from: nil)
                 Task {

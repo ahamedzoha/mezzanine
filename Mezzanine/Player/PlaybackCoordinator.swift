@@ -471,6 +471,28 @@ final class PlaybackCoordinator {
         await play(next, from: nil, autoplayed: false)
     }
 
+    /// Warms a title the viewer is likely to play next (its page is open, its poster has had
+    /// focus a moment): the file's opening bytes are fetched now, so Play starts without those
+    /// round trips. Home network only (8 MB each), never for a downloaded copy, once per file.
+    func prewarm(_ target: PlexMetadata) {
+        guard target.kind == .movie || target.kind == .episode, item == nil,
+              session.connection?.connection.route == .local,
+              downloads?.localFile(for: target.ratingKey) == nil,
+              let client = session.client, let key = target.media.first?.parts.first?.key,
+              let url = client.urls.part(key: key), !warmed.contains(url) else { return }
+        warmed.append(url)
+        if warmed.count > 12 { warmed.removeFirst() }
+        let headers = client.requestHeaders
+        Task.detached(priority: .utility) {
+            await MezzaninePlayer.prewarm(url: url, headers: headers)
+            #if DEBUG
+            print("PERF prewarmed \(target.ratingKey)")
+            #endif
+        }
+    }
+
+    @ObservationIgnored private var warmed: [URL] = []
+
     /// Warms the next episode's file (called when Up Next appears).
     func prewarmNext() {
         guard let next = nextEpisode, let client = session.client,

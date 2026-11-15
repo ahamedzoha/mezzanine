@@ -223,6 +223,13 @@ struct HomeView: View {
             commands.hasFocusedTitle = key != nil
             updateRoom()
         }
+        // A poster that keeps focus a moment is likely to be played: warm its file.
+        .task(id: model.focusedItem?.ratingKey) {
+            guard let item = model.focusedItem else { return }
+            try? await Task.sleep(for: .milliseconds(700))
+            guard !Task.isCancelled else { return }
+            playback.prewarm(item)
+        }
         .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }
         .onChange(of: commands.detailsRequests) { _, _ in
             withAnimation(Theme.Motion.object(reduceMotion)) { showsDetails.toggle() }

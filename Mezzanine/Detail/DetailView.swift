@@ -121,6 +121,12 @@ struct DetailView: View {
         }
         .onDisappear { if commands.currentDetailItem?.ratingKey == item?.ratingKey { commands.currentDetailItem = nil } }
         .onChange(of: library.revision) { _, _ in Task { await refreshEpisodes() } }
+        .task(id: playTarget?.ratingKey) {
+            guard let target = playTarget else { return }
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            playback.prewarm(target)
+        }
     }
 
     // MARK: Sections
@@ -261,6 +267,12 @@ struct DetailView: View {
     private var trailer: PlexMetadata? { item?.extras.first { $0.subtype == "trailer" } }
 
     /// For shows: the episode Play starts (in progress, else first unwatched).
+    /// What Play on this page would start, warmed half a second after it's known.
+    private var playTarget: PlexMetadata? {
+        guard let item else { return nil }
+        return nextEpisode ?? (item.kind == .movie ? item : nil)
+    }
+
     private var nextEpisode: PlexMetadata? {
         guard item?.kind == .show || item?.kind == .season else { return nil }
         return episodes.first { ($0.viewOffset ?? 0) > 0 } ?? episodes.first { !$0.isWatched }
