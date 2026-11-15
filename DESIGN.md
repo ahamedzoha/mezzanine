@@ -303,6 +303,7 @@ Arrows move focus and scroll (← at the first column returns to the sidebar; Ho
 - **Do** give every shortcut a menu item.
 - **Do** show selection on a strip or a Quick Open row as raised-hover fill and a lilac title, with lift only on strips.
 - **Do** ask before Restore Default Shelves, and make every shelf change one ⌘Z step.
+- **Do** add a 2 pt ink outline to the focused card under Increase Contrast, and only then (`contrastFocusOutline`).
 
 ### Don't:
 - **Don't** put Liquid Glass on content; toolbar, sidebar and player controls only.
@@ -356,6 +357,7 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - Playback info (I): a solid graphite card top-left under the title mark — route, video, decoder, audio path, output device and profile, volume, start and seek times.
 - Scrub hover: a 200 pt frame preview above the bar (the engine's cached segments near the playhead, a second reader's nearest keyframe elsewhere), with the chapter name and time; chapter starts are small gaps in the bar.
 - Help ▸ Keyboard Shortcuts (⌘/) lists every key, read-only, with Change Keys… into Settings.
+- The Playback menu is always there, dimmed with no film open: transport, Jump To ▸, Speed ▸, episodes, Audio and Subtitles ▸, Sound ▸, view items, Close Player, and the output's Sound Profile ▸. Bare-letter keys exist only while a film plays in the key window, so typing in Settings or a sheet never reaches the player. Closing the window stops the film.
 
 ## Delivery (direct play first)
 

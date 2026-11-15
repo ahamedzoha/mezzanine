@@ -1,5 +1,39 @@
 # Progress
 
+## 2026-11-15 (evening) — M13 finish: performance pass, full HIG sweep, architecture doc
+
+- Performance (optimized build, LAN, `-MezzanineNoActivity`):
+  - Launch: app ready at 0.4 s; Home shelves loaded at 2.5 s (network hubs). Home loaded three
+    times at launch (server, index, sync each changed its task id): now debounced into one reload.
+  - Idle Home: 0.3 % CPU, energy impact 0.4.
+  - Playback, 1080p HEVC with AAC 5.1 (bridged, shaped): 6.5 % of one core, energy impact ~8.
+    With Generate from Speech on: 7.5 %, ~9.4.
+  - Up Next into the next episode: 33 ms to load, first frame 471 ms later (prewarm works; S6 met).
+  - Cold first frame of a new title varies 2.3–4.7 s after load (worth a look at the engine's
+    probe/bridge start; open).
+  - Bug found: ⌥G pressed while a title loads was dropped. Now it starts when the title is on screen.
+- Full HIG sweep (Needs Work) applied:
+  - Player menu keys (bare letters) only live while a film plays in the key window: typing in
+    Settings or a sheet never pauses or mutes. Closing the window stops the film.
+  - Playback menu always visible (dimmed without a film), grouped: Audio and Subtitles ▸, Sound ▸.
+  - The section open at quit comes back at launch (not title pages or the player).
+  - OpenSubtitles/Subdl sheets: keys trimmed, half an account can't be saved, Remove Key, the key
+    field focused.
+  - Shortcuts: Restore Defaults asks first; window resizable and not reopened at launch; the
+    reference lists Downloads, Play and window keys and the Full Keyboard Access note.
+  - Find Subtitles: clicks right after a re-sort are ignored, two-line release names, other rows
+    locked while one loads, "every source is turned off" message.
+  - Increase Contrast: the focused card gains a 2 pt ink outline.
+  - Settings: why Sound adjustments are off for receivers and AirPods, Night mode two-line label,
+    the skip key named from its binding, friendly connection names, "None" not "—", a progress
+    spinner for Read Library Again, taller minimum window; menu titles without key hints;
+    View ▸ Show/Hide Details tracks its state.
+- `docs/ARCHITECTURE.md` written (module map, data flow, playback, persistence, gotchas, and
+  where the code differs from the plan).
+- Still open: S3 audio on each output (needs the owner at each device); Translate's first live
+  run; OpenSubtitles/Subdl keys; new-episode notifications (needs the owner's OK); not built:
+  mini player / pop-out, aspect and zoom, Google Cast, Trakt (needs the owner's API app).
+
 ## 2026-11-15 (afternoon) — M12 on-device subtitles, new app icon
 
 - App icon replaced by the owner's pick: stacked glass slabs with a standing play triangle
@@ -26,7 +60,6 @@
   Stop Generating and failed starts put back the previous subtitle, a refused translation pair
   retries on track change, switch rows are whole-row and hueless (One Lilac Rule; also Background
   box and Night mode), readout copy in the house style, privacy wording made exact.
-- Next: owner tries Translate once (system language download), then M13.
 
 ## 2026-11-15 (overnight) — Find Subtitles from every free source
 

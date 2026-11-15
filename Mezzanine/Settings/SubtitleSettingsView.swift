@@ -103,12 +103,14 @@ struct OpenSubtitlesSheet: View {
     @State private var checking = false
     @State private var result: (ok: Bool, message: String)?
     @State private var loaded = false
+    @FocusState private var keyFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Form {
                 Section {
                     SecureField("API key", text: $key, prompt: Text("Required"))
+                        .focused($keyFocused)
                     TextField("Username", text: $user, prompt: Text("Optional"))
                         .autocorrectionDisabled()
                     SecureField("Password", text: $password, prompt: Text("Optional"))
@@ -133,8 +135,13 @@ struct OpenSubtitlesSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)
+                if !settings.openSubtitlesKey.isEmpty {
+                    Button("Remove Key", role: .destructive) { remove() }
+                }
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Save") { save() }.keyboardShortcut(.defaultAction)
+                    .disabled(halfAccount)
+                    .help(halfAccount ? "Enter both the username and the password, or neither." : "")
             }
             .padding(.horizontal, 20).padding(.bottom, 16)
         }
@@ -146,11 +153,14 @@ struct OpenSubtitlesSheet: View {
             key = settings.openSubtitlesKey
             user = settings.openSubtitlesUser
             password = settings.openSubtitlesPassword
+            keyFocused = true
         }
         .onChange(of: [key, user, password]) { result = nil }
     }
 
-    private var halfAccount: Bool { user.isEmpty != password.isEmpty }
+    private var halfAccount: Bool { trimmedUser.isEmpty != password.isEmpty }
+    private var trimmedKey: String { key.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedUser: String { user.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private func check() async {
         if halfAccount {
@@ -158,16 +168,25 @@ struct OpenSubtitlesSheet: View {
             return
         }
         checking = true
-        result = await SubtitleSourceSettings.checkOpenSubtitles(key: key, user: user, password: password)
+        result = await SubtitleSourceSettings.checkOpenSubtitles(key: trimmedKey, user: trimmedUser, password: password)
         checking = false
         if let result { AccessibilityNotification.Announcement(result.message).post() }
     }
 
     private func save() {
-        settings.openSubtitlesKey = key
-        settings.openSubtitlesUser = user
+        guard !halfAccount else { return }
+        settings.openSubtitlesKey = trimmedKey
+        settings.openSubtitlesUser = trimmedUser
         settings.openSubtitlesPassword = password
         settings.openSubtitlesStatus = result.map { $0.ok ? $0.message : nil } ?? nil
+        dismiss()
+    }
+
+    private func remove() {
+        settings.openSubtitlesKey = ""
+        settings.openSubtitlesUser = ""
+        settings.openSubtitlesPassword = ""
+        settings.openSubtitlesStatus = nil
         dismiss()
     }
 }
@@ -178,12 +197,14 @@ private struct SubdlSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var key = ""
     @State private var loaded = false
+    @FocusState private var keyFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Form {
                 Section {
                     SecureField("API key", text: $key, prompt: Text("Required"))
+                        .focused($keyFocused)
                 } header: {
                     Text("Subdl")
                 } footer: {
@@ -196,8 +217,12 @@ private struct SubdlSheet: View {
             .formStyle(.grouped)
             HStack {
                 Spacer()
+                if !settings.subdlKey.isEmpty {
+                    Button("Remove Key", role: .destructive) { settings.subdlKey = ""; dismiss() }
+                }
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Save") { settings.subdlKey = key; dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Save") { settings.subdlKey = key.trimmingCharacters(in: .whitespacesAndNewlines); dismiss() }
+                    .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 20).padding(.bottom, 16)
         }
@@ -207,6 +232,7 @@ private struct SubdlSheet: View {
             guard !loaded else { return }
             loaded = true
             key = settings.subdlKey
+            keyFocused = true
         }
     }
 }

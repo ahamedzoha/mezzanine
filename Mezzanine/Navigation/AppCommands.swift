@@ -10,9 +10,36 @@ import MezzanineKit
 final class AppCommandCenter {
     /// Video libraries, for the Go menu (⌘2…⌘9).
     var sections: [PlexLibrarySection] = []
-    var selection: SidebarItem? = .home {
-        didSet { if selection != oldValue { query = ""; path = [] } }
+    var selection: SidebarItem? = AppCommandCenter.restoredSelection {
+        didSet {
+            if selection != oldValue { query = ""; path = [] }
+            UserDefaults.standard.set(selection.map(Self.storageKey), forKey: "lastSidebarItem")
+        }
     }
+
+    /// The section open when the app last quit (title pages and the player aren't restored).
+    /// Off under `-ApplePersistenceIgnoreState YES`, as every test run launches.
+    private static var restoredSelection: SidebarItem? {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "ApplePersistenceIgnoreState"), let raw = defaults.string(forKey: "lastSidebarItem") else { return .home }
+        if raw == "downloads" { return .downloads }
+        if raw.hasPrefix("library:") { return .library(String(raw.dropFirst("library:".count))) }
+        return .home
+    }
+
+    private static func storageKey(_ item: SidebarItem) -> String {
+        switch item {
+        case .home: "home"
+        case .downloads: "downloads"
+        case .library(let key): "library:\(key)"
+        }
+    }
+
+    /// The main window is key: bare-letter player shortcuts only act then, so typing in
+    /// Settings or another window never pauses or mutes the film.
+    var mainWindowIsKey = true
+    /// Home's summary panel is open (View ▸ Show/Hide Details).
+    var detailsShown = false
     /// Detail pages pushed over the current section.
     var path: [DetailRoute] = [] {
         didSet { recordForward(from: oldValue) }
@@ -225,15 +252,18 @@ struct MezzanineCommands: Commands {
 
     /// A player key as a menu item, showing its current (rebindable) key. The key router
     /// handles the key itself first, so these never fire while typing in a field.
+    /// Player keys are bare letters: they're live only while a film plays in the key window.
+    private var playerKeys: Bool { center.isPlayerOpen && center.mainWindowIsKey }
+
     private func item(_ key: PlayerKey, title: String? = nil, disabled: Bool = false) -> some View {
         Button(title ?? key.menuTitle) { center.player(.key(key)) }
-            .keyboardShortcut(shortcuts.menuShortcut(key))
+            .keyboardShortcut(playerKeys ? shortcuts.menuShortcut(key) : nil)
             .disabled(disabled)
     }
 
     private func toggle(_ key: PlayerKey, isOn: Bool, title: String? = nil) -> some View {
         Toggle(title ?? key.menuTitle, isOn: Binding(get: { isOn }, set: { _ in center.player(.key(key)) }))
-            .keyboardShortcut(shortcuts.menuShortcut(key))
+            .keyboardShortcut(playerKeys ? shortcuts.menuShortcut(key) : nil)
     }
 
     var body: some Commands {
@@ -283,11 +313,11 @@ struct MezzanineCommands: Commands {
                 Button("Move Shelf Down") { center.shelf(.moveDown) }
                     .keyboardShortcut(.downArrow, modifiers: .option)
                     .disabled(center.isBlocked)
-                Button("Show or Hide Shelf (Space)") { center.shelf(.toggleHidden) }
+                Button("Show or Hide Shelf") { center.shelf(.toggleHidden) }
                     .disabled(center.isBlocked)
-                Button("Rename Shelf… (Return)") { center.shelf(.rename) }
+                Button("Rename Shelf…") { center.shelf(.rename) }
                     .disabled(center.isBlocked)
-                Button("Remove Shelf (Delete)") { center.shelf(.remove) }
+                Button("Remove Shelf") { center.shelf(.remove) }
                     .disabled(center.isBlocked)
             }
             Divider()
@@ -302,7 +332,7 @@ struct MezzanineCommands: Commands {
             .keyboardShortcut("b", modifiers: [.command, .option])
             .disabled(center.currentDetailItem == nil || center.isBlocked)
             Divider()
-            Button("Show Details") { center.toggleDetails() }
+            Button(center.detailsShown ? "Hide Details" : "Show Details") { center.toggleDetails() }
                 .keyboardShortcut("i", modifiers: .command)
                 .disabled(!center.isHomeVisible || center.isBlocked || center.isEditingShelves)
             Button("Larger Posters") { center.stepDensity(20) }
@@ -355,7 +385,15 @@ struct MezzanineCommands: Commands {
             }
         }
         CommandMenu("Playback") {
-            if center.isPlayerOpen {
+            if !center.isPlayerOpen {
+                Button("Play") { center.playFocused() }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!center.hasFocusedTitle || !center.isSignedIn || center.isBlocked || center.isEditingShelves)
+                Divider()
+            }
+            // Shown always (dimmed with no film open) so the keys can be learned from here;
+            // their bare-letter shortcuts only exist while a film plays in the key window.
+            Group {
                 item(.playPause)
                 item(.back10)
                 item(.forward10)
@@ -366,7 +404,7 @@ struct MezzanineCommands: Commands {
                 Menu("Jump To") {
                     ForEach(0..<10, id: \.self) { d in
                         Button(d == 0 ? "Start" : "\(d * 10) %") { center.player(.jump(d)) }
-                            .keyboardShortcut(KeyEquivalent(Character(String(d))), modifiers: [])
+                            .keyboardShortcut(playerKeys ? KeyboardShortcut(KeyEquivalent(Character(String(d))), modifiers: []) : nil)
                     }
                 }
                 item(.previousFrame)
@@ -385,24 +423,29 @@ struct MezzanineCommands: Commands {
                 item(.nextEpisode, disabled: !center.hasNextEpisode)
                 item(.previousEpisode, disabled: !center.hasPreviousEpisode)
                 Divider()
-                item(.cycleAudio)
-                item(.cycleSubtitles)
-                item(.subtitleOptions)
-                item(.findSubtitles)
-                // Actions that start and stop name what they'll do; Translate is a setting.
-                item(.generateSubtitles, title: center.generatingSubtitles ? "Stop Generating Subtitles" : nil)
-                toggle(.translateSubtitles, isOn: center.translatingSubtitles,
-                       title: "Translate Subtitles to \(center.subtitleTranslateTarget)")
-                item(.subtitlesEarlier)
-                item(.subtitlesLater)
-                item(.matchSubtitleTiming, title: center.matchingSubtitleTiming ? "Stop Matching Subtitle Timing" : nil,
-                     disabled: !center.matchingSubtitleTiming && !center.canMatchSubtitleTiming)
-                Divider()
-                item(.volumeUp)
-                item(.volumeDown)
-                toggle(.mute, isOn: center.isMuted)
-                toggle(.dialogueBoost, isOn: sound.current.profile.dialogueGainDB > 0)
-                toggle(.nightMode, isOn: sound.current.profile.nightMode)
+                Menu("Audio and Subtitles") {
+                    item(.cycleAudio)
+                    item(.cycleSubtitles)
+                    item(.subtitleOptions)
+                    item(.findSubtitles)
+                    Divider()
+                    // Actions that start and stop name what they'll do; Translate is a setting.
+                    item(.generateSubtitles, title: center.generatingSubtitles ? "Stop Generating Subtitles" : nil)
+                    toggle(.translateSubtitles, isOn: center.translatingSubtitles,
+                           title: "Translate Subtitles to \(center.subtitleTranslateTarget)")
+                    Divider()
+                    item(.subtitlesEarlier)
+                    item(.subtitlesLater)
+                    item(.matchSubtitleTiming, title: center.matchingSubtitleTiming ? "Stop Matching Subtitle Timing" : nil,
+                         disabled: !center.matchingSubtitleTiming && !center.canMatchSubtitleTiming)
+                }
+                Menu("Sound") {
+                    item(.volumeUp)
+                    item(.volumeDown)
+                    toggle(.mute, isOn: center.isMuted)
+                    toggle(.dialogueBoost, isOn: sound.current.profile.dialogueGainDB > 0)
+                    toggle(.nightMode, isOn: sound.current.profile.nightMode)
+                }
                 Divider()
                 item(.fullScreen)
                 item(.pictureInPicture, disabled: !center.canPictureInPicture)
@@ -412,8 +455,9 @@ struct MezzanineCommands: Commands {
                     .keyboardShortcut("s", modifiers: [.command, .shift])
                 Divider()
                 Button("Close Player") { center.player(.close) }
-                    .keyboardShortcut(.escape, modifiers: [])
+                    .keyboardShortcut(playerKeys ? KeyboardShortcut(.escape, modifiers: []) : nil)
             }
+            .disabled(!center.isPlayerOpen)
             Divider()
             Menu("Sound Profile for \(sound.deviceName)") {
                 Picker("Profile", selection: Binding(get: { sound.current.kind }, set: { sound.setKind($0) })) {
@@ -422,13 +466,6 @@ struct MezzanineCommands: Commands {
                     }
                 }
                 .pickerStyle(.inline)
-            }
-            if !center.isPlayerOpen {
-                Button("Play") { center.playFocused() }
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(!center.hasFocusedTitle || !center.isSignedIn || center.isBlocked || center.isEditingShelves)
-                Divider()
-                Text("Also: Space plays the focused title; Return opens it")
             }
         }
     }

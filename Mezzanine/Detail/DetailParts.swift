@@ -189,6 +189,7 @@ struct EpisodeRow: View {
                     if hovering || isFocused { PlayDisc { onPlay(frame) }.padding(.trailing, 8).padding(.bottom, 12) }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.still, style: .continuous))
+                .contrastFocusOutline(isFocused, radius: Theme.Radius.still)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: Theme.Space.s) {

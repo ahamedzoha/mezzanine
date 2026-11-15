@@ -109,6 +109,7 @@ struct PosterCard: View {
                 if lifted { PlayDisc { onPlay(frame) }.padding(10).transition(.opacity) }
             }
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous))
+            .contrastFocusOutline(isFocused)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
             .shadow(color: .black.opacity(lifted ? 0.6 : 0.3), radius: lifted ? 22 : 8, y: lifted ? 14 : 4)
             .scaleEffect(lifted && !reduceMotion ? 1.045 : 1, anchor: .bottom)

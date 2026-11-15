@@ -208,7 +208,8 @@ struct PlayerOptions: View {
                     VStack(spacing: 2) {
                         ForEach(finder.results.prefix(Self.shownResults)) { result in
                             choice(result.release, detail: resultDetail(result), selected: false,
-                                   busy: finder.downloading == result.id, detailLines: 2) { choose(result) }
+                                   busy: finder.downloading == result.id, titleLines: 2, detailLines: 2) { choose(result) }
+                                .disabled(finder.downloading != nil && finder.downloading != result.id)
                                 .help(result.release)
                                 .accessibilityHint("Loads this subtitle")
                         }
@@ -227,7 +228,8 @@ struct PlayerOptions: View {
                 ForEach(finder.problems, id: \.source) { problem in problemNote("\(problem.source): \(problem.message).") }
             }
             if finder.results.isEmpty && !finder.isSearching {
-                note("No subtitles found in \(languageList).")
+                note(finder.sourceCount == 0 ? "Every subtitle source is turned off. Turn one on in Subtitle Settings."
+                     : "No subtitles found in \(languageList).")
             }
             Divider().overlay(Theme.rule).padding(.vertical, 4)
             if !finder.isSearching {
@@ -396,7 +398,7 @@ struct PlayerOptions: View {
         .accessibilityAddTraits(.isHeader)
     }
 
-    private func choice(_ title: String, detail: String?, selected: Bool, busy: Bool = false, detailLines: Int = 1,
+    private func choice(_ title: String, detail: String?, selected: Bool, busy: Bool = false, titleLines: Int = 1, detailLines: Int = 1,
                         action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: Theme.Space.m) {
@@ -407,7 +409,7 @@ struct PlayerOptions: View {
                 }
                 .frame(width: 12)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink).lineLimit(1)
+                    Text(title).font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink).lineLimit(titleLines)
                     if let detail, !detail.isEmpty {
                         Text(detail).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary).lineLimit(detailLines)
                     }

@@ -86,3 +86,42 @@ struct WindowChrome: NSViewRepresentable {
         }
     }
 }
+
+/// Tells the app when the main window becomes or stops being key, and when it closes, so
+/// bare-letter player shortcuts never fire while typing in Settings or a sheet, and closing
+/// the window stops a playing film instead of leaving it playing with no window.
+struct MainWindowWatcher: NSViewRepresentable {
+    let keyChanged: (Bool) -> Void
+    let willClose: () -> Void
+
+    func makeNSView(context: Context) -> WatcherView { WatcherView() }
+
+    func updateNSView(_ view: WatcherView, context: Context) {
+        view.keyChanged = keyChanged
+        view.willClose = willClose
+    }
+
+    final class WatcherView: NSView {
+        var keyChanged: ((Bool) -> Void)?
+        var willClose: (() -> Void)?
+        private var observers: [NSObjectProtocol] = []
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observers.forEach { NotificationCenter.default.removeObserver($0) }
+            observers = []
+            guard let window else { return }
+            let center = NotificationCenter.default
+            observers.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.keyChanged?(true) }
+            })
+            observers.append(center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.keyChanged?(false) }
+            })
+            observers.append(center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.willClose?() }
+            })
+            keyChanged?(window.isKeyWindow)
+        }
+    }
+}

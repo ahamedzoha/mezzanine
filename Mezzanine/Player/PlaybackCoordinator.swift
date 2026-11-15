@@ -113,6 +113,9 @@ final class PlaybackCoordinator {
     }
 
     private func play(_ item: PlexMetadata, from origin: CGRect?, autoplayed: Bool) async {
+        #if DEBUG
+        PerfLog.mark("play requested \(item.ratingKey) autoplayed=\(autoplayed)")
+        #endif
         // Offline: a downloaded film or episode still plays, from its saved details.
         guard let client = session.client else {
             await playOffline(item, from: origin)
@@ -218,6 +221,9 @@ final class PlaybackCoordinator {
         if let previousSession, previousSession != transcodeSession {
             Task { await client.stopTranscode(session: previousSession) }
         }
+        #if DEBUG
+        PerfLog.mark("engine load \(mode)")
+        #endif
         do {
             try await player.load(PlaybackRequest(url: url, headers: headers, startPosition: start,
                                                   preferredAudioLanguages: audio.map { [$0] } ?? [],

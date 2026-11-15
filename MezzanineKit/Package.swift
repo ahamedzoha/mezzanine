@@ -7,10 +7,10 @@ import PackageDescription
 // decoding and indexing run off the main actor; the app target is
 // MainActor-by-default.
 //
-// MezzaninePlayback wraps AetherEngine behind Mezzanine's own
-// `PlaybackEngine` protocol, so engine API churn (it releases almost daily)
-// touches one adapter. AetherEngine is pinned to an exact version on purpose:
-// bump it deliberately and re-run the playback matrix.
+// MezzaninePlayback holds `MezzaninePlayer`, the only code that imports AetherEngine; the app
+// talks to Mezzanine's own types, so engine API churn (it releases almost daily) touches one
+// file. AetherEngine is pinned to an exact version on purpose: bump it deliberately and re-run
+// the playback matrix.
 let package = Package(
     name: "MezzanineKit",
     platforms: [.macOS(.v26)],

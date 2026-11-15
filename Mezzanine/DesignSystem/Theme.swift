@@ -145,3 +145,25 @@ enum TitleFont {
         return Font(font)
     }
 }
+
+/// Under Increase Contrast the focused card also gets a 2 pt ink outline: lift, shadow and a
+/// lilac title alone are too faint there. (No ring otherwise, by design.)
+struct ContrastFocusOutline: ViewModifier {
+    let isFocused: Bool
+    let radius: CGFloat
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if isFocused && contrast == .increased {
+                RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Theme.ink, lineWidth: 2)
+            }
+        }
+    }
+}
+
+extension View {
+    func contrastFocusOutline(_ isFocused: Bool, radius: CGFloat = Theme.Radius.poster) -> some View {
+        modifier(ContrastFocusOutline(isFocused: isFocused, radius: radius))
+    }
+}

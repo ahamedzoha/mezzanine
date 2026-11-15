@@ -62,6 +62,8 @@ struct HomeView: View {
             }
         }
         .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(scope)|\(library.revision)") { await load() }
+        .onChange(of: showsDetails, initial: true) { _, shown in commands.detailsShown = shown }
+        .onDisappear { commands.detailsShown = false }
         .onChange(of: layouts.revision) { _, _ in
             // Reload only for changes made elsewhere (a profile switch), not for this page's own saves.
             guard !editing, loadedSaved != .some(layouts.saved(scope)) else { return }
@@ -286,11 +288,21 @@ struct HomeView: View {
 
     private func load() async {
         guard let client = session.client else { return }
+        // At launch the server, then the index, then its first sync each change the task id
+        // within a fraction of a second; once shelves are on screen, let those settle into
+        // one reload instead of three rounds of hub requests.
+        if !model.shelves.isEmpty {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+        }
         let saved = layouts.saved(scope)
         await model.load(scope: scope, saved: saved, client: client, index: library.index)
         // A newer load (the layout changed) supersedes this one.
         guard !Task.isCancelled else { return }
         loadedSaved = .some(saved)
+        #if DEBUG
+        PerfLog.mark("home loaded (\(model.shelves.count) shelves)")
+        #endif
         if editing { return }
         if !editing { updateRoom() }
         consumePendingAction()

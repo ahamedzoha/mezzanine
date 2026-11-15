@@ -328,6 +328,9 @@ public final class MezzaninePlayer {
             self.firstFrameReady = ready
             if ready, let started = self.loadStartedAt {
                 self.diagnostics.timeToFirstFrame = ContinuousClock().now - started
+                #if DEBUG
+                print("PERF first frame \(Int((ContinuousClock().now - started) / .milliseconds(1))) ms after engine load")
+                #endif
                 self.loadStartedAt = nil
             }
         }.store(in: &bag)

@@ -2,7 +2,7 @@
 
 Private native macOS 26 client for the owner's Plex Media Server (replaces Infuse). Read
 `docs/PROGRESS.md` first (status and open items), then the approved plan
-`~/.claude/plans/eventual-plotting-storm.md`, `docs/ARCHITECTURE.md` (once written),
+`~/.claude/plans/eventual-plotting-storm.md`, `docs/ARCHITECTURE.md`,
 `PRODUCT.md`, `DESIGN.md`.
 
 **UI/UX is the top priority.** Every UI surface gets an `/impeccable` round before it's built
@@ -27,7 +27,8 @@ Build output goes to `build.noindex/` (Spotlight skips it).
 
 - `MezzanineKit/` local SPM package, non-isolated code:
   - `MezzanineKit` — Plex client (plex.tv auth/resources, `ConnectionRacer`, `PlexServerClient`,
-    models with lenient decoding), `AudioProfile`/`VolumeLevel`, later the GRDB index.
+    models with lenient decoding), `AudioProfile`/`VolumeLevel`, the GRDB index, subtitle sources,
+    on-device speech (`OnDevice/`). Architecture map: `docs/ARCHITECTURE.md`.
   - `MezzaninePlayback` — `MezzaninePlayer`, the **only** code that imports AetherEngine.
     The app uses Mezzanine's own types (`PlayerStatus`, `PlayerTrack`, `PlayerCue`).
 - `Mezzanine/` app target, MainActor by default. `Lab/` is DEBUG-only (the M0 spike harness).

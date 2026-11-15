@@ -537,6 +537,7 @@ private struct WideCard: View {
             }
             .aspectRatio(16 / 9, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.still, style: .continuous))
+            .contrastFocusOutline(isFocused, radius: Theme.Radius.still)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
             .shadow(color: .black.opacity(lifted ? 0.6 : 0.3), radius: lifted ? 22 : 8, y: lifted ? 14 : 4)
             .scaleEffect(lifted && !reduceMotion ? 1.03 : 1, anchor: .bottom)
@@ -625,6 +626,7 @@ private struct TitleRow: View {
         .frame(height: 56)
         .background(RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous)
             .fill(isFocused || hovering ? Theme.raised : .clear))
+        .contrastFocusOutline(isFocused, radius: Theme.Radius.control)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         .task(id: item.ratingKey) { await library.resolveCleanPoster(for: item) }
         .modifier(CardInteraction(item: item, frame: frame, isFocused: isFocused, hovering: $hovering, dwell: $dwell,
@@ -724,6 +726,7 @@ struct GridPoster: View {
             }
             .aspectRatio(2 / 3, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.poster, style: .continuous))
+            .contrastFocusOutline(isFocused)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
             .shadow(color: .black.opacity(lifted ? 0.6 : 0.3), radius: lifted ? 22 : 8, y: lifted ? 14 : 4)
             .scaleEffect(lifted && !reduceMotion ? 1.045 : 1, anchor: .bottom)

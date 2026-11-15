@@ -32,6 +32,9 @@ struct MezzanineApp: App {
     @State private var subtitleFinder = SubtitleFinder()
 
     init() {
+        #if DEBUG
+        PerfLog.mark("app init")
+        #endif
         TitleFont.register()
         let session = SessionStore()
         let player = MezzaninePlayer.makeShared()
@@ -89,6 +92,9 @@ struct MezzanineApp: App {
         }
         .defaultSize(width: 520, height: 720)
         .windowResizability(.contentMinSize)
+        // A reference window: it doesn't come back by itself after a relaunch.
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.suppressed)
 
         #if DEBUG
         // Review captures: the rule sheet and collection picker as plain windows (window
@@ -165,6 +171,23 @@ private struct SheetPreview: View {
                 conditions: [.watch(.unwatched), .genre("Comedy", excluded: false), .decade(1990), .minRating(7)],
                 sort: .rating))), scope: HomeLayout.mainScope, sections: commands.sections) { _ in }
         }
+    }
+}
+#endif
+
+#if DEBUG
+/// `PERF` lines for performance passes: milliseconds since the app's process started.
+enum PerfLog {
+    static let processStart: Date = {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.size
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+        guard sysctl(&mib, 4, &info, &size, nil, 0) == 0 else { return Date() }
+        let t = info.kp_proc.p_starttime
+        return Date(timeIntervalSince1970: Double(t.tv_sec) + Double(t.tv_usec) / 1_000_000)
+    }()
+    static func mark(_ what: String) {
+        print(String(format: "PERF %@ +%.0f ms", what, Date().timeIntervalSince(processStart) * 1000))
     }
 }
 #endif

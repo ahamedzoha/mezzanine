@@ -18,6 +18,11 @@ final class SubtitleFinder {
     /// Why the last choice didn't load.
     var failure: String?
     private(set) var languages: [String] = []
+    /// How many sources the last search asked (0: every source is turned off).
+    private(set) var sourceCount = 0
+    /// When the list last re-sorted: a click just after lands on a row that moved under the
+    /// pointer, so it's ignored.
+    @ObservationIgnored private var reorderedAt = Date.distantPast
 
     @ObservationIgnored private var query: SubtitleQuery?
     @ObservationIgnored private var sources: [any SubtitleSource] = []
@@ -37,6 +42,7 @@ final class SubtitleFinder {
         problems = []
         failure = nil
         self.sources = sources
+        sourceCount = sources.count
         pending = sources.map(\.name)
         let languages = settings.languages
         task = Task { [weak self] in
@@ -45,7 +51,11 @@ final class SubtitleFinder {
             self?.query = query
             for await answer in SubtitleSearch.answers(query, sources: sources) {
                 guard let self, !Task.isCancelled else { return }
-                self.results = SubtitleSearch.rank(self.results + answer.results, languages: languages)
+                let ranked = SubtitleSearch.rank(self.results + answer.results, languages: languages)
+                if !self.results.isEmpty, ranked.prefix(self.results.count).map(\.id) != self.results.map(\.id) {
+                    self.reorderedAt = Date()
+                }
+                self.results = ranked
                 self.pending.removeAll { $0 == answer.source }
                 if let problem = answer.problem { self.problems.append((answer.source, problem)) }
             }
@@ -65,7 +75,7 @@ final class SubtitleFinder {
     /// app sees them); the rest are kept on this Mac for this title.
     func choose(_ result: SubtitleResult, current: PlexMetadata, client: PlexServerClient?, serverID: String?,
                 player: MezzaninePlayer) async -> Found? {
-        guard downloading == nil else { return nil }
+        guard downloading == nil, Date().timeIntervalSince(reorderedAt) > 0.35 else { return nil }
         downloading = result.id
         failure = nil
         defer { downloading = nil }

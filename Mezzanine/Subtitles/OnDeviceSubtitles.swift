@@ -89,6 +89,8 @@ final class OnDeviceSubtitles {
     @ObservationIgnored private var untranslatable: Set<String> = []
     /// The subtitle on screen before generating started.
     @ObservationIgnored private var previousTrack: Int?
+    /// Generate was asked for while the title was still loading.
+    @ObservationIgnored private var generateWhenReady = false
 
     init(player: MezzaninePlayer) {
         self.player = player
@@ -97,14 +99,15 @@ final class OnDeviceSubtitles {
     /// A title is on screen: its generated subtitles come back, on screen again if they were
     /// last time (or `carry`: the previous episode of the same show was generating).
     func begin(ratingKey: String, serverID: String?, carry: Bool) {
+        let asked = generateWhenReady
         end()
         self.ratingKey = ratingKey
         self.serverID = serverID
         if let saved = SavedSubtitles.generated(serverID: serverID, ratingKey: ratingKey) {
             lines = saved.lines
             generatedLanguage = saved.meta.language
-            if saved.meta.active || carry { showGenerated() }
-        } else if carry {
+            if saved.meta.active || carry || asked { showGenerated() }
+        } else if carry || asked {
             showGenerated()
         }
     }
@@ -122,6 +125,7 @@ final class OnDeviceSubtitles {
         matching = .idle
         modelProgress = nil
         previousTrack = nil
+        generateWhenReady = false
         translations = [:]
         untranslatable = []
         translating = .idle
@@ -142,6 +146,10 @@ final class OnDeviceSubtitles {
         if showsGenerated {
             hideGenerated()
             restorePreviousTrack()
+        } else if ratingKey == nil {
+            // Still loading: start as soon as the title is on screen.
+            generateWhenReady.toggle()
+            announce(generateWhenReady ? "Subtitles · Generating from speech once it starts" : "Subtitles · Generate cancelled")
         } else {
             showGenerated()
             announce("Subtitles · Generating from \(spokenLanguageName.map { $0 + " " } ?? "")speech")

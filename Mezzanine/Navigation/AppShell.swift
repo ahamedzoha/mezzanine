@@ -52,6 +52,8 @@ struct AppShell: View {
         .toolbarVisibility(playback.isPresented ? .hidden : .visible, for: .windowToolbar)
         .toolbarBackgroundVisibility(chromeHidden ? .hidden : .automatic, for: .windowToolbar)
         .background(WindowChrome(hidden: chromeHidden, hidesToolbar: playback.isPresented))
+        .background(MainWindowWatcher(keyChanged: { commands.mainWindowIsKey = $0 },
+                                      willClose: { if playback.isPresented { playback.close() } }))
         .frame(minWidth: 900, minHeight: 600)
         .alert("Couldn’t play this", isPresented: Binding(get: { playback.error != nil && !playback.isPresented },
                                                           set: { if !$0 { playback.clearError() } })) {
@@ -235,6 +237,10 @@ struct AppShell: View {
             // Music stays with Plexamp; photos aren't part of Mezzanine.
             commands.sections = sections.filter { $0.kind == .movie || $0.kind == .show }
             sectionsError = nil
+            // A library restored from the last launch that's gone (or another server's): Home.
+            if case .library(let key) = commands.selection, !commands.sections.contains(where: { $0.key == key }) {
+                commands.selection = .home
+            }
             if let server = session.currentServer {
                 library.connect(client: client, serverID: server.clientIdentifier,
                                 userID: session.account?.uuid ?? "owner", sections: commands.sections)

@@ -10,6 +10,7 @@ struct ShortcutSettings: View {
     @State private var windowObservers: [NSObjectProtocol] = []
     /// One line under the row just changed ("Moved from Mute").
     @State private var note: (action: PlayerKey, text: String)?
+    @State private var confirmRestore = false
 
     struct Recording: Equatable {
         let action: PlayerKey
@@ -21,12 +22,17 @@ struct ShortcutSettings: View {
         Form {
             Section {
                 LabeledContent {
-                    Button("Restore Defaults") {
-                        stopRecording()
-                        note = nil
-                        shortcuts.restoreAll()
-                    }
-                    .disabled(!shortcuts.isCustomized)
+                    Button("Restore Defaults…") { confirmRestore = true }
+                        .disabled(!shortcuts.isCustomized)
+                        .confirmationDialog("Restore the default player keys?", isPresented: $confirmRestore) {
+                            Button("Restore Defaults", role: .destructive) {
+                                stopRecording()
+                                note = nil
+                                shortcuts.restoreAll()
+                            }
+                        } message: {
+                            Text("Every key you changed goes back to how it came.")
+                        }
                 } label: {
                     Text("Player")
                     Text("Click a key to change it; while it waits, ⌫ removes it and Esc cancels. Each key also appears in the Playback menu. On a MacBook, Page Up and Page Down are fn-↑ and fn-↓.")
@@ -52,7 +58,7 @@ struct ShortcutSettings: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 640, height: 640)
+        .frame(minWidth: 560, idealWidth: 640, minHeight: 480, idealHeight: 640)
         .onDisappear(perform: stopRecording)
     }
 
@@ -245,7 +251,7 @@ enum ShortcutReference {
 
     static let pages: [Page] = [
         Page(title: "Home and libraries", keys: [
-            .init(keys: "← → ↑ ↓", action: "Move between titles"),
+            .init(keys: "← → ↑ ↓", action: "Move between titles (with Full Keyboard Access too: Tab moves between the sidebar, toolbar and content)"),
             .init(keys: "Return", action: "Open"),
             .init(keys: "Space or ⌘Return", action: "Play"),
             .init(keys: "⌘I", action: "Show details (Home)"),
@@ -276,11 +282,16 @@ enum ShortcutReference {
     static let anywhere: [Entry] = [
         .init(keys: "⌘K", action: "Quick Open: titles, places and actions"),
         .init(keys: "⌘F", action: "Find"),
+        .init(keys: "⌘↩", action: "Play the focused title"),
         .init(keys: "⌘[ ⌘]", action: "Back / forward"),
         .init(keys: "⌘1", action: "Home"),
         .init(keys: "⌘2 – ⌘9", action: "Libraries"),
+        .init(keys: "⌥⌘L", action: "Downloads"),
+        .init(keys: "⇧⌘D", action: "Download the title on screen"),
+        .init(keys: "⌘⌫", action: "Remove its download"),
         .init(keys: "⌘/", action: "Keyboard shortcuts"),
         .init(keys: "⌘,", action: "Settings"),
+        .init(keys: "⌘W  ⌘Q", action: "Close the window (stops a film) / quit"),
     ]
 }
 
@@ -293,7 +304,7 @@ struct ShortcutsWindow: View {
     var body: some View {
         Form {
             ForEach(PlayerKey.Group.allCases) { group in
-                Section(group == .playback ? "Player ▸ \(group.rawValue)" : group.rawValue) {
+                Section("Player: \(group.rawValue)") {
                     ForEach(PlayerKey.allCases.filter { $0.group == group }) { key in
                         LabeledContent(key.label) {
                             Text(shortcuts.display(key, separator: "  ")).font(.callout.weight(.medium)).foregroundStyle(.secondary)

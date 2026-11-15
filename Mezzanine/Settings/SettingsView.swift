@@ -16,9 +16,9 @@ struct SettingsView: View {
             Tab("Account", systemImage: "person.crop.circle", value: "account") {
                 Form {
                     LabeledContent("Plex account", value: session.account?.displayName ?? "Not signed in")
-                    LabeledContent("Server", value: session.currentServer?.name ?? "—")
+                    LabeledContent("Server", value: session.currentServer?.name ?? "None")
                     if let c = session.connection {
-                        LabeledContent("Connection", value: "\(c.connection.route.rawValue) · \(c.connection.protocolName)")
+                        LabeledContent("Connection", value: "\(routeName(c.connection.route)) · \(c.connection.protocolName)")
                     }
                     if session.account != nil {
                         Button("Sign Out…", role: .destructive) { confirmSignOut = true }
@@ -30,6 +30,12 @@ struct SettingsView: View {
                     }
                 }
                 .formStyle(.grouped)
+                .safeAreaInset(edge: .bottom) {
+                    Text("Switch Plex Home profiles from Mezzanine ▸ Switch Profile.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20).padding(.bottom, 16)
+                }
             }
             Tab("Playback", systemImage: "play.rectangle", value: "playback") {
                 @Bindable var playback = playback
@@ -56,7 +62,7 @@ struct SettingsView: View {
                             ForEach([2, 3, 4, 6, 8], id: \.self) { Text("\($0) episodes").tag($0) }
                         }
                     } footer: {
-                        Text("Skip Intro and Next Episode buttons always appear; these settings decide what happens without them. S or Return skips by hand.")
+                        Text("Skip Intro and Next Episode buttons always appear; these settings decide what happens without them. \(PlayerShortcuts.shared.display(.skipMarker)) or Return skips by hand.")
                     }
                 }
                 .formStyle(.grouped)
@@ -98,15 +104,22 @@ struct SettingsView: View {
                             Text("Moderately").tag(Double?.some(-20))
                             Text("A lot").tag(Double?.some(-16))
                         }
-                        Toggle("Night mode (softer explosions, clearer whispers)", isOn: Binding(get: { sound.current.profile.nightMode }, set: { _ in sound.toggleNight() }))
+                        Toggle(isOn: Binding(get: { sound.current.profile.nightMode }, set: { _ in sound.toggleNight() })) {
+                            Text("Night mode")
+                            Text("Softer explosions, clearer whispers")
+                        }
                     } header: {
                         Text("Adjust")
                     } footer: {
-                        if sound.current.volumePercent > 100 {
+                        if adjustmentsOff {
+                            Text(sound.current.kind == .hdmi
+                                 ? "A receiver or soundbar gets the original sound untouched, so it can decode surround itself. Adjust volume on it."
+                                 : "AirPods get the original sound so spatial audio keeps working. Adjust volume on the Mac.")
+                        } else if sound.current.volumePercent > 100 {
                             Text("Above 100 % is boost: a limiter keeps peaks from clipping, but very quiet films raised a lot can sound compressed.")
                         }
                     }
-                    .disabled(sound.current.kind == .hdmi || sound.current.kind == .airPods)
+                    .disabled(adjustmentsOff)
                 }
                 .formStyle(.grouped)
             }
@@ -128,8 +141,12 @@ struct SettingsView: View {
                         LabeledContent("Local library") {
                             switch library.syncState {
                             case .idle: Text("Up to date")
-                            case .syncing(let s, let d, let t): Text("Reading \(s) (\(d.formatted()) of \(t.formatted()))")
-                            case .failed(let m): Label(m, systemImage: "exclamationmark.triangle.fill")
+                            case .syncing(let s, let d, let t):
+                                HStack(spacing: 8) {
+                                    ProgressView().controlSize(.small)
+                                    Text("Reading \(s) (\(d.formatted()) of \(t.formatted()))")
+                                }
+                            case .failed(let m): Label(m, systemImage: "exclamationmark.triangle.fill").lineLimit(3)
                             }
                         }
                         Button("Read Library Again") { Task { await library.syncAll(force: true) } }
@@ -139,6 +156,17 @@ struct SettingsView: View {
                 .formStyle(.grouped)
             }
         }
-        .frame(minWidth: 520, idealWidth: 540, minHeight: 320)
+        .frame(minWidth: 520, idealWidth: 540, minHeight: 420)
+    }
+
+    /// The device plays the original sound (receiver decodes it, AirPods keep spatial audio).
+    private var adjustmentsOff: Bool { sound.current.kind == .hdmi || sound.current.kind == .airPods }
+
+    private func routeName(_ route: PlexConnection.Route) -> String {
+        switch route {
+        case .local: "Local network"
+        case .remote: "Internet"
+        case .relay: "Plex relay"
+        }
     }
 }
