@@ -53,6 +53,7 @@ Build output goes to `build.noindex/` (Spotlight skips it).
 (or the Open Lab button on the placeholder root). Player: `-MezzanineAutoplay <ratingKey>`
 `-MezzanineAutoSeek <s>` `-MezzanineAutoClose <s>` `-MezzanineAutoplayDelay <s>` `-MiniExpandAfter <s>` `-NotifyTest YES` (posts one new-episode notification) `-PlayerChromePinned YES`
 `-PlayerOptionsOpen YES` `-PlayerOptionsPage search|subtitles|audio|picture` `-FindSubtitlesChoose YES` (picks the first non-Plex result; local only) `-PlayerFullScreen YES` `-PlayerKeyScript "i,c,shift+right,!snapshot"`
+(`~3` waits 3 s, `!fs` toggles full screen directly) `-SelectBehindAfter 14` (switches the page under the player)
 (real key events through the router; menus ignore keys while the app is in the background, so
 ⌘ items use `!action`) `-ScrubHoverAt 0.6` `-SnapshotNoClipboard YES`; detail:
 `-MezzanineOpen <ratingKey>` `-DetailSection cast`; windows: `-MezzanineOpenWindow shortcuts|settings`
@@ -105,7 +106,12 @@ the second read sees the stale array and duplicates the element. Build the new a
 Full screen: AppKit moves the title bar into a separate window and keeps it as an opaque band over
 the content even with the toolbar hidden (pinned, or revealed with the menu bar). While the player
 owns the window, `WindowChrome` sets `.autoHideToolbar` and also hides that strip window outright,
-re-applying on full-screen, key, screen and app-activation changes. Verify with full-display
+re-applying on full-screen, key, screen and app-activation changes. SwiftUI and AppKit re-show the
+toolbar on their own (a 52 pt opaque band pinned over the film and its logo until something
+re-applied), so in full screen `WindowChrome` also watches the toolbar (KVO), the strip window and a
+1 s check, re-applying on drift (full screen only: hiding the toolbar in a window resizes it by 20 pt).
+DEBUG: `-ChromeTrace YES` logs the strip state, `-ToolbarDriftAfter 14` forces the drift,
+`-ChromeWatchOff YES` disables the watch for comparison. Verify with full-display
 captures (`screencapture -D 1`): window captures (`-l`) never include the strip.
 
 ## Server

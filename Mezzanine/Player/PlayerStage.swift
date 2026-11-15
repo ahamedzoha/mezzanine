@@ -133,6 +133,9 @@ struct PlayerStage: View {
                     try? await Task.sleep(for: .seconds(4))
                     for token in script.split(separator: ",") {
                         // "!snapshot": the menu action itself (menus ignore keys while the app is in the background).
+                        // "~3": wait that many seconds (full-screen transitions take a moment).
+                        if token.hasPrefix("~") { try? await Task.sleep(for: .seconds(Double(token.dropFirst()) ?? 1)); continue }
+                        if token == "!fs" { NSApp.windows.first { $0.isVisible && $0.canBecomeMain }?.toggleFullScreen(nil); continue }
                         if token == "!snapshot" { _ = perform(.snapshot) } else { DebugKeys.post(String(token)) }
                         try? await Task.sleep(for: .milliseconds(600))
                     }

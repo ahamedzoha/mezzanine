@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-11-15 (evening) — full-screen grey band, icon cache
+
+- Owner's report: in full screen a grey bar sometimes stayed at the top after the menu bar slid
+  in and out, and the title logo went missing after a few full-screen/window switches; switching
+  Spaces fixed both. The bar in the screenshot is exactly 52 pt of #1C1C1C: the toolbar's strip,
+  shown again and pinned, over the top of the film where the logo sits. Traces showed SwiftUI
+  re-showing the toolbar on its own while the film owns the window, and AppKit silently dropping
+  the auto-hide-toolbar option. The chrome was re-applied only on a few notifications (a Space
+  switch is one). Now, in full screen, `WindowChrome` re-applies whenever the toolbar's visibility
+  changes (KVO), the strip window moves, resizes or is replaced, the title bar loses its
+  transparency, and on a 1 s check. Not in a window: hiding the toolbar there resizes the window
+  by 20 pt (tried, reverted). The exact trigger didn't reproduce in scripted runs (real
+  pointer reveals, toggles, page switches behind the player); forced drift recovers within a
+  check, with no re-apply loops. Owner to confirm the logo stays.
+- Icon cache: three stale build copies were registered with Launch Services; unregistered,
+  re-registered the installed app, cleared the user and system icon caches.
+
 ## 2026-11-15 (late) — HIG review fixes: Google Cast, mini player, notifications
 
 - Cast: the button's menu is now a "Play On" picker (This Mac + each TV, current one checked;

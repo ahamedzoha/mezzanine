@@ -196,6 +196,18 @@ struct AppShell: View {
         .task(id: session.currentServer?.clientIdentifier) {
             contentFocused = true
             #if DEBUG
+            // -SelectBehindAfter 14: switches the sidebar page under the player (Downloads, then
+            // back), the way a background update rebuilds the toolbar while a film plays.
+            let selectAfter = UserDefaults.standard.integer(forKey: "SelectBehindAfter")
+            if selectAfter > 0 {
+                Task {
+                    try? await Task.sleep(for: .seconds(selectAfter))
+                    let was = commands.selection
+                    print("CHROME poke: select downloads"); commands.selection = .downloads
+                    try? await Task.sleep(for: .seconds(2))
+                    print("CHROME poke: select back"); commands.selection = was
+                }
+            }
             // -SearchQuery "south" types into the toolbar search at launch (search panel tests).
             if let q = UserDefaults.standard.string(forKey: "SearchQuery") {
                 try? await Task.sleep(for: .seconds(4))
