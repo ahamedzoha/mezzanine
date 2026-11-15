@@ -100,6 +100,7 @@ struct PlayerStage: View {
             case "search": optionsPage = .search; optionsOpen = true
             case "subtitles": optionsPage = .subtitles; optionsOpen = true
             case "audio": optionsPage = .audio; optionsOpen = true
+            case "picture": optionsPage = .picture; optionsOpen = true
             default: break
             }
             // -PlayerKeyScript "i,c,g,shift+c": posts real key events through the app's event
@@ -146,6 +147,7 @@ struct PlayerStage: View {
         .onChange(of: player.canPictureInPicture, initial: true) { _, v in commands.canPictureInPicture = v }
         .onChange(of: player.rate, initial: true) { _, r in commands.playbackRate = r }
         .modifier(OnDeviceHost(onDevice: playback.onDevice, commands: commands, toast: { showToast($0, long: $1) }))
+        .onChange(of: playback.pictureMode, initial: true) { _, m in commands.pictureMode = m.rawValue }
         .onChange(of: upNext) { _, state in
             switch state {
             case .counting(let s) where s == playback.binge.upNextCountdown:
@@ -181,7 +183,12 @@ struct PlayerStage: View {
         GeometryReader { geo in
             let rect = upNextShown ? UpNextLayout(size: geo.size, aspect: videoAspect).picture : CGRect(origin: .zero, size: geo.size)
             ZStack {
+                // Zoom lays the picture out larger than the window (the window crops it); the
+                // subtitles stay inside the window.
+                let zoom = upNextShown ? 1 : playback.pictureMode.scale
                 PlayerSurface(player: player)
+                    .frame(width: rect.width * zoom, height: rect.height * zoom)
+                    .frame(width: rect.width, height: rect.height)
                 SubtitleOverlay(player: player, onDevice: playback.onDevice)
                 // The video is an AppKit layer, so its rounding is painted in the stage's black
                 // rather than left to SwiftUI clipping of a hosted view.
@@ -558,6 +565,10 @@ struct PlayerStage: View {
         switch action {
         case .key(let key): return perform(key)
         case .speed(let rate): setRate(rate)
+        case .picture(let raw):
+            guard let mode = PictureMode(rawValue: raw) else { return .ignored }
+            withAnimation(Theme.Motion.object(reduceMotion)) { playback.pictureMode = mode }
+            showToast("Picture: " + mode.label)
         case .jump(let digit):
             guard player.duration > 0 else { return .ignored }
             Task { await player.seek(to: player.duration * Double(digit) / 10) }
@@ -613,6 +624,9 @@ struct PlayerStage: View {
             player.togglePictureInPicture()
         case .options: setOptions(open: !optionsOpen)
         case .stats: withAnimation(Theme.Motion.quick) { statsVisible.toggle() }
+        case .pictureMode:
+            withAnimation(Theme.Motion.object(reduceMotion)) { playback.pictureMode = playback.pictureMode.next }
+            showToast("Picture: " + playback.pictureMode.label)
         }
         return .handled
     }

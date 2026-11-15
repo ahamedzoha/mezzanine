@@ -79,6 +79,26 @@ final class PlaybackCoordinator {
     /// Subtitles made on this Mac: generated from speech, translated, timing matched (M12).
     let onDevice: OnDeviceSubtitles
 
+    /// Fit, fill or zoom, remembered per film and per show.
+    var pictureMode: PictureMode = .fit {
+        didSet {
+            player.fillsView = pictureMode == .fill
+            guard let key = pictureKey else { return }
+            var saved = UserDefaults.standard.dictionary(forKey: "pictureModes.v1") as? [String: String] ?? [:]
+            saved[key] = pictureMode == .fit ? nil : pictureMode.rawValue
+            UserDefaults.standard.set(saved, forKey: "pictureModes.v1")
+        }
+    }
+
+    /// Films keep their own; every episode of a show shares the show's.
+    private var pictureKey: String? { item.map { $0.kind == .episode ? ($0.grandparentRatingKey ?? $0.ratingKey) : $0.ratingKey } }
+
+    private func restorePictureMode() {
+        let saved = UserDefaults.standard.dictionary(forKey: "pictureModes.v1") as? [String: String] ?? [:]
+        let mode = pictureKey.flatMap { saved[$0] }.flatMap(PictureMode.init(rawValue:)) ?? .fit
+        if mode != pictureMode { pictureMode = mode } else { player.fillsView = mode == .fill }
+    }
+
     init(player: MezzaninePlayer, session: SessionStore) {
         self.player = player
         self.session = session
@@ -165,6 +185,7 @@ final class PlaybackCoordinator {
             if let lastError { throw lastError }
             guard generation == requestGeneration else { return }
             beginOnDevice(detail, carryFrom: previous)
+            restorePictureMode()
             let reporter = ActivityReporter(client: client, item: detail, player: player)
             self.reporter = reporter
             reporter.start()
@@ -274,6 +295,7 @@ final class PlaybackCoordinator {
                 externalSubtitles: local + saved.map(\.subtitle)))
             restoreSavedSubtitle(saved, after: local.count)
             beginOnDevice(detail, carryFrom: previous)
+            restorePictureMode()
             mode = .direct
             playingDownload = true
             reporter = nil
@@ -564,5 +586,35 @@ enum PlaybackMode: Hashable {
                                     videoResolution: kbps.map { $0 >= 8000 ? "1920x1080" : "1280x720" },
                                     mediaIndex: mediaIndex, isLocal: isLocal)
         }
+    }
+}
+
+/// How the picture meets the window: whole (fit), filling it (edges cropped), or zoomed past
+/// black bars that are part of the picture itself (a wide film in a 16:9 frame).
+enum PictureMode: String, CaseIterable, Codable {
+    case fit, fill, zoom
+
+    var label: String {
+        switch self {
+        case .fit: "Fit"
+        case .fill: "Fill"
+        case .zoom: "Zoom"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .fit: "The whole picture"
+        case .fill: "Fills the window; the edges are cropped"
+        case .zoom: "Removes black bars that are part of the picture"
+        }
+    }
+
+    /// How much larger than the window the picture is laid out (Zoom).
+    var scale: CGFloat { self == .zoom ? 1.33 : 1 }
+
+    var next: PictureMode {
+        let all = Self.allCases
+        return all[(all.firstIndex(of: self)! + 1) % all.count]
     }
 }

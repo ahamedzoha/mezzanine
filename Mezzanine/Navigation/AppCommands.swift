@@ -89,13 +89,15 @@ final class AppCommandCenter {
     var isFolderBrowserVisible = false
 
     /// A Playback menu item or key: a rebindable player key, or one of the fixed ones.
-    enum PlayerAction: Equatable { case key(PlayerKey), speed(Double), jump(Int), snapshot, close }
+    enum PlayerAction: Equatable { case key(PlayerKey), speed(Double), jump(Int), picture(String), snapshot, close }
     // Player state the Playback menu enables and checks items from.
     var hasActiveMarker = false
     var hasNextEpisode = false
     var hasPreviousEpisode = false
     var canPictureInPicture = false
     var playbackRate: Double = 1
+    /// The picture mode in force (Fit, Fill, Zoom), for the menu's checkmarks.
+    var pictureMode = "fit"
     var isMuted = false
     var statsVisible = false
     /// On-device subtitles (M12), mirrored from the player for the menu's checkmarks.
@@ -457,6 +459,14 @@ struct MezzanineCommands: Commands {
                 }
                 Divider()
                 item(.fullScreen)
+                Menu("Picture Size") {
+                    item(.pictureMode)
+                    Divider()
+                    ForEach(PictureMode.allCases, id: \.self) { mode in
+                        Toggle(mode.label, isOn: Binding(get: { center.pictureMode == mode.rawValue },
+                                                         set: { _ in center.player(.picture(mode.rawValue)) }))
+                    }
+                }
                 item(.pictureInPicture, disabled: !center.canPictureInPicture)
                 item(.options)
                 toggle(.stats, isOn: center.statsVisible)

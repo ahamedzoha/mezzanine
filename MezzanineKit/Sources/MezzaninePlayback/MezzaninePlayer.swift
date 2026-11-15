@@ -48,6 +48,11 @@ public final class MezzaninePlayer {
         didSet { applyVolumeAndShaping() }
     }
 
+    /// Fill the view, cropping the picture's edges, instead of fitting it whole.
+    public var fillsView = false {
+        didSet { if fillsView != oldValue { engine.videoGravity = fillsView ? .resizeAspectFill : .resizeAspect } }
+    }
+
     /// The per-device profile in force (set by the audio route monitor).
     public var audioProfile: AudioProfile = .passthrough {
         didSet { if audioProfile != oldValue { applyVolumeAndShaping() } }
