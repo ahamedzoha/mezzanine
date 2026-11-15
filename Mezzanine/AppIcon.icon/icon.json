@@ -1,15 +1,168 @@
 {
-  "fill" : { "automatic-gradient" : "display-p3:0.13,0.13,0.16,1.00000" },
-  "groups" : [
-    { "layers" : [ { "image-name" : "screen.svg", "name" : "screen" } ],
-      "shadow" : { "kind" : "layer-color", "opacity" : 0.6 },
-      "translucency" : { "enabled" : false, "value" : 0 } },
-    { "layers" : [ { "image-name" : "tiers.svg", "name" : "tiers" } ],
-      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
-      "translucency" : { "enabled" : true, "value" : 0.25 } },
-    { "layers" : [ { "image-name" : "glow.svg", "name" : "glow", "glass" : false } ],
-      "shadow" : { "kind" : "none", "opacity" : 0 },
-      "translucency" : { "enabled" : false, "value" : 0 } }
+  "fill-specializations": [
+    {
+      "value": {
+        "linear-gradient": [
+          "display-p3:0.875,0.870,0.915,1.00000",
+          "display-p3:0.640,0.625,0.760,1.00000"
+        ],
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
+          },
+          "stop": {
+            "x": 0.5,
+            "y": 1
+          }
+        }
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "linear-gradient": [
+          "display-p3:0.130,0.118,0.230,1.00000",
+          "display-p3:0.055,0.059,0.067,1.00000"
+        ],
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
+          },
+          "stop": {
+            "x": 0.5,
+            "y": 1
+          }
+        }
+      }
+    }
   ],
-  "supported-platforms" : { "squares" : "shared" }
+  "groups": [
+    {
+      "name": "triangle",
+      "layers": [
+        {
+          "image-name": "tri-inner.svg",
+          "name": "tri-inner"
+        },
+        {
+          "image-name": "tri-front.svg",
+          "name": "tri-front"
+        },
+        {
+          "image-name": "tri-side.svg",
+          "name": "tri-side"
+        },
+        {
+          "image-name": "tri-haze.svg",
+          "name": "tri-haze",
+          "glass": false
+        }
+      ],
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.35
+      }
+    },
+    {
+      "name": "plate",
+      "layers": [
+        {
+          "image-name": "lamp.svg",
+          "name": "lamp",
+          "glass": false
+        },
+        {
+          "image-name": "plate-top.svg",
+          "name": "plate-top"
+        },
+        {
+          "image-name": "plate-side.svg",
+          "name": "plate-side"
+        },
+        {
+          "image-name": "plate-glow.svg",
+          "name": "plate-glow",
+          "glass": false
+        }
+      ],
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.12
+      }
+    },
+    {
+      "name": "middle",
+      "layers": [
+        {
+          "image-name": "mid-top.svg",
+          "name": "mid-top"
+        },
+        {
+          "image-name": "mid-side.svg",
+          "name": "mid-side"
+        },
+        {
+          "image-name": "mid-glow.svg",
+          "name": "mid-glow",
+          "glass": false
+        }
+      ],
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "name": "base",
+      "layers": [
+        {
+          "image-name": "base-top.svg",
+          "name": "base-top"
+        },
+        {
+          "image-name": "base-side.svg",
+          "name": "base-side"
+        },
+        {
+          "image-name": "ground.svg",
+          "name": "ground",
+          "glass": false,
+          "opacity-specializations": [
+            {
+              "value": 1
+            },
+            {
+              "appearance": "tinted",
+              "value": 0.25
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.6
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
 }
