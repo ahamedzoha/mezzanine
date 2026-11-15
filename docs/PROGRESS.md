@@ -35,6 +35,12 @@ Open, waiting on the owner:
   Development identity as .p12 (expires 2027-08-27), the Sparkle key, the deploy key.
 - No Developer ID certificate, so no notarization: first install needs Open Anyway once (README in
   the releases repo); updates install without it.
+- Verified end to end: 0.2.0 shipped with `--local` (26 MB DMG; CI on its tag saw it published
+  and stopped), installed from the DMG; 0.2.1 shipped through CI (green in ~6 min: kit tests,
+  build, signing, DMG, publish; the first try failed only at publish because the runner's
+  unauthenticated GitHub meta call was rate-limited, now the host key is pinned). The installed
+  0.2.0 found 0.2.1 (release notes rendered in dark mode), installed it and relaunched: 0.2.1
+  (59), signature valid, no quarantine, still signed in, no Keychain prompt.
 
 ## 2026-11-15 (last) — full-screen grey band, icon cache
 
