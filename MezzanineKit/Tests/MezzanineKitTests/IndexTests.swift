@@ -65,3 +65,23 @@ import Testing
         #expect(try index.item(key)?.cleanPosterPath == "/clean.jpg")
     }
 }
+
+@Suite("Search ranking")
+struct SearchRankingTests {
+    private func row(_ key: String, _ type: String, _ title: String, summary: String = "") throws -> (PlexMetadata, Data) {
+        let json = try JSONSerialization.data(withJSONObject: ["ratingKey": key, "type": type, "title": title, "summary": summary])
+        return (try JSONDecoder().decode(PlexMetadata.self, from: json), json)
+    }
+
+    @Test func titleStartsBeatLessonsAndSummaries() throws {
+        let index = try LibraryIndex()
+        try index.upsert([try row("10", "movie", "1.Recap-Architecture"), try row("11", "movie", "003 Testing Architecture")], section: "3")
+        try index.upsert([try row("20", "show", "Archer (2009)"), try row("21", "show", "Bob's Burgers", summary: "An arch rival")], section: "2")
+        try index.upsert([try row("30", "movie", "The Departed", summary: "South Boston")], section: "1")
+        let arch = try index.search("arch", demotedSections: ["3"]).map(\.title)
+        #expect(arch.first == "Archer (2009)")
+        #expect(arch.firstIndex(of: "Bob's Burgers")! > arch.firstIndex(of: "1.Recap-Architecture")!)
+        let south = try index.search("south", demotedSections: ["3"]).map(\.title)
+        #expect(south == ["The Departed"])
+    }
+}

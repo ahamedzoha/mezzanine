@@ -53,6 +53,9 @@ struct QuickOpen: View {
         .onAppear {
             fieldFocused = true
             #if DEBUG
+            print("QUICKOPEN appeared (page: \(commands.path.last?.ratingKey ?? "section"))")
+            #endif
+            #if DEBUG
             if let q = UserDefaults.standard.string(forKey: "QuickOpenQuery"), q != "_" { query = q }
             #endif
             Task { await refresh() }

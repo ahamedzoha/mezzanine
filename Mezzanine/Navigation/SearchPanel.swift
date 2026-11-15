@@ -49,8 +49,18 @@ struct SearchPanel: View {
                 .padding(.top, Theme.Space.s)
         }
         .task(id: query) { await search() }
-        .onAppear(perform: installKeys)
-        .onDisappear(perform: removeKeys)
+        .onAppear {
+            installKeys()
+            #if DEBUG
+            print("SEARCHPANEL appeared (page: \(commands.path.last?.ratingKey ?? "section"))")
+            #endif
+        }
+        .onDisappear {
+            removeKeys()
+            #if DEBUG
+            print("SEARCHPANEL disappeared")
+            #endif
+        }
     }
 
     // MARK: Panel

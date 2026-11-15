@@ -107,8 +107,10 @@ final class LibraryStore {
 
     func search(_ text: String) async -> [PlexMetadata] {
         guard let index else { return [] }
+        // Lessons and home videos come after films and shows that match as well.
+        let personal = sections.filter(\.isPersonalMedia).map(\.key)
         return await Task.detached(priority: .userInitiated) {
-            ((try? index.search(text)) ?? []).compactMap { $0.metadata() }
+            ((try? index.search(text, demotedSections: personal)) ?? []).compactMap { $0.metadata() }
         }.value
     }
 

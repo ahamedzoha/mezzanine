@@ -84,6 +84,14 @@ then Match Timing is refused: delete them between tests. Set the Debug Timing wi
 `defaults write ~/Library/Containers/com.mezzanine.mac.debug/Data/Library/Preferences/com.mezzanine.mac.debug.plist subtitleOffset -float 3`
 (an `-subtitleOffset` launch argument would shadow what the app writes).
 
+SwiftUI gotcha: a NavigationStack draws a pushed page above anything overlaid on the stack, so
+panels that must float over every page (Quick Open, the search panel) hang on the page itself
+(`PagePanels` in AppShell, top page only). Check new overlays on a title page too:
+`Scripts/ui-case.sh detail-search 13 -MezzanineOpen 11998 -SearchQuery alien` (captures every display).
+Async loads that fill a list (search, season episodes, folders) must drop their answer when a
+newer request started (`Task.isCancelled` or compare the request after the await): three bugs came
+from a slower, older answer landing last.
+
 SwiftUI gotcha: never mutate a `@Binding` array twice in one transaction (remove, then insert):
 the second read sees the stale array and duplicates the element. Build the new array, assign once.
 

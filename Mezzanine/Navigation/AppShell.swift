@@ -143,24 +143,16 @@ struct AppShell: View {
                     // Quick Open is modal: VoiceOver and Tab stay inside it.
                     .accessibilityHidden(commands.isQuickOpenShown)
                     .disabled(commands.isQuickOpenShown)
+                    .modifier(PagePanels(onTop: commands.path.isEmpty, showsSearchPanel: showsSearchPanel))
                     .navigationDestination(for: DetailRoute.self) { route in
                         DetailView(route: route, contentFocus: $contentFocused)
                             .background { RoomLight(palette: playback.roomPalette, intensity: playback.isPresented ? 0 : 1) }
+                            .modifier(PagePanels(onTop: commands.path.last == route, showsSearchPanel: showsSearchPanel))
                     }
             }
             .background {
                 RoomLight(palette: playback.roomPalette, intensity: playback.isPresented ? 0 : 1)
             }
-            .overlay(alignment: .topLeading) {
-                if commands.isQuickOpenShown && !playback.isPresented {
-                    QuickOpen().transition(.opacity)
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                if showsSearchPanel { SearchPanel().transition(.opacity) }
-            }
-            .animation(Theme.Motion.quick, value: commands.isQuickOpenShown)
-            .animation(Theme.Motion.quick, value: showsSearchPanel)
         }
         .sheet(item: $commands.artworkRequest) { request in
             ArtworkPicker(request: request)
@@ -300,6 +292,31 @@ struct AppShell: View {
     private func icon(for section: PlexLibrarySection) -> String {
         if section.isPersonalMedia { return "folder" }
         return section.kind == .show ? "tv" : "film"
+    }
+}
+
+/// Quick Open (⌘K) and the search panel, hung on the page that's on top. A NavigationStack
+/// draws a pushed page above anything overlaid on the stack itself, so they can't live
+/// there: each page carries them, and only the top page shows them (one panel, one key
+/// monitor).
+private struct PagePanels: ViewModifier {
+    let onTop: Bool
+    let showsSearchPanel: Bool
+    @Environment(AppCommandCenter.self) private var commands
+    @Environment(PlaybackCoordinator.self) private var playback
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .topLeading) {
+                if onTop && commands.isQuickOpenShown && !playback.isPresented {
+                    QuickOpen().transition(.opacity)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if onTop && showsSearchPanel { SearchPanel().transition(.opacity) }
+            }
+            .animation(Theme.Motion.quick, value: commands.isQuickOpenShown)
+            .animation(Theme.Motion.quick, value: showsSearchPanel)
     }
 }
 

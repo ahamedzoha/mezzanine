@@ -12,6 +12,10 @@
   episodes now wear the ✓ badge and "Watched".
 - Courses: clicking rows while a folder loaded stacked siblings into the path and mixed lists.
   A click now opens from the list on screen; stale loads are dropped; each folder is its own list.
+- Search panel didn't show on title pages (a NavigationStack draws pushed pages over overlays on
+  the stack; Quick Open had the same bug). Both now hang on the top page; verified with captures
+  on a title page, a library page and Home. Ranking: titles starting with the text, then a word
+  of the title, then the rest; lessons (personal-media libraries) after films and shows.
 - Mark as Watched on a title page waited for a full library re-read before the screen changed
   (the mark reached Plex at once; the owner clicked twice, so one episode shows 2 views). The
   row, its ✓ and the season ticks now change instantly; the library catches up in the background.

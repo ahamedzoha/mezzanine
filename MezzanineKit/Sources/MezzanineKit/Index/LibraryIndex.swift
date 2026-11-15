@@ -290,15 +290,29 @@ public final class LibraryIndex: Sendable {
     }
 
     /// Whole-library search across every section (titles, people, collections, summaries).
-    public func search(_ text: String, kinds: [String] = ["movie", "show", "episode"], limit: Int = 80) throws -> [IndexedItem] {
+    /// Titles matching every typed word as a prefix (titles, people, collections, summaries).
+    /// Ranked the way people expect: titles that start with the text, then titles with a word
+    /// that starts with it, then the rest; within each, titles from `demotedSections` (personal
+    /// media such as lessons) come after films and shows, then by relevance. Episodes last.
+    public func search(_ text: String, kinds: [String] = ["movie", "show", "episode"], limit: Int = 80,
+                       demotedSections: [String] = []) throws -> [IndexedItem] {
         guard let pattern = FTS5Pattern(matchingAllPrefixesIn: text) else { return [] }
+        let typed = text.trimmingCharacters(in: .whitespaces).lowercased()
+            .replacingOccurrences(of: "%", with: "").replacingOccurrences(of: "_", with: "")
+        let demoted = demotedSections.isEmpty ? "''" : demotedSections.map { _ in "?" }.joined(separator: ",")
         return try pool.read { db in
             try IndexedItem.fetchAll(db, sql: """
                 SELECT item.* FROM item JOIN item_ft ON item_ft.rowid = item.rowid AND item_ft MATCH ?
                 WHERE item.kind IN (\(kinds.map { _ in "?" }.joined(separator: ",")))
-                ORDER BY CASE item.kind WHEN 'episode' THEN 1 ELSE 0 END, bm25(item_ft, 10.0, 3.0, 2.0, 1.0)
+                ORDER BY CASE item.kind WHEN 'episode' THEN 1 ELSE 0 END,
+                         CASE WHEN lower(item.title) LIKE ? || '%' THEN 0
+                              WHEN lower(item.title) LIKE '% ' || ? || '%' OR lower(item.title) LIKE '%-' || ? || '%'
+                                OR lower(item.title) LIKE '%.' || ? || '%' OR lower(item.title) LIKE '%:' || ? || '%'
+                                OR lower(item.title) LIKE '%(' || ? || '%' THEN 1 ELSE 2 END,
+                         CASE WHEN item.section IN (\(demoted)) THEN 1 ELSE 0 END,
+                         bm25(item_ft, 10.0, 3.0, 2.0, 1.0)
                 LIMIT ?
-                """, arguments: StatementArguments([pattern.rawPattern] + kinds + [limit]))
+                """, arguments: StatementArguments([pattern.rawPattern] + kinds + Array(repeating: typed, count: 6) + demotedSections + [limit]))
         }
     }
 
