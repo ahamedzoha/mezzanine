@@ -1,6 +1,24 @@
 # Progress
 
-## 2026-11-15 (evening) — full-screen grey band, icon cache
+## Where things stand (2026-11-15)
+
+Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
+picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
+watch. Owner: sound looks good so far, testing as they go.
+
+Open, waiting on the owner:
+- API work, deferred by the owner: OpenSubtitles and Subdl keys (Find Subtitles skips those two
+  sources until keys are entered in Settings); M10 Trakt (needs the owner's Trakt API app).
+- First live run of Translate (on-device language download).
+- Audio profiles on each output (2.1 speakers, AirPods, MacBook, HDMI receiver), as the owner
+  watches.
+- Cast's Connecting/Cancel and failure panels haven't been seen on the TV (only on the Mac);
+  check on the next cast.
+- The logo-under-the-band theory (see below): owner to say if the logo still goes missing.
+
+Post-v1: Sparkle updates, DMG, CI.
+
+## 2026-11-15 (last) — full-screen grey band, icon cache
 
 - Owner's report: in full screen a grey bar sometimes stayed at the top after the menu bar slid
   in and out, and the title logo went missing after a few full-screen/window switches; switching
