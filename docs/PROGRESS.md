@@ -16,6 +16,13 @@
   the stack; Quick Open had the same bug). Both now hang on the top page; verified with captures
   on a title page, a library page and Home. Ranking: titles starting with the text, then a word
   of the title, then the rest; lessons (personal-media libraries) after films and shows.
+- Google Cast (no SDK on macOS: Bonjour discovery, Cast v2 over TLS with a hand-written protobuf
+  codec, Default Media Receiver, Plex HLS with a transient token). Live on the owner's
+  "Family room TV" (SmartTV 4K): H.264 stereo film played from 10:01 and came back to the Mac;
+  Severance (HEVC Main 10, AAC 5.1) failed as copied, so a TV that refuses the file's own
+  streams gets H.264 + stereo AAC (remembered per TV), which played. Bugs found and fixed in
+  testing: browser parameters, a transcode stop cancelled with its task, resume point after a
+  failed cast, position between the TV's reports, stale media statuses, quitting while casting.
 - New-episode notifications (owner OK'd the prompt): after each library sync, shows being
   watched (an episode seen in the past year) that gained unwatched episodes get one notification
   with the poster; click opens the show. Settings ▸ Playback ▸ New episodes. Debug test posted

@@ -59,7 +59,24 @@ public struct PlexURLs: Sendable {
         transcodeURL("decision", ratingKey: ratingKey, options)
     }
 
-    private func transcodeURL(_ endpoint: String, ratingKey: String, _ options: TranscodeOptions) -> URL? {
+    /// The same stream for a device that can't send headers (a TV casting from Mezzanine): the
+    /// short-lived `token` and the sender's identity ride in the URL, and the target profile is
+    /// what a Cast receiver plays.
+    public func castTranscode(_ endpoint: String, ratingKey: String, _ options: TranscodeOptions,
+                              token: String, identity: [String: String], compatible: Bool = false) -> URL? {
+        transcodeURL(endpoint, ratingKey: ratingKey, options, profileExtra: TranscodeOptions.castProfileExtra(compatible: compatible),
+                     extra: identity.sorted { $0.key < $1.key }.map { ($0.key, $0.value) } + [("X-Plex-Token", token)])
+    }
+
+    /// An image for a device that can't send headers, with the short-lived token in the URL.
+    public func castImage(_ path: String, width: Int, height: Int, token: String) -> URL? {
+        guard let url = photo(path, width: width, height: height), var c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        c.queryItems = (c.queryItems ?? []) + [URLQueryItem(name: "X-Plex-Token", value: token)]
+        return c.url
+    }
+
+    private func transcodeURL(_ endpoint: String, ratingKey: String, _ options: TranscodeOptions,
+                              profileExtra: String = TranscodeOptions.profileExtra, extra: [(String, String)] = []) -> URL? {
         var c = URLComponents(url: baseURL.appending(path: "video/:/transcode/universal/\(endpoint)"), resolvingAgainstBaseURL: false)!
         c.percentEncodedPath = c.percentEncodedPath.replacingOccurrences(of: "%3A", with: ":")
         var items: [(String, String)] = [
@@ -82,8 +99,8 @@ public struct PlexURLs: Sendable {
             // Plex has no transcode profile for platform "macOS" (it answers 400); the Generic
             // profile plus Mezzanine's own target declaration is accepted.
             ("X-Plex-Client-Profile-Name", "Generic"),
-            ("X-Plex-Client-Profile-Extra", TranscodeOptions.profileExtra),
-        ]
+            ("X-Plex-Client-Profile-Extra", profileExtra),
+        ] + extra
         if let kbps = options.maxVideoBitrate {
             items += [("videoQuality", "100"), ("maxVideoBitrate", String(kbps))]
         } else {
@@ -158,6 +175,16 @@ public struct TranscodeOptions: Sendable, Equatable {
         self.mediaIndex = mediaIndex
         self.isLocal = isLocal
         self.session = session
+    }
+
+    /// What a Cast receiver plays from Plex: HLS in MPEG-TS with H.264 or HEVC video and AAC,
+    /// AC-3 or E-AC-3 sound (copied when the file already has them).
+    /// `compatible`: H.264 and stereo AAC only (what every Cast device plays).
+    public static func castProfileExtra(compatible: Bool) -> String {
+        compatible
+            ? "add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac&replace=true)"
+                + "+add-limitation(scope=videoAudioCodec&scopeName=aac&type=upperBound&name=audio.channels&value=2)"
+            : "add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264,hevc&audioCodec=aac,ac3,eac3&replace=true)"
     }
 
     /// What Mezzanine's engine plays: HLS in MPEG-TS with H.264/HEVC and AAC/AC-3/E-AC-3.

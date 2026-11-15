@@ -16,6 +16,11 @@
 	<string>Mezzanine connects to your Plex Media Server, which is usually on your local network.</string>
 	<!-- Generate from Speech and Match Timing to Speech recognize the film's dialogue on
 	     this Mac (never the microphone). -->
+	<!-- Google Cast: finding TVs with Chromecast built in on the local network. -->
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_googlecast._tcp</string>
+	</array>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Mezzanine turns a video’s dialogue into subtitles and matches subtitle timing to it. The audio is processed on this Mac and never sent anywhere.</string>
 </dict>

@@ -97,6 +97,21 @@ final class PlaybackCoordinator {
 
     /// Subtitles made on this Mac: generated from speech, translated, timing matched (M12).
     let onDevice: OnDeviceSubtitles
+    /// Google Cast to a TV.
+    let cast = CastController()
+
+    /// Sends the film to a Cast device from where it is; the Mac pauses.
+    func startCasting(to device: CastDevice) async {
+        guard let item, let client = session.client else { return }
+        player.pause()
+        await cast.cast(item, mediaIndex: mediaIndex, at: player.currentTime, to: device, client: client,
+                        isLocal: session.connection?.connection.route == .local)
+    }
+
+    /// Brings the film back to the Mac at the TV's position.
+    func stopCasting() async {
+        await cast.stop(resume: true)
+    }
 
     /// Fit, fill or zoom, remembered per film and per show.
     var pictureMode: PictureMode = .fit {
@@ -123,6 +138,21 @@ final class PlaybackCoordinator {
         self.session = session
         onDevice = OnDeviceSubtitles(player: player)
         onDevice.selectTrack = { [weak self] id in self?.selectSubtitle(trackID: id) }
+        cast.onStopped = { [weak self] at in
+            guard let self, self.item != nil else { return }
+            Task {
+                await self.player.seek(to: at)
+                self.player.play()
+            }
+        }
+        // An episode that ends on the TV hands over to the next one there (Up Next autoplay).
+        cast.onFinished = { [weak self] device in
+            guard let self, self.nextEpisode != nil, self.binge.upNextCountdown > 0 else { return }
+            Task {
+                await self.playNext(autoplayed: true)
+                await self.startCasting(to: device)
+            }
+        }
     }
 
     /// After a title loads: its generated subtitles come back. An episode keeps generating
@@ -208,6 +238,10 @@ final class PlaybackCoordinator {
             beginOnDevice(detail, carryFrom: previous)
             restorePictureMode()
             let reporter = ActivityReporter(client: client, item: detail, player: player)
+            reporter.castPosition = { [weak self] in
+                guard let self, self.cast.isCasting, let status = self.cast.status else { return nil }
+                return (status.currentTime, status.duration ?? self.player.duration, self.cast.isPlaying)
+            }
             self.reporter = reporter
             reporter.start()
             publishNowPlaying(detail)
@@ -429,6 +463,8 @@ final class PlaybackCoordinator {
     func close() {
         requestGeneration += 1
         isMini = false
+        // Closing the player while casting stops the TV too.
+        if cast.isCasting { Task { await cast.stop(resume: false) } }
         let item = self.item
         let time = player.currentTime, duration = player.duration
         let reporter = self.reporter
@@ -453,6 +489,8 @@ final class PlaybackCoordinator {
     func finishForQuit() async {
         // Generated subtitles written since the last save are kept.
         onDevice.end()
+        // Quitting while casting stops the TV too (as closing the player does).
+        if cast.isCasting { await cast.stop(resume: false) }
         await reporter?.stop()
         reporter = nil
         if let id = transcodeSession, let client = session.client { await client.stopTranscode(session: id) }

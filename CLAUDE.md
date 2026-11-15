@@ -84,6 +84,13 @@ then Match Timing is refused: delete them between tests. Set the Debug Timing wi
 `defaults write ~/Library/Containers/com.mezzanine.mac.debug/Data/Library/Preferences/com.mezzanine.mac.debug.plist subtitleOffset -float 3`
 (an `-subtitleOffset` launch argument would shadow what the app writes).
 
+Google Cast: `MezzanineKit/Cast/` (discovery, `CastMessage` codec, `CastSession`), app side
+`Mezzanine/Player/CastController.swift`. Casting tests play on the owner's living-room TV
+("Family room TV"): say so before running them, keep them short (`-CastTo Family -CastStopAfter 25`
+with `-MezzanineAutoplay`), and never quit the app mid-cast in a script without stopping it.
+Leftover player on the TV: `MEZZANINE_CAST=stop swift test --filter CastLiveTests/stopsRunningReceiver`.
+Discovery check: `MEZZANINE_CAST=1 swift test --filter CastLiveTests/findsDevices`.
+
 SwiftUI gotcha: a NavigationStack draws a pushed page above anything overlaid on the stack, so
 panels that must float over every page (Quick Open, the search panel) hang on the page itself
 (`PagePanels` in AppShell, top page only). Check new overlays on a title page too:

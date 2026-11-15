@@ -19,6 +19,8 @@ final class ActivityReporter {
     private var heartbeat: Task<Void, Never>?
     private var lastState: PlexServerClient.TimelineState?
     private(set) var lastReportedTime: TimeInterval = 0
+    /// While casting, the TV's position and state stand in for the (paused) local player's.
+    var castPosition: (() -> (time: TimeInterval, duration: TimeInterval, playing: Bool)?)?
 
     init(client: PlexServerClient, item: PlexMetadata, player: MezzaninePlayer) {
         self.client = client
@@ -45,8 +47,9 @@ final class ActivityReporter {
     /// Pass the time explicitly when the player is about to be (or was) stopped.
     func stop(at time: TimeInterval? = nil, duration: TimeInterval? = nil) async {
         heartbeat?.cancel()
-        let time = time ?? player.currentTime
-        let duration = duration ?? player.duration
+        let cast = castPosition?()
+        let time = time ?? cast?.time ?? player.currentTime
+        let duration = duration ?? cast?.duration ?? player.duration
         guard !Self.isDisabled, duration > 0 else { return }
         _ = try? await withTimeout(.seconds(2)) { [client, item, sessionID] in
             try await client.reportTimeline(ratingKey: item.ratingKey, state: .stopped, time: time,
@@ -56,6 +59,16 @@ final class ActivityReporter {
     }
 
     private func report(force: Bool) async {
+        if let cast = castPosition?() {
+            guard !Self.isDisabled, cast.duration > 0 else { return }
+            let state: PlexServerClient.TimelineState = cast.playing ? .playing : .paused
+            guard force || state != lastState else { return }
+            lastState = state
+            lastReportedTime = cast.time
+            try? await client.reportTimeline(ratingKey: item.ratingKey, state: state, time: cast.time,
+                                             duration: cast.duration, sessionID: sessionID)
+            return
+        }
         guard !Self.isDisabled, player.duration > 0 else { return }
         let state: PlexServerClient.TimelineState
         switch player.status {

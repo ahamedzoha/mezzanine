@@ -347,6 +347,13 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 
 - One notification per show: "New episode of Severance" / "3 new episodes of Severance", body "S2 E10 · Cold Harbor" or "S2 E8–E10", the show's poster attached, grouped by show. Only shows being watched (an episode seen in the past year); the first check per profile only sets the mark. Clicking opens the show's page (not while a film fills the window). Settings ▸ Playback ▸ New episodes; if macOS has them off, the setting says so with Open Notification Settings….
 
+## Google Cast
+
+- The player's bottom-right row gains a Cast button (a TV with waves; filled while casting) when a Cast device is on the network; its menu lists the TVs ("Cast to · Family room TV") or "Stop Casting to …". AirPlay stays beside it.
+- Casting: the Mac pauses and the picture steps back under a graphite veil; on the gutter, left and low (never centred): "Playing on Family room TV" (caption), the title (28 pt bold), the episode line, a 3 pt ink position line with "10:20 of 2:59:53", then Pause/Play (lilac primary), Stop Casting (bordered) and the key hint. The player's own controls (close, Cast, AirPlay, ⋯) stay above it; the Mac's paused time, scrub and subtitles hide. Space, ←/→ (and ⇧ for a minute) and ↑/↓ (TV volume) drive the TV.
+- Stop Casting returns the film to the Mac at the TV's position; closing the player or quitting stops the TV. A failure says why on the same panel with OK (back to the Mac where the film was).
+- The TV fetches Plex's HLS of the title with a short-lived token (never the account token). It first gets the file's own video and sound re-packaged; a TV that refuses them gets H.264 with stereo AAC from Plex instead, and keeps getting it (remembered per TV). An episode that ends on the TV hands over to the next one there when Up Next autoplay is on.
+
 ## Mini player
 
 - The owner's pick: the film shrinks into the corner of the window (not a separate window; Picture in Picture already floats over other apps). ⌥M, the player's bottom-right row (next to PiP) or Playback ▸ Mini Player.

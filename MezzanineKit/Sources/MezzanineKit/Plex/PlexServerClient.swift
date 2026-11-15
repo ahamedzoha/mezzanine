@@ -44,6 +44,23 @@ public actor PlexServerClient {
         return h
     }
 
+    // MARK: Casting
+
+    /// A short-lived token for a device that can't send headers (the TV fetching a cast
+    /// stream). Plex expires it on its own; the account token never leaves this Mac.
+    public func transientToken() async throws -> String {
+        struct TokenContainer: Decodable { let token: String? }
+        let c: TokenContainer = try await get("/security/token", query: [
+            URLQueryItem(name: "type", value: "delegation"),
+            URLQueryItem(name: "scope", value: "all"),
+        ])
+        guard let token = c.token, !token.isEmpty else { throw PlexError.notFound }
+        return token
+    }
+
+    /// The identity headers (no token), for URLs a TV opens on Mezzanine's behalf.
+    public nonisolated var identityHeaders: [String: String] { identity.headers }
+
     // MARK: Library
 
     public func sections() async throws -> [PlexLibrarySection] {

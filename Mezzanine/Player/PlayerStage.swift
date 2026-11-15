@@ -56,6 +56,8 @@ struct PlayerStage: View {
         ZStack {
             Color.black
             picture
+            // Casting: the TV's panel sits over the picture and under the player's own controls.
+            if playback.cast.isCasting || isCastFailure { CastingPanel(item: item).transition(.opacity) }
             if upNextShown {
                 GlassIconButton(symbol: "xmark", label: "Close Player", help: "Close (Esc)") { _ = perform(.close) }
                     .padding(.top, Theme.Space.xl).padding(.trailing, Theme.Space.gutter)
@@ -63,7 +65,7 @@ struct PlayerStage: View {
             } else if chromeVisible || optionsOpen || player.status == .paused {
                 chrome.transition(.opacity)
             }
-            if !upNextShown { skipButton }
+            if !upNextShown && !playback.cast.isCasting { skipButton }
             if statsVisible && !upNextShown { PlayerStats(item: item).transition(.opacity) }
             if optionsOpen {
                 PlayerOptions(item: item, page: $optionsPage, close: { setOptions(open: false) })
@@ -91,6 +93,26 @@ struct PlayerStage: View {
         .position(x: frame.midX, y: frame.midY)
         .onAppear {
             focused = true
+            playback.cast.startDiscovery()
+            #if DEBUG
+            // -CastTo "Family" -CastStopAfter 25: casts to that device once playback runs, then stops.
+            if let name = UserDefaults.standard.string(forKey: "CastTo") {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(6))
+                    print("CAST devices=\(playback.cast.devices.map(\.name))")
+                    guard let device = playback.cast.devices.first(where: { $0.name.hasPrefix(name) }) else { return }
+                    await playback.startCasting(to: device)
+                    let stopAfter = UserDefaults.standard.integer(forKey: "CastStopAfter")
+                    if stopAfter > 0 {
+                        try? await Task.sleep(for: .seconds(stopAfter))
+                        print("CAST stopping at \(playback.cast.position)")
+                        await playback.stopCasting()
+                        try? await Task.sleep(for: .seconds(2))
+                        print("CAST local resumed at \(player.currentTime) status=\(player.status)")
+                    }
+                }
+            }
+            #endif
             withAnimation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.34, dampingFraction: 1)) { opened = true }
             scheduleHide()
             #if DEBUG
@@ -190,7 +212,7 @@ struct PlayerStage: View {
                 PlayerSurface(player: player)
                     .frame(width: rect.width * zoom, height: rect.height * zoom)
                     .frame(width: rect.width, height: rect.height)
-                SubtitleOverlay(player: player, onDevice: playback.onDevice)
+                if !playback.cast.isCasting { SubtitleOverlay(player: player, onDevice: playback.onDevice) }
                 // The video is an AppKit layer, so its rounding is painted in the stage's black
                 // rather than left to SwiftUI clipping of a hosted view.
                 PictureCorners(radius: upNextShown ? Theme.Radius.panel : 0)
@@ -244,6 +266,7 @@ struct PlayerStage: View {
                 Spacer()
                 HStack(alignment: .bottom, spacing: Theme.Space.s) {
                     Spacer()
+                    CastButton()
                     if player.avPlayer != nil {
                         AirPlayButton(player: player)
                             .frame(width: 40, height: 40)
@@ -264,6 +287,8 @@ struct PlayerStage: View {
                 }
                 .padding(.horizontal, Theme.Space.gutter)
                 .padding(.bottom, Theme.Space.m)
+                // While casting, the TV's position is in the panel; the Mac's paused one would mislead.
+                if !playback.cast.isCasting {
                 HStack(spacing: Theme.Space.s) {
                     if player.status == .paused {
                         Label("Paused", systemImage: "pause.fill")
@@ -285,6 +310,7 @@ struct PlayerStage: View {
                 }
                 // A new title gets a fresh bar: hover previews are cached per position.
                 .id(item.ratingKey)
+                }
             }
         }
     }
@@ -582,7 +608,31 @@ struct PlayerStage: View {
         return .handled
     }
 
+    private var isCastFailure: Bool {
+        if case .failed = playback.cast.state { return true }
+        return false
+    }
+
+    /// While casting, the transport keys drive the TV.
+    private func performOnTV(_ key: PlayerKey) -> KeyPress.Result? {
+        let cast = playback.cast
+        guard cast.isCasting else { return nil }
+        switch key {
+        case .playPause: cast.togglePlay()
+        case .back10: cast.seek(by: -10)
+        case .forward10: cast.seek(by: 10)
+        case .back60: cast.seek(by: -60)
+        case .forward60: cast.seek(by: 60)
+        case .volumeUp: cast.changeVolume(by: 0.05)
+        case .volumeDown: cast.changeVolume(by: -0.05)
+        case .stats, .options, .fullScreen, .miniPlayer: return nil
+        default: return .ignored
+        }
+        return .handled
+    }
+
     private func perform(_ key: PlayerKey) -> KeyPress.Result {
+        if let handled = performOnTV(key) { return handled }
         switch key {
         case .playPause:
             let willPlay = player.status != .playing
