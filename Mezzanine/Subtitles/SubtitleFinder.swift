@@ -74,7 +74,7 @@ final class SubtitleFinder {
     /// Adds `result` to the player. Plex's own results are fetched by the server (every Plex
     /// app sees them); the rest are kept on this Mac for this title.
     func choose(_ result: SubtitleResult, current: PlexMetadata, client: PlexServerClient?, serverID: String?,
-                player: MezzaninePlayer) async -> Found? {
+                player: MezzaninePlayer, isCurrent: @escaping () -> Bool = { true }) async -> Found? {
         guard downloading == nil, Date().timeIntervalSince(reorderedAt) > 0.35 else { return nil }
         downloading = result.id
         failure = nil
@@ -82,12 +82,14 @@ final class SubtitleFinder {
         do {
             if result.source == PlexSubtitleSource.sourceName {
                 guard let client else { throw SubtitleSourceError.rejected("the server isn’t connected") }
-                return try await chooseThroughPlex(result, current: current, client: client, player: player)
+                return try await chooseThroughPlex(result, current: current, client: client, player: player, isCurrent: isCurrent)
             } else {
                 guard let query, let source = sources.first(where: { $0.name == result.source }) else { throw SubtitleSourceError.notFound }
                 let file = try await source.download(result, for: query)
                 guard let serverID else { throw SubtitleSourceError.unreadable }
                 let (entry, url) = try SavedSubtitles.save(file, result: result, serverID: serverID, ratingKey: current.ratingKey)
+                // Kept for its title either way; only shown if that title is still playing.
+                guard isCurrent() else { return nil }
                 let track = player.addExternalSubtitle(ExternalSubtitle(entry, url: url), headers: [:])
                 return Found(trackID: track.id, savedEntry: entry.id)
             }
@@ -102,7 +104,7 @@ final class SubtitleFinder {
     }
 
     private func chooseThroughPlex(_ result: SubtitleResult, current: PlexMetadata, client: PlexServerClient,
-                                   player: MezzaninePlayer) async throws -> Found {
+                                   player: MezzaninePlayer, isCurrent: () -> Bool) async throws -> Found? {
         let before = Set(current.media.flatMap { $0.parts.flatMap { $0.streams.map(\.id) } })
         try await client.downloadSubtitle(ratingKey: current.ratingKey, key: result.payload, codec: result.format,
                                           language: result.language, hearingImpaired: result.hearingImpaired,
@@ -113,6 +115,7 @@ final class SubtitleFinder {
         }), let key = added.key, let url = client.urls.subtitle(streamKey: key) else {
             throw SubtitleSourceError.rejected("the server saved it, but hasn’t listed it yet. Try again in a moment")
         }
+        guard isCurrent() else { return nil }
         let track = player.addExternalSubtitle(ExternalSubtitle(url: url, name: added.label, language: added.languageCode,
                                                                 format: added.codec, isForced: added.forced,
                                                                 isHearingImpaired: added.hearingImpaired),

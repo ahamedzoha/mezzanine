@@ -16,6 +16,16 @@
   the stack; Quick Open had the same bug). Both now hang on the top page; verified with captures
   on a title page, a library page and Home. Ranking: titles starting with the text, then a word
   of the title, then the rest; lessons (personal-media libraries) after films and shows.
+- Stability sweep: scripted walkthrough of 13 pages with captures (Home, each library layout,
+  Courses folders, title pages and seasons, search and ⌘K on title pages, Downloads, Settings,
+  the player panel): all render right. A read-only audit found 24 more places where an older,
+  slower answer could land last; all fixed: play requests (a request counter), profile and
+  server switches (a connect counter; the account changes with its client), library grids,
+  library sync (one pass at a time), Home shelves, episode refreshes, Up Next, suggestions,
+  scrub previews per title, Find Subtitles after a title change, artwork kind, downloads
+  (ordered manifest writes, profile captured, no orphaned extras, pause vs resume), generated
+  subtitles' save timer and listener handle, translations per language pair, the key check,
+  folder errors, the onboarding wall, shared image fetches.
 - Mark as Watched on a title page waited for a full library re-read before the screen changed
   (the mark reached Plex at once; the owner clicked twice, so one episode shows 2 views). The
   row, its ✓ and the season ticks now change instantly; the library catches up in the background.

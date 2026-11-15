@@ -87,6 +87,18 @@ struct FolderBrowser: View {
         .onKeyPress(.delete) { goUp(); return .handled }
         .onChange(of: commands.enclosingFolderRequests) { _, _ in goUp() }
         .task(id: path.last?.key ?? "root") { await load() }
+        #if DEBUG
+        // -FolderClicks "2,0": opens the 3rd folder, then the 1st inside it (walkthrough captures).
+        .task {
+            guard let clicks = UserDefaults.standard.string(forKey: "FolderClicks") else { return }
+            for token in clicks.split(separator: ",") {
+                try? await Task.sleep(for: .seconds(2))
+                if let i = Int(token), let folders = listing?.folders, folders.indices.contains(i) { open(folders[i]) }
+            }
+            try? await Task.sleep(for: .seconds(2))
+            print("FOLDERS path=\(path.map(\.title)) listing=\(listingPath.map(\.title)) rows=\(rowCount)")
+        }
+        #endif
     }
 
     // MARK: Parts
@@ -198,7 +210,10 @@ struct FolderBrowser: View {
             if let returnTo, let i = next.folders.firstIndex(where: { $0.key == returnTo }) { focused = i } else { focused = nil }
             returnTo = nil
         } catch is CancellationError {
+            return
         } catch {
+            // Only the folder on screen reports its failure.
+            guard requested.map(\.key) == path.map(\.key) else { return }
             self.error = (error as? PlexError)?.userMessage ?? "The server couldn’t list this folder."
             listing = nil
         }

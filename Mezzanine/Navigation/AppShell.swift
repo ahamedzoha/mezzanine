@@ -71,7 +71,11 @@ struct AppShell: View {
             if phase == .signedOut && old != .signedOut { onboardingComplete = false }
         }
         // Sections and the local library follow the connection, onboarding included.
-        .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(session.account?.uuid ?? "")") { await loadSections() }
+        // The address is part of it: after a Wi-Fi or VPN change the library and downloads move to
+        // the new client too.
+        .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(session.account?.uuid ?? "")|\(session.connection?.baseURL.absoluteString ?? "")") {
+            await loadSections()
+        }
         .onChange(of: isOffline, initial: true) { _, offline in
             guard offline else { return }
             commands.selection = .downloads

@@ -70,9 +70,40 @@ final class LibraryStore {
         }
     }
 
+    /// One sync at a time. A request while one runs makes it go round once more when it ends
+    /// (so a change made meanwhile, like a watched mark, is picked up), instead of a second sync
+    /// writing an older page over a newer one.
+    @ObservationIgnored private var running: Task<Void, Never>?
+    @ObservationIgnored private var again = false
+    @ObservationIgnored private var forceAgain = false
+
     func syncAll(force: Bool = false) async {
+        if let running {
+            again = true
+            forceAgain = forceAgain || force
+            await running.value
+            return
+        }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.syncPass(force: force)
+            while self.again {
+                let force = self.forceAgain
+                self.again = false
+                self.forceAgain = false
+                await self.syncPass(force: force)
+            }
+        }
+        running = task
+        await task.value
+        running = nil
+    }
+
+    private func syncPass(force: Bool) async {
         guard let sync else { return }
         for section in sections where !LibrarySync.types(for: section).isEmpty {
+            // A profile or server switch replaced the sync: this pass belongs to the old one.
+            guard sync === self.sync else { return }
             do {
                 let changed = try await sync.sync(section, force: force) { progress in
                     Task { @MainActor [weak self] in

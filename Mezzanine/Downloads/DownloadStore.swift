@@ -158,9 +158,12 @@ final class DownloadStore {
     func download(_ item: PlexMetadata, keptByRule: Bool = false) {
         guard item.kind == .movie || item.kind == .episode, record(item.ratingKey) == nil,
               let client, !serverID.isEmpty else { return }
+        // The profile this download belongs to, fixed before anything is awaited.
+        let serverID = self.serverID, userID = self.userID
         Task {
             guard let (meta, json) = try? await client.metadataWithJSON(item.ratingKey),
                   let part = meta.media.first?.parts.first, let partKey = part.key else { return }
+            guard self.serverID == serverID, self.userID == userID else { return }
             let ext = (partKey as NSString).pathExtension.isEmpty ? "mkv" : (partKey as NSString).pathExtension
             let base = Self.fileBase(meta)
             var record = DownloadRecord(
@@ -242,9 +245,11 @@ final class DownloadStore {
         task.cancel { [weak self] data in
             Task { @MainActor in
                 if let data { try? data.write(to: Self.resumeData(id)) }
-                self?.tasks[id] = nil
-                self?.setState(id, .paused)
-                self?.pump()
+                // Resumed again meanwhile: the new transfer is the one in charge.
+                guard let self, self.tasks[id] === task else { return }
+                self.tasks[id] = nil
+                self.setState(id, .paused)
+                self.pump()
             }
         }
     }
@@ -418,7 +423,13 @@ final class DownloadStore {
                 try? data.write(to: folder.appendingPathComponent(sub.file))
             }
         }
-        guard let i = records.firstIndex(where: { $0.id == record.id }) else { return }
+        guard let i = records.firstIndex(where: { $0.id == record.id }) else {
+            // Removed while its extras arrived: don't leave them behind.
+            for file in [updated.posterFile, updated.backdropFile, updated.logoFile].compactMap({ $0 }) + record.subtitles.map(\.file) {
+                try? FileManager.default.removeItem(at: folder.appendingPathComponent(file))
+            }
+            return
+        }
         records[i].posterFile = updated.posterFile
         records[i].backdropFile = updated.backdropFile
         records[i].logoFile = updated.logoFile
@@ -458,10 +469,13 @@ final class DownloadStore {
         keepRules = manifest.keepRules
     }
 
+    /// Writes run one after another in the order asked, so the last snapshot is the one on disk
+    /// (several saves fire within milliseconds when a season is queued).
     private func save() {
-        saveTask?.cancel()
         let manifest = Manifest(records: records, keepRules: keepRules)
+        let previous = saveTask
         saveTask = Task.detached(priority: .utility) {
+            await previous?.value
             try? FileManager.default.createDirectory(at: Self.support, withIntermediateDirectories: true)
             if let data = try? JSONEncoder().encode(manifest) { try? data.write(to: Self.manifest, options: .atomic) }
         }

@@ -137,35 +137,52 @@ final class SessionStore {
 
     // MARK: Servers
 
+    /// Bumped by every sign-in, profile switch and server pick: a slower, older one that's still
+    /// racing addresses stops instead of landing over the newer choice.
+    @ObservationIgnored private var connectGeneration = 0
+
     private func connect(token: String) async {
+        connectGeneration += 1
+        let generation = connectGeneration
         phase = .connecting
         do {
             async let account = tv.account(token: token)
             async let servers = tv.resources(token: token)
-            self.account = try await account
-            self.servers = try await servers.sorted { ($0.owned ? 0 : 1, $0.name) < ($1.owned ? 0 : 1, $1.name) }
+            let newAccount = try await account
+            let newServers = try await servers.sorted { ($0.owned ? 0 : 1, $0.name) < ($1.owned ? 0 : 1, $1.name) }
+            guard generation == connectGeneration else { return }
+            self.servers = newServers
             let saved = UserDefaults.standard.string(forKey: Self.serverDefaultsKey)
-            guard let server = self.servers.first(where: { $0.clientIdentifier == saved })
-                    ?? self.servers.first(where: \.owned) ?? self.servers.first else {
+            guard let server = newServers.first(where: { $0.clientIdentifier == saved })
+                    ?? newServers.first(where: \.owned) ?? newServers.first else {
+                self.account = newAccount
                 phase = .failed("This Plex account has no servers.")
                 return
             }
-            try await select(server, token: token)
+            // The account changes together with its client, so nothing reads the new profile
+            // through the previous profile's connection.
+            try await select(server, token: token, account: newAccount, generation: generation)
+        } catch is CancellationError {
         } catch PlexError.unauthorized {
+            guard generation == connectGeneration else { return }
             signOut()
         } catch {
+            guard generation == connectGeneration else { return }
             phase = .failed((error as? PlexError)?.userMessage ?? error.localizedDescription)
         }
     }
 
     func select(_ server: PlexServerResource) async {
         guard let token = activeToken else { return }
-        do { try await select(server, token: token) } catch {
+        connectGeneration += 1
+        let generation = connectGeneration
+        do { try await select(server, token: token, account: nil, generation: generation) } catch {
+            guard generation == connectGeneration else { return }
             phase = .failed((error as? PlexError)?.userMessage ?? error.localizedDescription)
         }
     }
 
-    private func select(_ server: PlexServerResource, token: String) async throws {
+    private func select(_ server: PlexServerResource, token: String, account newAccount: PlexAccount?, generation: Int) async throws {
         // A refresh of the same server keeps the window as it is; only a first
         // connection or a server switch shows "Connecting".
         if currentServer?.clientIdentifier != server.clientIdentifier || client == nil {
@@ -174,8 +191,11 @@ final class SessionStore {
         let racer = ConnectionRacer()
         guard let won = await racer.race(server.candidates,
                                          probe: ConnectionRacer.identityProbe(expectedMachineIdentifier: server.clientIdentifier)) else {
+            guard generation == connectGeneration else { return }
             throw await diagnoseUnreachable(server)
         }
+        guard generation == connectGeneration else { return }
+        if let newAccount { account = newAccount }
         currentServer = server
         connection = won
         client = PlexServerClient(baseURL: won.baseURL, token: server.accessToken ?? token,
@@ -247,9 +267,13 @@ final class SessionStore {
     /// unless the address actually changed.
     private func refreshConnection(_ server: PlexServerResource) async {
         guard let token = activeToken else { return }
+        let generation = connectGeneration
         guard let won = await ConnectionRacer().race(server.candidates,
                                                      probe: ConnectionRacer.identityProbe(expectedMachineIdentifier: server.clientIdentifier)),
               won.connection != connection?.connection else { return }
+        // A profile or server switch finished meanwhile: its connection stands.
+        guard generation == connectGeneration, activeToken == token,
+              currentServer?.clientIdentifier == server.clientIdentifier else { return }
         connection = won
         client = PlexServerClient(baseURL: won.baseURL, token: server.accessToken ?? token,
                                   machineIdentifier: server.clientIdentifier, identity: identity)

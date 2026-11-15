@@ -530,7 +530,8 @@ struct PlayerOptions: View {
         let current = playback.item ?? item
         let serverID = session.currentServer?.clientIdentifier ?? downloads.record(current.ratingKey)?.serverID
         Task {
-            if let found = await finder.choose(result, current: current, client: session.client, serverID: serverID, player: player) {
+            if let found = await finder.choose(result, current: current, client: session.client, serverID: serverID, player: player,
+                                               isCurrent: { playback.item?.ratingKey == current.ratingKey }) {
                 playback.adoptFoundSubtitle(trackID: found.trackID, savedEntry: found.savedEntry, plexStream: found.plexStream)
                 page = .subtitles
             }

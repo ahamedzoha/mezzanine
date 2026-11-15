@@ -55,9 +55,18 @@ final class HomeModel {
         .map { ShelfSpec(id: "hub:\($0.hubIdentifier)", source: .hub(identifier: $0.hubIdentifier, section: section)) }
     }
 
+    /// Bumped by every load: an older one (a retry, a sync tick, a profile switch) that finishes
+    /// late stops instead of writing over the newer shelves. `Task.isCancelled` alone can't tell,
+    /// because some loads start outside a cancellable task.
+    @ObservationIgnored private var loadGeneration = 0
+    /// The last refresh asked for each shelf, so an older one can't land after a newer edit.
+    @ObservationIgnored private var refreshTokens: [String: UUID] = [:]
+
     func load(scope: String, saved: [ShelfSpec]?, client: PlexServerClient, index: LibraryIndex?) async {
+        loadGeneration += 1
+        let generation = loadGeneration
         isLoading = shelves.isEmpty
-        defer { isLoading = false }
+        defer { if generation == loadGeneration { isLoading = false } }
         var hubCache: [String?: [PlexHub]] = [:]
         func hubs(_ section: String?) async throws -> [PlexHub] {
             if let cached = hubCache[section] { return cached }
@@ -79,17 +88,19 @@ final class HomeModel {
                 out[spec.id] = await resolve(spec, hubs: hubs, client: client, index: index)
             }
             // Superseded by a newer load (the layout changed): leave the state to it.
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, generation == loadGeneration else { return }
             specs = layout
             resolved = out
             shelves = layout.filter { !$0.hidden }.compactMap { out[$0.id] }.filter { !$0.items.isEmpty && !$0.isMissing }
             // The rows Add Shelf can offer here: global ones on the main Home, the library's own elsewhere.
-            hubCatalog[isMain ? nil : scope] = try await hubs(isMain ? nil : scope)
+            let catalog = try await hubs(isMain ? nil : scope)
+            guard generation == loadGeneration else { return }
+            hubCatalog[isMain ? nil : scope] = catalog
             clampFocus()
             error = nil
         } catch is CancellationError {
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, generation == loadGeneration else { return }
             self.error = (error as? PlexError)?.userMessage ?? "Couldn’t load the shelves."
         }
     }
@@ -116,12 +127,17 @@ final class HomeModel {
 
     /// Resolves one shelf in place (after Edit Home adds or changes it), without reloading Home.
     func refresh(_ spec: ShelfSpec, client: PlexServerClient, index: LibraryIndex?) async {
+        let token = UUID()
+        refreshTokens[spec.id] = token
+        let generation = loadGeneration
         let cache = hubCatalog
         let shelf = await resolve(spec, hubs: { section in
             if let list = cache[section], list.contains(where: { $0.items.count > 1 }) { return list }
             if let section { return try await client.sectionHubs(section, count: 24) }
             return try await client.homeHubs(count: 24)
         }, client: client, index: index)
+        // A newer edit of this shelf, or a full reload, answered meanwhile.
+        guard refreshTokens[spec.id] == token, generation == loadGeneration else { return }
         resolved[spec.id] = shelf
     }
 

@@ -46,7 +46,8 @@ struct OnboardingView: View {
         .task(id: library.revision) {
             guard session.phase == .ready else { return }
             let items = await library.wallItems(limit: 160)
-            if items.count != wall.count { withAnimation(.easeOut(duration: 0.3)) { wall = items } }
+            guard !Task.isCancelled else { return }
+            if items.map(\.ratingKey) != wall.map(\.ratingKey) { withAnimation(.easeOut(duration: 0.3)) { wall = items } }
         }
         .task(id: wall.count) { await cycleRoomLight() }
         .onChange(of: step) { _, _ in AccessibilityNotification.ScreenChanged(nil).post() }

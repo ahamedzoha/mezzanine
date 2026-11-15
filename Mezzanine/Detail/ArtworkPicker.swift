@@ -273,6 +273,9 @@ struct ArtworkPicker: View {
 
     private func apply() async {
         guard !applying, let candidate = selectedCandidate else { return }
+        // The Poster/Background switch can change while the server answers: this apply is for
+        // the kind chosen now.
+        let kind = self.kind
         switch target {
         case .mezzanine:
             library.setArtworkOverride(kind, for: owner, path: candidate.key)
@@ -288,10 +291,10 @@ struct ArtworkPicker: View {
                 try await client.setArtwork(kind, ratingKey: owner, to: candidate)
                 // The server's choice now leads; drop any Mezzanine-only one and re-read the title.
                 library.setArtworkOverride(kind, for: owner, path: nil)
-                await library.syncAll()
                 if let fresh = try? await client.artwork(kind, ratingKey: owner) { candidates[kind] = fresh }
+                Task { await library.syncAll() }
                 // Stay open: the previous picture is one click away if this was a mistake.
-                status = "Set on the Plex server." + (previous.map { " Before: \($0.source)." } ?? "")
+                status = "\(kind.label) set on the Plex server." + (previous.map { " Before: \($0.source)." } ?? "")
                 announce(status ?? "")
             } catch {
                 failed = (error as? PlexError)?.userMessage ?? "The server didn’t accept it."

@@ -112,10 +112,16 @@ final class PlaybackCoordinator {
         await play(previous, from: nil, autoplayed: false)
     }
 
+    /// Bumped by every play request and by close: an older request that's still looking its
+    /// title up stops at the next check instead of loading over the newer one.
+    @ObservationIgnored private var requestGeneration = 0
+
     private func play(_ item: PlexMetadata, from origin: CGRect?, autoplayed: Bool) async {
         #if DEBUG
         PerfLog.mark("play requested \(item.ratingKey) autoplayed=\(autoplayed)")
         #endif
+        requestGeneration += 1
+        let generation = requestGeneration
         // Offline: a downloaded film or episode still plays, from its saved details.
         guard let client = session.client else {
             await playOffline(item, from: origin)
@@ -128,6 +134,7 @@ final class PlaybackCoordinator {
         do {
             let playable = try await resolvePlayable(item, client: client)
             let detail = try await client.metadata(playable.ratingKey)
+            guard generation == requestGeneration else { return }
             if detail.ratingKey != item.ratingKey || !detail.media.indices.contains(mediaIndex) { mediaIndex = 0 }
             guard detail.media.indices.contains(mediaIndex), detail.media[mediaIndex].parts.first?.key != nil else {
                 error = "This item has no playable file."
@@ -138,6 +145,7 @@ final class PlaybackCoordinator {
             onDevice.end()
             withAnimation(Theme.Motion.object) { self.item = detail }
             if let reporter { await reporter.stop(at: player.currentTime, duration: player.duration) }
+            guard generation == requestGeneration else { return }
             let start = detail.viewOffset.map { Double($0) / 1000 }
             fallbackNotice = nil
             // Direct play first; if the file won't open, let Plex remux it, then convert it.
@@ -155,6 +163,7 @@ final class PlaybackCoordinator {
                 }
             }
             if let lastError { throw lastError }
+            guard generation == requestGeneration else { return }
             beginOnDevice(detail, carryFrom: previous)
             let reporter = ActivityReporter(client: client, item: detail, player: player)
             self.reporter = reporter
@@ -375,6 +384,7 @@ final class PlaybackCoordinator {
     }
 
     func close() {
+        requestGeneration += 1
         let item = self.item
         let time = player.currentTime, duration = player.duration
         let reporter = self.reporter
@@ -397,6 +407,8 @@ final class PlaybackCoordinator {
 
     /// For app quit: the final report, waited for (at most ~2 s).
     func finishForQuit() async {
+        // Generated subtitles written since the last save are kept.
+        onDevice.end()
         await reporter?.stop()
         reporter = nil
         if let id = transcodeSession, let client = session.client { await client.stopTranscode(session: id) }
@@ -429,6 +441,8 @@ final class PlaybackCoordinator {
     private func resolveNext(after episode: PlexMetadata, client: PlexServerClient) async {
         guard episode.kind == .episode, let show = episode.grandparentRatingKey else { return }
         if episodesCache[show] == nil { episodesCache[show] = try? await client.allLeaves(show) }
+        // Another title (or none) took the screen meanwhile: this Up Next isn't for it.
+        guard item?.ratingKey == episode.ratingKey else { return }
         let all = episodesCache[show] ?? []
         previousEpisode = BingePlanner.previousEpisode(before: episode, in: all)
         nextEpisode = BingePlanner.nextEpisode(after: episode, in: all)
@@ -439,6 +453,7 @@ final class PlaybackCoordinator {
     func loadSuggestions() async {
         guard let item, item.kind == .movie, suggestions.isEmpty, let client = session.client else { return }
         let hubs = (try? await client.related(item.ratingKey, count: 12)) ?? []
+        guard self.item?.ratingKey == item.ratingKey else { return }
         var seen: Set<String> = [item.ratingKey]
         var picks: [PlexMetadata] = []
         for hub in hubs where !hub.items.isEmpty {

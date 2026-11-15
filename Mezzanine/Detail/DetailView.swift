@@ -25,6 +25,9 @@ struct DetailView: View {
     @State private var seasons: [PlexMetadata] = []
     @State private var season: PlexMetadata?
     @State private var episodes: [PlexMetadata] = []
+    /// Bumped by every change to `episodes`: a refresh that started before a newer change
+    /// (a watched mark, another refresh) drops its older answer.
+    @State private var episodesVersion = 0
     @State private var related: [PlexHub] = []
     @State private var focusedEpisode: Int?
     @State private var error: String?
@@ -282,6 +285,12 @@ struct DetailView: View {
             related = (try? await client.related(detail.ratingKey)) ?? []
             #if DEBUG
             // -DetailSection cast: land scrolled to a section, for review captures.
+            // -DetailSeason 4: picks that season (walkthrough captures).
+            let pick = UserDefaults.standard.integer(forKey: "DetailSeason")
+            if pick > 0, let s = seasons.first(where: { $0.index == pick }) { await choose(season: s) }
+            if detail.kind == .show {
+                print("DETAIL seasons=\(seasons.count) chosen=\(season?.title ?? "-") episodes=\(episodes.prefix(2).map { "\($0.parentIndex ?? -1)x\($0.index ?? -1) watched=\($0.isWatched)" })")
+            }
             if let id = UserDefaults.standard.string(forKey: "DetailSection"), let i = sectionIDs.firstIndex(of: id) {
                 try? await Task.sleep(for: .milliseconds(600))
                 section = i
@@ -302,13 +311,16 @@ struct DetailView: View {
         // Another season was chosen while this one loaded: its list is the one to show.
         guard season?.ratingKey == s.ratingKey else { return }
         episodes = list
+        episodesVersion += 1
     }
 
     private func refreshEpisodes() async {
         guard let s = season, let client = session.client else { return }
-        let list = (try? await client.children(s.ratingKey)) ?? episodes
-        guard season?.ratingKey == s.ratingKey else { return }
+        let version = episodesVersion
+        guard let list = try? await client.children(s.ratingKey) else { return }
+        guard season?.ratingKey == s.ratingKey, version == episodesVersion else { return }
         episodes = list
+        episodesVersion += 1
     }
 
     private var confirmTitle: String {
@@ -333,6 +345,7 @@ struct DetailView: View {
         } else if target.kind == .show || (target.kind == .season && target.ratingKey == season?.ratingKey) {
             episodes = episodes.map { $0.markedWatched(watched) }
         }
+        episodesVersion += 1
         if item?.ratingKey == target.ratingKey, target.kind == .movie || target.kind == .episode {
             item = item?.markedWatched(watched)
         }

@@ -236,6 +236,8 @@ struct LibraryView: View {
 
     private func load() async {
         let result = await library.items(query)
+        // A newer sort, filter or sync page asked again meanwhile: its answer is the one to show.
+        guard !Task.isCancelled else { return }
         items = result
         loaded = library.count(section: section.key) > 0 || library.syncState == .idle
         if let f = focused, f >= items.count { focused = nil }

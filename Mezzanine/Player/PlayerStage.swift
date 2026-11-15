@@ -273,6 +273,8 @@ struct PlayerStage: View {
                               preview: { [player] t in await player.previewFrame(at: t, maxWidth: 400) }) { t in
                     Task { await player.seek(to: t) }
                 }
+                // A new title gets a fresh bar: hover previews are cached per position.
+                .id(item.ratingKey)
             }
         }
     }

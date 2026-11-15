@@ -84,12 +84,12 @@ public actor ImagePipeline {
             let image = try await withTaskCancellationHandler {
                 try await task.value
             } onCancel: {
-                Task { await self.waiterCancelled(key) }
+                Task { await self.waiterCancelled(key, task: task) }
             }
-            finish(key, image: image)
+            finish(key, image: image, task: task)
             return image
         } catch {
-            finish(key, image: nil)
+            finish(key, image: nil, task: task)
             throw error
         }
     }
@@ -101,8 +101,10 @@ public actor ImagePipeline {
 
     // MARK: Bookkeeping
 
-    private func waiterCancelled(_ key: String) {
-        guard var entry = inFlight[key] else { return }
+    /// Acts only on the fetch this waiter shared: a newer fetch for the same key (scrolled away
+    /// and back) is never cancelled or dropped by an older one's bookkeeping.
+    private func waiterCancelled(_ key: String, task: Task<CGImage, Error>) {
+        guard var entry = inFlight[key], entry.task == task else { return }
         entry.waiters -= 1
         if entry.waiters <= 0 {
             entry.task.cancel()
@@ -112,11 +114,11 @@ public actor ImagePipeline {
         }
     }
 
-    private func finish(_ key: String, image: CGImage?) {
+    private func finish(_ key: String, image: CGImage?, task: Task<CGImage, Error>) {
         if let image {
             memory.setObject(ImageBox(image), forKey: key as NSString, cost: image.bytesPerRow * image.height)
         }
-        inFlight[key] = nil
+        if inFlight[key]?.task == task { inFlight[key] = nil }
     }
 
     nonisolated func cacheKey(_ url: URL, _ bucket: Int) -> String {

@@ -91,6 +91,8 @@ final class OnDeviceSubtitles {
     @ObservationIgnored private var previousTrack: Int?
     /// Generate was asked for while the title was still loading.
     @ObservationIgnored private var generateWhenReady = false
+    /// The pair `translations` belong to.
+    @ObservationIgnored private var servedPair: String?
 
     init(player: MezzaninePlayer) {
         self.player = player
@@ -117,6 +119,7 @@ final class OnDeviceSubtitles {
         if ratingKey != nil { save() }
         stopListening()
         saveTask?.cancel()
+        saveTask = nil
         ratingKey = nil
         lines = []
         generatedLanguage = nil
@@ -128,6 +131,7 @@ final class OnDeviceSubtitles {
         generateWhenReady = false
         translations = [:]
         untranslatable = []
+        servedPair = nil
         translating = .idle
     }
 
@@ -274,9 +278,13 @@ final class OnDeviceSubtitles {
 
     private func startListening() {
         guard listenTask == nil else { return }
-        listenTask = Task { [weak self] in
-            await self?.listen()
-            self?.listenTask = nil
+        let task = Task { [weak self] () -> Void in await self?.listen() }
+        listenTask = task
+        // Only this task's own end clears the handle: a stopped one finishing late must not
+        // drop the handle of the listener that replaced it.
+        Task { [weak self] in
+            await task.value
+            if self?.listenTask == task { self?.listenTask = nil }
         }
     }
 
@@ -390,11 +398,15 @@ final class OnDeviceSubtitles {
 
     private func scheduleSave() {
         guard saveTask == nil else { return }
-        saveTask = Task { [weak self] in
+        let task = Task { [weak self] in
             try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled else { return }
             self?.save()
-            self?.saveTask = nil
+        }
+        saveTask = task
+        Task { [weak self] in
+            await task.value
+            if self?.saveTask == task { self?.saveTask = nil }
         }
     }
 
@@ -464,6 +476,12 @@ final class OnDeviceSubtitles {
     /// screen and the next minute and a half, nearest first.
     func serve(_ session: TranslationSession) async {
         let pair = pairKey
+        // Another pair (a new target language, or a track in another language): start clean.
+        if pair != servedPair {
+            translations = [:]
+            untranslatable = []
+            servedPair = pair
+        }
         translating = .preparing
         if let source = sourceLanguage {
             let status = await LanguageAvailability().status(from: Locale.Language(identifier: source),
@@ -492,7 +510,9 @@ final class OnDeviceSubtitles {
                 continue
             }
             do {
-                for (key, text) in try await Self.translate(box, batch) { translations[key] = text }
+                let results = try await Self.translate(box, batch)
+                guard !Task.isCancelled, pairKey == pair else { return }
+                for (key, text) in results { translations[key] = text }
                 for piece in batch where translations[piece] == nil { untranslatable.insert(piece) }
             } catch {
                 if Task.isCancelled { return }

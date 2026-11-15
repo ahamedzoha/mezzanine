@@ -168,9 +168,13 @@ struct OpenSubtitlesSheet: View {
             return
         }
         checking = true
-        result = await SubtitleSourceSettings.checkOpenSubtitles(key: trimmedKey, user: trimmedUser, password: password)
+        let checked = (trimmedKey, trimmedUser, password)
+        let answer = await SubtitleSourceSettings.checkOpenSubtitles(key: checked.0, user: checked.1, password: checked.2)
         checking = false
-        if let result { AccessibilityNotification.Announcement(result.message).post() }
+        // Edited while checking: the answer is about the old entries, so it isn't shown.
+        guard checked == (trimmedKey, trimmedUser, password) else { return }
+        result = answer
+        AccessibilityNotification.Announcement(answer.message).post()
     }
 
     private func save() {

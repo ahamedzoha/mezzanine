@@ -10,11 +10,13 @@ root=~/Code/mezzanine
 bin=$root/build.noindex/DerivedData/Build/Products/Debug/Mezzanine.app/Contents/MacOS/Mezzanine
 out=$root/build.noindex/ui; mkdir -p $out
 source $root/.mezzanine-live.env
-MEZZANINE_DEV_TOKEN="$PLEX_TOKEN" script -q /dev/null $bin -MezzanineNoActivity YES -onboardingComplete YES "$@" < /dev/null > $out/$name.log 2>&1 &
+# Each case starts on Home unless it names a section (the last run's section would come back).
+home=(-lastSidebarItem home); [[ " $* " == *" -lastSidebarItem "* || " $* " == *" -MezzanineSection "* ]] && home=()
+MEZZANINE_DEV_TOKEN="$PLEX_TOKEN" script -q /dev/null $bin -MezzanineNoActivity YES -onboardingComplete YES $home "$@" < /dev/null > $out/$name.log 2>&1 &
 sleep $wait
 osascript -e 'tell application id "com.mezzanine.mac.debug" to activate' >/dev/null 2>&1
 sleep 1.2
 screencapture -x $out/$name-1.png $out/$name-2.png $out/$name-3.png 2>/dev/null
 osascript -e 'tell application id "com.mezzanine.mac.debug" to quit' >/dev/null 2>&1
 sleep 2
-tr -d '\r' < $out/$name.log | grep -E "SEARCHPANEL|QUICKOPEN|error|Fatal" | head -12
+tr -d '\r' < $out/$name.log | grep -E "SEARCHPANEL|QUICKOPEN|FOLDERS|DETAIL|PERF home|AUTOPLAY|error|Fatal" | head -12
