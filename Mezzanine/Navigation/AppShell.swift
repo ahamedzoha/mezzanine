@@ -156,7 +156,11 @@ struct AppShell: View {
                     QuickOpen().transition(.opacity)
                 }
             }
+            .overlay(alignment: .topTrailing) {
+                if showsSearchPanel { SearchPanel().transition(.opacity) }
+            }
             .animation(Theme.Motion.quick, value: commands.isQuickOpenShown)
+            .animation(Theme.Motion.quick, value: showsSearchPanel)
         }
         .sheet(item: $commands.artworkRequest) { request in
             ArtworkPicker(request: request)
@@ -188,6 +192,11 @@ struct AppShell: View {
         .task(id: session.currentServer?.clientIdentifier) {
             contentFocused = true
             #if DEBUG
+            // -SearchQuery "south" types into the toolbar search at launch (search panel tests).
+            if let q = UserDefaults.standard.string(forKey: "SearchQuery") {
+                try? await Task.sleep(for: .seconds(4))
+                for i in 1...q.count { commands.query = String(q.prefix(i)); try? await Task.sleep(for: .milliseconds(40)) }
+            }
             // -MezzanineAutoplay <ratingKey> starts a title at launch (player tests).
             if let key = UserDefaults.standard.string(forKey: "MezzanineAutoplay"), let client = session.client,
                let item = try? await client.metadata(key) {
@@ -212,9 +221,17 @@ struct AppShell: View {
         }
     }
 
-    /// The current section's own page (search results while a query is typed).
+    /// Typing in the toolbar field opens the results panel over the page (not on the full
+    /// results grid, over Quick Open, the player, or after Esc for this query).
+    private var showsSearchPanel: Bool {
+        let q = commands.query.trimmingCharacters(in: .whitespaces)
+        return !q.isEmpty && !commands.showsAllResults && commands.searchPanelDismissedFor != commands.query
+            && !commands.isQuickOpenShown && !playback.isPresented
+    }
+
+    /// The current section's own page (the full search results after See all).
     @ViewBuilder private var sectionRoot: some View {
-        if !commands.query.trimmingCharacters(in: .whitespaces).isEmpty {
+        if commands.showsAllResults && !commands.query.trimmingCharacters(in: .whitespaces).isEmpty {
             SearchView(query: commands.query, contentFocus: $contentFocused)
         } else {
             switch commands.selection {

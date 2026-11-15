@@ -22,6 +22,8 @@ final class SessionStore {
     private(set) var client: PlexServerClient?
     /// Plex Home members (empty when the account has no Home).
     private(set) var homeUsers: [PlexHomeUser] = []
+    /// Each profile's avatar as a round menu-sized image (menus can't clip SwiftUI images).
+    private(set) var avatars: [String: NSImage] = [:]
 
     let identity: PlexIdentity
     /// Every remote image in the app goes through this one pipeline.
@@ -189,6 +191,7 @@ final class SessionStore {
     func loadHomeUsers() async {
         guard let token else { return }
         homeUsers = (try? await tv.homeUsers(token: token)) ?? []
+        Task { await loadAvatars() }
     }
 
     /// The profile in use: the account itself, or a Home member.
@@ -273,5 +276,29 @@ final class SessionStore {
     func logoURL(_ path: String?) -> URL? {
         guard let path, let client else { return nil }
         return client.urls.asset(path)
+    }
+
+    // MARK: Avatars
+
+    /// Fetches every profile's avatar once (plex.tv, no token) and keeps a round copy for menus.
+    func loadAvatars() async {
+        for user in homeUsers where avatars[user.uuid] == nil {
+            guard let thumb = user.thumb, let url = URL(string: thumb),
+                  let image = try? await images.image(for: url, pixelSize: 64) else { continue }
+            avatars[user.uuid] = Self.roundMenuImage(image, points: 18)
+        }
+        #if DEBUG
+        print("AVATARS \(avatars.count) of \(homeUsers.count)")
+        #endif
+    }
+
+    static func roundMenuImage(_ image: CGImage, points: CGFloat) -> NSImage {
+        let size = NSSize(width: points, height: points)
+        return NSImage(size: size, flipped: false) { rect in
+            NSBezierPath(ovalIn: rect).addClip()
+            NSGraphicsContext.current?.imageInterpolation = .high
+            NSImage(cgImage: image, size: .zero).draw(in: rect)
+            return true
+        }
     }
 }

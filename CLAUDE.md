@@ -63,7 +63,7 @@ defaults and Keychain item), so test runs never change the installed app's setti
 
 Shelves: `-HomeSeedShelves YES` (smart shelf, collection, hidden row), `-HomeEditing YES`,
 `-HomeKeyScript "down,opt+down,space"`, `-SmartShelfSheet YES`, `-CollectionPicker YES`,
-`-QuickOpenQuery "after"` (`_` for empty). Window snapshots of an attached sheet fail: capture
+`-QuickOpenQuery "after"` (`_` for empty), `-SearchQuery "south"` (types into the toolbar search; logs `SEARCHPANEL`). Window snapshots of an attached sheet fail: capture
 `-MezzanineOpenWindow sheetPreview -SheetPreviewKind rules|picker|artwork|opensubtitles` instead.
 
 Subtitles: Find Subtitles' sources live in `MezzanineKit/Subtitles/`; the keys in the Keychain

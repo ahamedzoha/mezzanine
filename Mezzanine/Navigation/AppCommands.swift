@@ -48,7 +48,16 @@ final class AppCommandCenter {
     private(set) var forwardStack: [DetailRoute] = []
     @ObservationIgnored private var steppingForward = false
     /// Toolbar search text. Choosing a sidebar item or a Go item clears it.
-    var query = ""
+    var query = "" {
+        didSet {
+            if query.trimmingCharacters(in: .whitespaces).isEmpty { showsAllResults = false; searchPanelDismissedFor = nil }
+        }
+    }
+    /// The full results grid replaces the page (See all in the search panel); otherwise typing
+    /// only opens the panel and the page stays.
+    var showsAllResults = false
+    /// The query the panel was closed for (Esc or a click outside); typing more reopens it.
+    var searchPanelDismissedFor: String?
 
     // State reported by the window.
     var isSignedIn = false

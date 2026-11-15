@@ -13,6 +13,20 @@ public final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate, Sendabl
     }
 }
 
+/// Images: a request that carries no token may follow redirects (plex.tv avatars redirect to
+/// gravatar or assets.plex.tv); one that carries the server token never does, so the token
+/// can't travel to another host.
+public final class TokenSafeRedirectDelegate: NSObject, URLSessionTaskDelegate, Sendable {
+    public func urlSession(_ session: URLSession, task: URLSessionTask,
+                           willPerformHTTPRedirection response: HTTPURLResponse,
+                           newRequest request: URLRequest) async -> URLRequest? {
+        let carriesToken = task.originalRequest?.value(forHTTPHeaderField: "X-Plex-Token") != nil
+            || request.value(forHTTPHeaderField: "X-Plex-Token") != nil
+        guard !carriesToken, request.url?.scheme == "https" else { return nil }
+        return request
+    }
+}
+
 public enum Transport {
     public static let userAgent = "Mezzanine/0.1 (macOS)"
 
@@ -46,7 +60,7 @@ public enum Transport {
         config.timeoutIntervalForRequest = 15
         config.httpAdditionalHeaders = ["User-Agent": userAgent]
         config.httpMaximumConnectionsPerHost = 10
-        return URLSession(configuration: config, delegate: NoRedirectDelegate(), delegateQueue: nil)
+        return URLSession(configuration: config, delegate: TokenSafeRedirectDelegate(), delegateQueue: nil)
     }
 }
 

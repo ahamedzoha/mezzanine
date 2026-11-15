@@ -30,9 +30,21 @@ struct ProfileMenuItems: View {
         ForEach(session.homeUsers) { user in
             Toggle(isOn: Binding(get: { user.uuid == session.account?.uuid },
                                  set: { _ in ProfileSwitch.choose(user, session: session, commands: commands) })) {
-                Text(user.protected && !user.admin ? "\(user.title) (PIN)" : user.title)
+                Label {
+                    Text(user.protected && !user.admin ? "\(user.title) (PIN)" : user.title)
+                } icon: {
+                    Image(nsImage: session.avatars[user.uuid] ?? Self.placeholder)
+                }
             }
         }
+        .task { await session.loadAvatars() }
+    }
+
+    /// A neutral disc while an avatar loads (or when a profile has none).
+    private static let placeholder: NSImage = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+        NSColor.secondaryLabelColor.withAlphaComponent(0.35).setFill()
+        NSBezierPath(ovalIn: rect).fill()
+        return true
     }
 }
 

@@ -15,6 +15,8 @@ struct FolderBrowser: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var path: [PlexServerClient.FolderListing.Folder] = []
     @State private var listing: PlexServerClient.FolderListing?
+    /// The folder path `listing` belongs to (it lags `path` while the next folder loads).
+    @State private var listingPath: [PlexServerClient.FolderListing.Folder] = []
     @State private var loading = false
     @State private var error: String?
     @State private var focused: Int?
@@ -46,6 +48,8 @@ struct FolderBrowser: View {
                             }
                         }
                     }
+                    // One list per folder: rows from the last folder never linger in this one.
+                    .id(listingPath.last?.key ?? "root")
                     .padding(.horizontal, Theme.Space.gutter - Theme.Space.m)
                     .padding(.top, path.isEmpty ? Theme.Space.xl : 0)
                     .padding(.bottom, Theme.Space.xl)
@@ -184,9 +188,13 @@ struct FolderBrowser: View {
         // Keep the current rows on screen while the next folder loads.
         loading = listing != nil
         error = nil
+        let requested = path
         do {
-            let next = try await client.folder(section: section.key, key: path.last?.key)
+            let next = try await client.folder(section: section.key, key: requested.last?.key)
+            // A newer folder was opened while this one loaded: its listing wins.
+            guard !Task.isCancelled, requested.map(\.key) == path.map(\.key) else { return }
             listing = next
+            listingPath = requested
             if let returnTo, let i = next.folders.firstIndex(where: { $0.key == returnTo }) { focused = i } else { focused = nil }
             returnTo = nil
         } catch is CancellationError {
@@ -203,7 +211,9 @@ struct FolderBrowser: View {
         counts[folder.key] = (inside.folders.count, inside.items.count)
     }
 
-    private func open(_ folder: PlexServerClient.FolderListing.Folder) { path.append(folder) }
+    /// Opens a folder from the list on screen: its path is that list's, even while another
+    /// folder is still loading (a click there must not stack siblings in the path).
+    private func open(_ folder: PlexServerClient.FolderListing.Folder) { path = listingPath + [folder] }
 
     private func goUp() {
         guard let leaving = path.popLast() else { return }

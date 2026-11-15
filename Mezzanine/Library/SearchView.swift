@@ -74,6 +74,8 @@ struct SearchView: View {
         guard let client = session.client else { return }
         // The local index answers as you type; the server only when it's empty.
         let local = await library.search(q)
+        // A newer keystroke started its own search: this one's answer is stale.
+        guard !Task.isCancelled else { return }
         if !local.isEmpty || library.index != nil && library.syncState == .idle {
             let titles = local.filter { $0.kind != .episode }
             results = titles + local.filter { $0.kind == .episode }.prefix(12)

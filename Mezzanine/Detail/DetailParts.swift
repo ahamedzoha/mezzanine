@@ -188,6 +188,9 @@ struct EpisodeRow: View {
                 .overlay(alignment: .bottomTrailing) {
                     if hovering || isFocused { PlayDisc { onPlay(frame) }.padding(.trailing, 8).padding(.bottom, 12) }
                 }
+                // Watched: the same ✓ badge posters wear, and the still steps back a little.
+                .overlay { if episode.isWatched { Color.black.opacity(0.28) } }
+                .overlay(alignment: .topTrailing) { WatchedMark(item: episode) }
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.still, style: .continuous))
                 .contrastFocusOutline(isFocused, radius: Theme.Radius.still)
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
@@ -197,13 +200,10 @@ struct EpisodeRow: View {
                         .font(Theme.Typeface.cardTitle)
                         .foregroundStyle(isFocused ? Theme.lilac : Theme.ink)
                         .lineLimit(1)
-                    if episode.isWatched {
-                        Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.inkTertiary)
-                            .accessibilityLabel("Watched")
-                    }
                     DownloadMark(ratingKey: episode.ratingKey)
                 }
-                Text([episode.duration.map(Format.duration), episode.originallyAvailableAt, Format.timeLeft(episode)]
+                Text([episode.isWatched ? "Watched" : nil, episode.duration.map(Format.duration), episode.originallyAvailableAt,
+                      Format.timeLeft(episode)]
                         .compactMap { $0 }.joined(separator: " · "))
                     .font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary)
                 if let summary = episode.summary, !summary.isEmpty {

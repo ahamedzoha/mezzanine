@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-11-15 (night) — search panel, owner's bug reports
+
+- Search: results for an earlier keystroke could land last and replace the newer ones ("south"
+  showed "so" matches: course "solutions"). Every search now drops its answer when a newer one
+  started. Live: "south" → South Park first.
+- Search panel (owner asked for Trove's): typing opens a panel under the toolbar field over the
+  page (titles, people chips, episodes, See all), ↑↓ ↩ ⌘↩ esc; See all opens the old grid.
+- Season chips: picking a season while another loaded could show the other's episodes under the
+  wrong chip (Archer: Season 4 highlighted over Season 5's list). Fixed the same way; watched
+  episodes now wear the ✓ badge and "Watched".
+- Courses: clicking rows while a folder loaded stacked siblings into the path and mixed lists.
+  A click now opens from the list on screen; stale loads are dropped; each folder is its own list.
+- Profiles: avatars never loaded (the image session refused plex.tv's redirect to gravatar).
+  Token-free image requests may now follow https redirects; the token still never leaves the
+  server's host. Avatars show in the sidebar and beside every profile in the menus.
+
 ## 2026-11-15 (evening) — M13 finish: performance pass, full HIG sweep, architecture doc
 
 - Performance (optimized build, LAN, `-MezzanineNoActivity`):

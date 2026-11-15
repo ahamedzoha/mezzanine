@@ -56,12 +56,28 @@ public struct PlexHub: Decodable, Sendable, Identifiable {
     public let style: String?
     public let promoted: Bool
     public let items: [PlexMetadata]
+    /// People a search found (actor and director hubs list them as directories).
+    public let people: [Person]
 
     public var id: String { hubIdentifier }
 
+    public struct Person: Decodable, Sendable, Hashable, Identifiable {
+        public let id: String
+        public let name: String
+        /// An absolute URL (Plex's metadata images) or a server path.
+        public let thumb: String?
+        enum CodingKeys: String, CodingKey { case id, tag, thumb }
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = (try? c.decode(String.self, forKey: .tag)) ?? ""
+            id = c.lenientString(.id) ?? name
+            thumb = try? c.decodeIfPresent(String.self, forKey: .thumb)
+        }
+    }
+
     enum CodingKeys: String, CodingKey {
         case hubIdentifier, title, type, context, key, size, more, style, promoted
-        case metadata = "Metadata"
+        case metadata = "Metadata", directory = "Directory"
     }
 
     public init(from decoder: Decoder) throws {
@@ -76,5 +92,8 @@ public struct PlexHub: Decodable, Sendable, Identifiable {
         style = try? c.decodeIfPresent(String.self, forKey: .style)
         promoted = c.lenientBool(.promoted) ?? false
         items = c.list(PlexMetadata.self, .metadata)
+        let kind = type ?? ""
+        people = ["actor", "director", "writer", "producer"].contains(kind)
+            ? c.list(Person.self, .directory).filter { !$0.name.isEmpty } : []
     }
 }

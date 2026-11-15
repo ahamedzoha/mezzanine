@@ -271,6 +271,9 @@ A native sheet, 680 pt wide, opened from Add Shelf, ⌘N or a strip's Edit Rules
 - **Scroll:** rules scroll inside the sheet past 280 pt.
 - **Collection picker:** "Add a Collection", a 520 × 560 pt sheet of collections with a 24 × 36 thumbnail each, chosen by pointer or keys.
 
+### Search panel
+Typing in the toolbar field opens a solid raised panel (560 pt, panel radius, rule border, deep shadow) hanging under the field at the trailing edge, over a light scrim (black 28 %); the page stays put. Groups: Titles (28 × 42 poster, title with the typed words set bold, "Show · 2009 · TV Shows"), People (chips with a round photo; choosing one narrows the search to their titles), Episodes (64 × 36 still, "South Park · S3 E5"). Footer: "See all N results for “…”", which opens the full results grid, and the key hints. Selection is the raised-hover fill and a lilac title. Keys while the field has focus: ↓/↑ move, Return opens, ⌘Return plays, Esc closes the panel (a second Esc clears the field); a click outside closes it.
+
 ### Quick Open
 ⌘K opens a command panel over the content; Esc, a click on the scrim, or ⌘K again closes it.
 
@@ -344,7 +347,7 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 
 - Hero: full-width backdrop dissolving into the room, clear logo (≤ 620 × 170 pt), ruled caption, tagline, then Play/Resume (lilac; on shows "Resume S2 E4"), Trailer, and Mark Watched. On shows and seasons the button names its scope ("Mark Show Watched") and confirms first, because it changes every episode.
 - Progress under the hero buttons always carries its caption: "S2 E4 · 26 min left" (shows) or "26 min left" (films).
-- Episode rows: one click plays (pointer-first), focus follows the click; the still's progress runs flush along its bottom edge (3 pt on a dark track) so the hover play disc never sits on it.
+- Episode rows: one click plays (pointer-first), focus follows the click; the still's progress runs flush along its bottom edge (3 pt on a dark track) so the hover play disc never sits on it. Watched episodes wear the posters' ✓ badge on the still (dimmed a little) and lead their caption with "Watched".
 - Keys: ↑/↓ walk the page section by section (hero, about, episodes, cast, extras, related) and episode by episode inside the list; ↑ from the first episode returns to the hero. ⌥←/⌥→ change season. Return plays the focused episode, Space plays the primary title. W toggles the focused episode, else the episode Play would start; never the whole series from a key.
 - Scrolled-to sections land with a 24 pt lead under the toolbar.
 
@@ -376,6 +379,8 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - Provider pictures load from Plex's own small renditions; server files go through the server's photo transcoder. The token never leaves the server's host.
 
 ## Profiles (M9)
+
+- Every profile shows its plex.tv avatar: round in the sidebar footer and beside each name in the profile menus (pre-rendered round images, since menus can't clip).
 
 - Plex Home profiles each keep their own index, Continue Watching, watched marks and shelves.
 - Sidebar footer: the current profile's avatar and name with a ⌃⌄ chevron; a click opens the profile menu (current one checked, "(PIN)" on protected ones). Mezzanine ▸ Switch Profile holds the same menu. Disabled while a film plays.

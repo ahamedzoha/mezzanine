@@ -298,12 +298,17 @@ struct DetailView: View {
         focusedEpisode = nil
         if let e = sectionIDs.firstIndex(of: "episodes"), section > e { section = e }
         guard let client = session.client else { return }
-        episodes = (try? await client.children(s.ratingKey)) ?? []
+        let list = (try? await client.children(s.ratingKey)) ?? []
+        // Another season was chosen while this one loaded: its list is the one to show.
+        guard season?.ratingKey == s.ratingKey else { return }
+        episodes = list
     }
 
     private func refreshEpisodes() async {
         guard let s = season, let client = session.client else { return }
-        episodes = (try? await client.children(s.ratingKey)) ?? episodes
+        let list = (try? await client.children(s.ratingKey)) ?? episodes
+        guard season?.ratingKey == s.ratingKey else { return }
+        episodes = list
     }
 
     private var confirmTitle: String {
