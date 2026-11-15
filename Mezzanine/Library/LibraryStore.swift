@@ -39,6 +39,10 @@ final class LibraryStore {
     private var timer: Task<Void, Never>?
     private var resolving = Set<String>()
     private var openedFor: String?
+    /// "server-user" of the open index (per-profile state such as the new-episode check).
+    var indexKey: String? { openedFor }
+    /// Called after every completed sync (the new-episode check).
+    @ObservationIgnored var onSynced: (() -> Void)?
 
     /// Opens (or reopens) the index for a server + user and starts syncing.
     func connect(client: PlexServerClient, serverID: String, userID: String, sections: [PlexLibrarySection]) {
@@ -97,6 +101,7 @@ final class LibraryStore {
         running = task
         await task.value
         running = nil
+        onSynced?()
     }
 
     private func syncPass(force: Bool) async {

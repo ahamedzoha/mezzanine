@@ -316,6 +316,33 @@ public final class LibraryIndex: Sendable {
         }
     }
 
+    /// Unwatched episodes added after `since` (seconds since 1970) to shows being watched: at
+    /// least one episode seen, the last within `activeWithin` seconds. Grouped by show, in
+    /// season and episode order.
+    public func newEpisodes(since: Double, activeWithin: Double = 365 * 86_400,
+                            now: Double = Date().timeIntervalSince1970) throws -> [(show: IndexedItem, episodes: [IndexedItem])] {
+        try pool.read { db in
+            let episodes = try IndexedItem.fetchAll(db, sql: """
+                SELECT e.* FROM item e JOIN item s ON s.ratingKey = e.grandparentRatingKey
+                WHERE e.kind = 'episode' AND e.addedAt > ? AND e.viewCount = 0
+                  AND s.kind = 'show' AND COALESCE(s.viewedLeafCount, 0) > 0
+                  AND COALESCE(s.lastViewedAt, 0) > ?
+                ORDER BY s.titleSort, e.parentIndex, e.\"index\"
+                """, arguments: [since, now - activeWithin])
+            var order: [String] = []
+            var groups: [String: [IndexedItem]] = [:]
+            for e in episodes {
+                guard let key = e.grandparentRatingKey else { continue }
+                if groups[key] == nil { order.append(key) }
+                groups[key, default: []].append(e)
+            }
+            return try order.compactMap { key in
+                guard let show = try IndexedItem.fetchOne(db, key: key) else { return nil }
+                return (show, groups[key] ?? [])
+            }
+        }
+    }
+
     public func item(_ ratingKey: String) throws -> IndexedItem? {
         try pool.read { db in try IndexedItem.fetchOne(db, key: ratingKey) }
     }

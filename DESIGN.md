@@ -343,6 +343,10 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - Transient glyphs (play, pause, ±10) flash centred in a 70 pt glass circle for 0.65 s; sound changes show a corner readout with a volume bar to 400 % and a tick at 100 %.
 - Click toggles play; double click toggles full screen.
 
+## New-episode notifications
+
+- One notification per show: "New episode of Severance" / "3 new episodes of Severance", body "S2 E10 · Cold Harbor" or "S2 E8–E10", the show's poster attached, grouped by show. Only shows being watched (an episode seen in the past year); the first check per profile only sets the mark. Clicking opens the show's page (not while a film fills the window). Settings ▸ Playback ▸ New episodes; if macOS has them off, the setting says so with Open Notification Settings….
+
 ## Mini player
 
 - The owner's pick: the film shrinks into the corner of the window (not a separate window; Picture in Picture already floats over other apps). ⌥M, the player's bottom-right row (next to PiP) or Playback ▸ Mini Player.

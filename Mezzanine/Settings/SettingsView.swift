@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SoundSettings.self) private var sound
     @Environment(PlaybackCoordinator.self) private var playback
+    @Environment(NewEpisodeNotifier.self) private var notifier
     @State private var confirmSignOut = false
     @AppStorage("settingsTab") private var tab = "account"
 
@@ -50,6 +51,26 @@ struct SettingsView: View {
                         }
                         Toggle("Skip credits and go to the next episode", isOn: $playback.binge.autoSkipCredits)
                     }
+                    Section {
+                        @Bindable var notifier = notifier
+                        Toggle(isOn: $notifier.enabled) {
+                            Text("New episodes")
+                            Text("A notification when a show you’re watching gets new episodes, while Mezzanine is open.")
+                        }
+                        if notifier.enabled && notifier.authorization == .denied {
+                            LabeledContent {
+                                Button("Open Notification Settings…") {
+                                    let id = Bundle.main.bundleIdentifier ?? ""
+                                    if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                }
+                            } label: {
+                                Label("Notifications are off for Mezzanine in System Settings.", systemImage: "exclamationmark.triangle")
+                            }
+                        }
+                    }
+                    .task { await notifier.refreshStatus() }
                     Section("Films") {
                         Toggle("Suggest what to watch next at the credits", isOn: Binding(
                             get: { playback.showsPostPlay }, set: { playback.showsPostPlay = $0 }))

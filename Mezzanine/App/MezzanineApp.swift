@@ -25,6 +25,7 @@ struct MezzanineApp: App {
     @State private var playback: PlaybackCoordinator
     @State private var commands = AppCommandCenter()
     @State private var library = LibraryStore()
+    @State private var notifier = NewEpisodeNotifier()
     @State private var layouts = HomeLayoutStore()
     @State private var downloads = DownloadStore()
     @State private var sound: SoundSettings
@@ -57,8 +58,15 @@ struct MezzanineApp: App {
                 .environment(sound)
                 .environment(subtitleSources)
                 .environment(subtitleFinder)
+                .environment(notifier)
                 .task {
                     playback.downloads = downloads
+                    notifier.start(library: library, session: session, commands: commands)
+                    #if DEBUG
+                    if UserDefaults.standard.bool(forKey: "NotifyTest") {
+                        Task { try? await Task.sleep(for: .seconds(8)); await notifier.postTest() }
+                    }
+                    #endif
                     appDelegate.beforeQuit = { [playback, downloads] in
                         await playback.finishForQuit()
                         await downloads.suspendForQuit()
@@ -85,6 +93,7 @@ struct MezzanineApp: App {
                 .environment(downloads)
                 .environment(sound)
                 .environment(subtitleSources)
+                .environment(notifier)
         }
 
         Window("Keyboard Shortcuts", id: "shortcuts") {

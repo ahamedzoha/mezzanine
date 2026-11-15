@@ -16,6 +16,10 @@
   the stack; Quick Open had the same bug). Both now hang on the top page; verified with captures
   on a title page, a library page and Home. Ranking: titles starting with the text, then a word
   of the title, then the rest; lessons (personal-media libraries) after films and shows.
+- New-episode notifications (owner OK'd the prompt): after each library sync, shows being
+  watched (an episode seen in the past year) that gained unwatched episodes get one notification
+  with the poster; click opens the show. Settings ▸ Playback ▸ New episodes. Debug test posted
+  (Archer S14 E9) after the prompt was allowed.
 - Mini player (owner's pick: corner of the window): ⌥M shrinks the film into a 340 pt tile while
   browsing; click or ⌥M grows it back. Verified with captures (shrink, browse, expand).
 - Picture size: Fit / Fill / Zoom (Z, ⋯ ▸ Picture, Playback ▸ Picture Size), kept per film or show.

@@ -85,3 +85,30 @@ struct SearchRankingTests {
         #expect(south == ["The Departed"])
     }
 }
+
+@Suite("New episodes")
+struct NewEpisodeTests {
+    private func row(_ fields: [String: Any]) throws -> (PlexMetadata, Data) {
+        let json = try JSONSerialization.data(withJSONObject: fields)
+        return (try JSONDecoder().decode(PlexMetadata.self, from: json), json)
+    }
+
+    @Test func onlyShowsBeingWatched() throws {
+        let index = try LibraryIndex()
+        let now = 2_000_000_000.0
+        try index.upsert([
+            try row(["ratingKey": "1", "type": "show", "title": "Severance", "leafCount": 19, "viewedLeafCount": 18, "lastViewedAt": now - 86_400]),
+            try row(["ratingKey": "2", "type": "show", "title": "Never Started", "leafCount": 10, "viewedLeafCount": 0]),
+            try row(["ratingKey": "3", "type": "show", "title": "Abandoned", "leafCount": 10, "viewedLeafCount": 3, "lastViewedAt": now - 3 * 365 * 86_400]),
+        ], section: "2")
+        try index.upsert([
+            try row(["ratingKey": "11", "type": "episode", "title": "Cold Harbor", "grandparentRatingKey": "1", "parentIndex": 2, "index": 10, "addedAt": now - 60]),
+            try row(["ratingKey": "12", "type": "episode", "title": "Old one", "grandparentRatingKey": "1", "parentIndex": 2, "index": 9, "addedAt": now - 900_000, "viewCount": 1]),
+            try row(["ratingKey": "21", "type": "episode", "title": "Pilot", "grandparentRatingKey": "2", "parentIndex": 1, "index": 1, "addedAt": now - 60]),
+            try row(["ratingKey": "31", "type": "episode", "title": "Return", "grandparentRatingKey": "3", "parentIndex": 2, "index": 1, "addedAt": now - 60]),
+        ], section: "2")
+        let found = try index.newEpisodes(since: now - 3600, now: now)
+        #expect(found.map(\.show.title) == ["Severance"])
+        #expect(found.first?.episodes.map(\.title) == ["Cold Harbor"])
+    }
+}
