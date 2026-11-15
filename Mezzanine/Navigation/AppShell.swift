@@ -20,6 +20,7 @@ struct AppShell: View {
     @Environment(AppCommandCenter.self) private var commands
     @Environment(LibraryStore.self) private var library
     @Environment(NewEpisodeNotifier.self) private var notifier
+    @Environment(AppUpdater.self) private var updater
     @Environment(HomeLayoutStore.self) private var layouts
     @Environment(DownloadStore.self) private var downloads
     @FocusState private var searchFocused: Bool
@@ -91,6 +92,7 @@ struct AppShell: View {
             if !owns { contentFocused = true }
             notifier.openPending()
         }
+        .onChange(of: playback.item == nil) { _, closed in if closed { updater.playerClosed() } }
         .onChange(of: library.index == nil) { _, missing in if !missing { notifier.openPending() } }
         .onChange(of: playback.isMini, initial: true) { _, mini in commands.hasMiniPlayer = mini }
     }

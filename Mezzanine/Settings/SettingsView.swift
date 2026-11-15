@@ -9,6 +9,7 @@ struct SettingsView: View {
     @Environment(SoundSettings.self) private var sound
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(NewEpisodeNotifier.self) private var notifier
+    @Environment(AppUpdater.self) private var updater
     @State private var confirmSignOut = false
     @AppStorage("settingsTab") private var tab = "account"
 
@@ -186,8 +187,54 @@ struct SettingsView: View {
                 }
                 .formStyle(.grouped)
             }
+            Tab("Updates", systemImage: "arrow.down.app", value: "updates") {
+                updatesForm
+            }
         }
         .frame(minWidth: 520, idealWidth: 540, minHeight: 420)
+    }
+
+    /// Settings ▸ Updates: the version, Sparkle's two switches, and Check Now.
+    private var updatesForm: some View {
+        @Bindable var updater = updater
+        return Form {
+            Section {
+                LabeledContent("Version", value: AppUpdater.versionLine)
+                if updater.isAvailable {
+                    Toggle("Check for updates automatically", isOn: $updater.checksAutomatically)
+                    Toggle(isOn: $updater.installsAutomatically) {
+                        Text("Download and install updates automatically")
+                        Text(updater.checksAutomatically
+                             ? "New versions install the next time you quit Mezzanine."
+                             : "Needs automatic checks.")
+                    }
+                    .disabled(!updater.checksAutomatically)
+                    if let version = updater.waitingVersion {
+                        LabeledContent("Update waiting") { Text("Version \(version) will be offered when you close the film.") }
+                    }
+                    LabeledContent("Last checked") {
+                        HStack(spacing: 10) {
+                            if !updater.canCheck {
+                                ProgressView().controlSize(.small)
+                                Text("Checking…")
+                            } else if let date = updater.lastChecked {
+                                Text(date, format: .relative(presentation: .numeric))
+                            } else {
+                                Text("Never")
+                            }
+                            Button("Check Now") { updater.checkForUpdates() }
+                                .disabled(!updater.canCheck)
+                                .accessibilityHint("Looks for a new version of Mezzanine.")
+                        }
+                    }
+                }
+            } footer: {
+                Text(updater.isAvailable
+                     ? "Updates come from Mezzanine’s GitHub releases and are signed."
+                     : "This is a development build. It doesn’t update itself; install a release to get updates.")
+            }
+        }
+        .formStyle(.grouped)
     }
 
     /// The device plays the original sound (receiver decodes it, AirPods keep spatial audio).

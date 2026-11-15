@@ -230,6 +230,7 @@ struct MezzanineCommands: Commands {
     let sound: SoundSettings
     let session: SessionStore
     let downloads: DownloadStore
+    let updater: AppUpdater
 
     private var downloadTitle: String {
         switch center.currentDetailItem?.kind {
@@ -283,6 +284,13 @@ struct MezzanineCommands: Commands {
     }
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            // Release builds only (a Debug build never updates itself).
+            if updater.isAvailable {
+                Button("Check for Updates…") { updater.checkForUpdates() }
+                    .disabled(!updater.canCheck)
+            }
+        }
         CommandGroup(after: .appSettings) {
             Menu("Switch Profile") { ProfileMenuItems(session: session, commands: center) }
                 .disabled(center.isPlayerOpen || center.hasMiniPlayer || center.isModalShown)

@@ -16,5 +16,11 @@
 	<!-- Downloads for offline viewing live in Movies ▸ Mezzanine. -->
 	<key>com.apple.security.assets.movies.read-write</key>
 	<true/>
+	<!-- Sparkle's installer launcher and status services (sandboxed apps). -->
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spks</string>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)-spki</string>
+	</array>
 </dict>
 </plist>

@@ -4,7 +4,8 @@
 
 Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
 picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
-watch. Owner: sound looks good so far, testing as they go.
+watch, and distribution: Sparkle updates, the DMG installer and release CI (see below).
+Ship with `Scripts/release.sh <x.y.z>` (CLAUDE.md ▸ Releases and updates).
 
 Open, waiting on the owner:
 - API work, deferred by the owner: OpenSubtitles and Subdl keys (Find Subtitles skips those two
@@ -12,11 +13,28 @@ Open, waiting on the owner:
 - First live run of Translate (on-device language download).
 - Audio profiles on each output (2.1 speakers, AirPods, MacBook, HDMI receiver), as the owner
   watches.
-- Cast's Connecting/Cancel and failure panels haven't been seen on the TV (only on the Mac);
-  check on the next cast.
-- The logo-under-the-band theory (see below): owner to say if the logo still goes missing.
+- Cast's Connecting/Cancel and failure panels haven't been seen on the TV (only on the Mac).
+- Whether the logo still goes missing in full screen (see the grey-band entry).
 
-Post-v1: Sparkle updates, DMG, CI.
+## 2026-11-15 (night, late) — auto-updates, installer, release CI
+
+- Sparkle 2.10.1 (Release builds only): feed and DMGs in the public `ahamedzoha/mezzanine-releases`
+  repo (owner's pick; the source stays private), EdDSA key in the login Keychain (account
+  `mezzanine`, separate from another project's key found there). Sandbox set-up: installer
+  launcher service, mach-lookup exceptions, Sparkle's helpers re-signed with our identity.
+  Downloads in the background and installs on quit by default; an update alert never shows over a
+  film (gentle reminders defer it until the film closes, mini player included). Mezzanine ▸ Check
+  for Updates…, Settings ▸ Updates. HIG review: fixes applied (switches follow Sparkle's state,
+  wording, Check Now with progress, icon).
+- DMG: dmgbuild (pinned with hashes), light wall with the lilac lamp glow and arrow; Finder draws
+  labels dark over a background picture, so a graphite wall was unreadable (tried).
+- CI (owner's pick: tags and manual only, Mac minutes bill 10×): `Release` workflow on GitHub's
+  `xcode-27` image with Xcode 27.2: kit tests, build (build number = commit count), sign, DMG,
+  Sparkle signature, staged to the public repo through a write deploy key scoped to it; the public
+  repo's Publish workflow makes the Release and appcast and resets its history. Secrets: the Apple
+  Development identity as .p12 (expires 2027-08-27), the Sparkle key, the deploy key.
+- No Developer ID certificate, so no notarization: first install needs Open Anyway once (README in
+  the releases repo); updates install without it.
 
 ## 2026-11-15 (last) — full-screen grey band, icon cache
 

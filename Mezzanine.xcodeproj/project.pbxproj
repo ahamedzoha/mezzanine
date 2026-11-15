@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		TC0000000000000000000002 /* MezzanineKit in Frameworks */ = {isa = PBXBuildFile; productRef = TC0000000000000000000003 /* MezzanineKit */; };
 		TC0000000000000000000004 /* MezzaninePlayback in Frameworks */ = {isa = PBXBuildFile; productRef = TC0000000000000000000005 /* MezzaninePlayback */; };
+		TC0000000000000000000006 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = TC0000000000000000000007 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,6 +39,7 @@
 			files = (
 				TC0000000000000000000002 /* MezzanineKit in Frameworks */,
 				TC0000000000000000000004 /* MezzaninePlayback in Frameworks */,
+				TC0000000000000000000006 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,6 +93,7 @@
 			packageProductDependencies = (
 				TC0000000000000000000003 /* MezzanineKit */,
 				TC0000000000000000000005 /* MezzaninePlayback */,
+				TC0000000000000000000007 /* Sparkle */,
 			);
 			productName = Mezzanine;
 			productReference = TA0000000000000000000006 /* Mezzanine.app */;
@@ -147,6 +150,7 @@
 			mainGroup = TA0000000000000000000002;
 			packageReferences = (
 				TC0000000000000000000001 /* XCLocalSwiftPackageReference "MezzanineKit" */,
+				TC0000000000000000000008 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			productRefGroup = TA0000000000000000000003 /* Products */;
 			projectDirPath = "";
@@ -401,6 +405,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		TC0000000000000000000008 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		TC0000000000000000000003 /* MezzanineKit */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -409,6 +424,11 @@
 		TC0000000000000000000005 /* MezzaninePlayback */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MezzaninePlayback;
+		};
+		TC0000000000000000000007 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = TC0000000000000000000008 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -435,6 +435,10 @@ Keychain from the `MEZZANINE_DEV_TOKEN` environment variable when no token exist
   `nonisolated` helper in `MezzaninePlayer`; a main-actor closure traps.
 - **One player, reused.** `MezzaninePlayer` lives for the app's life. Reloads end the speech
   audio stream, so anything fed by `speechAudio()` must re-ask after a load.
+- **Updates.** `AppUpdater` (Sparkle 2, Release only) needs the sandbox pieces together:
+  `SUEnableInstallerLauncherService`, the `-spks`/`-spki` mach-lookup exceptions, and Sparkle's
+  helpers re-signed with our identity (`Scripts/sign-sparkle.sh`; Xcode leaves them ad-hoc). The
+  `SUPublicEDKey` must match the Keychain key (account `mezzanine`) and the CI secret.
 - **Full-screen title strip.** AppKit keeps the title bar in a separate window as an opaque band.
   `WindowChrome` hides it while the player owns the window; verify with full-display captures
   (`screencapture -D 1`), not window captures.
@@ -469,3 +473,20 @@ were built differently:
 - Subtitle upload from OpenSubtitles results to the server is not done: only Plex-source results
   are stored on the server; internet results stay on this Mac (`SavedSubtitles`).
 - No mini player or pop-out player (PiP and AirPlay exist). The app-level `MezzanineTests` folder is not described here.
+
+## 10. Distribution and updates
+
+```
+Scripts/release.sh x.y.z ─ bump + tag ─▶ CI (Release, xcode-27) ─▶ Scripts/build-release.sh
+   Release build (build number = commit count) ─▶ sign-sparkle.sh ─▶ dmgbuild DMG ─▶ sign_update
+   ─▶ Scripts/ci/publish.sh (deploy key) ─▶ mezzanine-releases: staging/ commit
+   ─▶ Publish workflow: GitHub Release + releases.json + appcast.xml, history reset to one commit
+App: AppUpdater ─▶ SPUStandardUpdaterController ─▶ raw.githubusercontent.com/…/appcast.xml
+   ─▶ DMG from the release ─▶ EdDSA check ─▶ installer XPC service ─▶ installs on quit
+```
+
+- `--local` runs the same build and publish from the Mac (login Keychain identity and Sparkle key),
+  waits for the public repo to publish, then pushes the tag; CI sees the tag published and stops.
+- The public repo holds only the feed, `releases.json` (last ten) and its publish tool; DMGs live
+  in GitHub Releases. Its README explains the one-time Open Anyway (signed, not notarized: there is
+  no Developer ID certificate).

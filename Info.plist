@@ -21,6 +21,22 @@
 	<array>
 		<string>_googlecast._tcp</string>
 	</array>
+	<!-- Software updates (Sparkle). Release builds only; the feed and DMGs live in the public
+	     ahamedzoha/mezzanine-releases repo, signed with the EdDSA key in the owner's Keychain
+	     (account "mezzanine"). Updates download in the background and install on quit. -->
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/ahamedzoha/mezzanine-releases/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>HDEHLe7NE5Q5xsgGP/tY52VwfRYt4qX57YnOSvqmXj0=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>14400</integer>
+	<!-- Sandboxed: Sparkle's installer runs as an XPC service launched for the app. -->
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Mezzanine turns a video’s dialogue into subtitles and matches subtitle timing to it. The audio is processed on this Mac and never sent anywhere.</string>
 </dict>

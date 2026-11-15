@@ -18,8 +18,30 @@ Scripts/live-test.sh                      # read-only checks vs the real server 
 Scripts/plex.sh pms /library/sections     # read-only Plex API helper (GET only, token never printed)
 xcodebuild -project Mezzanine.xcodeproj -scheme Mezzanine -destination 'platform=macOS' \
   -derivedDataPath build.noindex/DerivedData build
-Scripts/install.sh                        # Release build → /Applications/Mezzanine.app
+Scripts/install.sh                        # Release build → /Applications/Mezzanine.app (local only)
+Scripts/release.sh 0.3.0                  # ship: bump, tag, push → CI publishes, installs update
+Scripts/release.sh 0.3.0 --local          # same, built and published from this Mac (no CI minutes)
 ```
+
+## Releases and updates
+
+- Ship a version with `Scripts/release.sh <x.y.z>` after adding a `## <x.y.z>` section to
+  `CHANGELOG.md` (owner-facing notes; Sparkle's update window shows them). The script bumps
+  `MARKETING_VERSION`, commits "Release x.y.z", tags `vx.y.z` and pushes; the `Release` workflow
+  (`.github/workflows/release.yml`, runner `xcode-27`, Xcode 27.2) tests, builds, re-signs
+  Sparkle's helpers (`Scripts/sign-sparkle.sh`), makes the DMG (`Scripts/build-release.sh`,
+  dmgbuild + `Scripts/dmg/`) and stages it in the public `ahamedzoha/mezzanine-releases` repo
+  through a deploy key; that repo's Publish workflow creates the GitHub Release and the appcast
+  entry and resets its history. Installed copies download it and install on quit.
+- CI runs only on tags and "Run workflow" (Mac minutes bill 10× on private repos). Prefer
+  `--local` when iterating on the pipeline.
+- Build number = `git rev-list --count HEAD` (local installs too), so releases always compare newer.
+- Secrets (private repo): `MAC_CERT_P12`/`MAC_CERT_PASSWORD` (the Apple Development identity,
+  expires 2027-08-27: renew, re-export, reset both), `SPARKLE_ED_KEY` (EdDSA private key; the
+  original is in the login Keychain, account `mezzanine`; `SUPublicEDKey` in `Info.plist` must
+  match), `RELEASES_DEPLOY_KEY` (write access to mezzanine-releases only). Never print them.
+- Debug builds never run the updater (`AppUpdater.isAvailable` is false); test updates with real
+  releases. Commits in the public repo use the owner's GitHub no-reply address.
 
 Build output goes to `build.noindex/` (Spotlight skips it).
 
