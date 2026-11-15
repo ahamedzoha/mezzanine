@@ -86,7 +86,7 @@ struct SidebarProfileButton: View {
         .menuIndicator(.hidden)
         .focusEffectDisabled(false)
         .onHover { hovering = $0 }
-        .disabled(commands.isPlayerOpen)
+        .disabled(commands.isPlayerOpen || commands.hasMiniPlayer)
         .help("Switch profile (Mezzanine ▸ Switch Profile)")
         .accessibilityLabel("Profile: \(current?.title ?? "unknown"). Switch profile")
         .padding(.horizontal, Theme.Space.s)

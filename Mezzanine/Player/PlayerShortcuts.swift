@@ -11,7 +11,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
     case volumeUp, volumeDown, mute, dialogueBoost, nightMode
     case cycleAudio, cycleSubtitles, subtitleOptions, findSubtitles, subtitlesEarlier, subtitlesLater
     case generateSubtitles, translateSubtitles, matchSubtitleTiming
-    case fullScreen, pictureInPicture, options, stats, pictureMode
+    case fullScreen, pictureInPicture, options, stats, pictureMode, miniPlayer
 
     var id: String { rawValue }
 
@@ -50,6 +50,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .options: "Audio, subtitles, sound and speed"
         case .stats: "Playback info"
         case .pictureMode: "Picture: fit, fill or zoom"
+        case .miniPlayer: "Mini player (keep browsing)"
         }
     }
 
@@ -89,6 +90,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .options: "Audio, Subtitles and Sound…"
         case .stats: "Playback Info"
         case .pictureMode: "Next Picture Size"
+        case .miniPlayer: "Mini Player"
         }
     }
 
@@ -105,7 +107,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .volumeUp, .volumeDown, .mute, .dialogueBoost, .nightMode: .sound
         case .cycleAudio, .cycleSubtitles, .subtitleOptions, .findSubtitles, .subtitlesEarlier, .subtitlesLater,
              .generateSubtitles, .translateSubtitles, .matchSubtitleTiming: .subtitles
-        case .fullScreen, .pictureInPicture, .options, .stats, .pictureMode: .view
+        case .fullScreen, .pictureInPicture, .options, .stats, .pictureMode, .miniPlayer: .view
         }
     }
 
@@ -144,6 +146,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .options: [.char("o")]
         case .stats: [.char("i")]
         case .pictureMode: [.char("z")]
+        case .miniPlayer: [.char("m", option: true)]
         }
     }
 }

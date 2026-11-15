@@ -105,7 +105,8 @@ struct PlayerStage: View {
             }
             // -PlayerKeyScript "i,c,g,shift+c": posts real key events through the app's event
             // queue (router, menus) after 4 s, 0.6 s apart, for review captures.
-            if let script = UserDefaults.standard.string(forKey: "PlayerKeyScript") {
+            if let script = UserDefaults.standard.string(forKey: "PlayerKeyScript"), !DebugKeys.scriptRan {
+                DebugKeys.scriptRan = true
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(4))
                     for token in script.split(separator: ",") {
@@ -254,6 +255,8 @@ struct PlayerStage: View {
                         GlassIconButton(symbol: player.isPictureInPicture ? "pip.exit" : "pip.enter",
                                         label: "Picture in Picture", help: PlayerShortcuts.shared.help("Picture in Picture", .pictureInPicture)) { _ = perform(.key(.pictureInPicture)) }
                     }
+                    GlassIconButton(symbol: "rectangle.inset.bottomright.filled", label: "Mini Player",
+                                    help: PlayerShortcuts.shared.help("Mini player: keep browsing", .miniPlayer)) { _ = perform(.key(.miniPlayer)) }
                     GlassIconButton(symbol: "ellipsis", label: "Audio, subtitles, sound and speed",
                                     help: PlayerShortcuts.shared.help("Audio, subtitles, sound, speed", .options)) {
                         setOptions(open: !optionsOpen)
@@ -624,6 +627,9 @@ struct PlayerStage: View {
             player.togglePictureInPicture()
         case .options: setOptions(open: !optionsOpen)
         case .stats: withAnimation(Theme.Motion.quick) { statsVisible.toggle() }
+        case .miniPlayer:
+            setOptions(open: false)
+            playback.shrink()
         case .pictureMode:
             withAnimation(Theme.Motion.object(reduceMotion)) { playback.pictureMode = playback.pictureMode.next }
             showToast("Picture: " + playback.pictureMode.label)
@@ -1002,6 +1008,8 @@ private struct OnDeviceHost: ViewModifier {
 struct SubtitleOverlay: View {
     let player: MezzaninePlayer
     let onDevice: OnDeviceSubtitles
+    /// The mini player's tile: smaller type, closer to the edge.
+    var compact = false
     @AppStorage("subtitleScale") private var scale: Double = 1
     @AppStorage("subtitleBackground") private var background = false
     @AppStorage("subtitleOffset") private var offset: Double = 0
@@ -1035,7 +1043,7 @@ struct SubtitleOverlay: View {
         let active = shown
         GeometryReader { geo in
             // Size follows the picture so subtitles read the same in a window and full screen.
-            let size = max(16, geo.size.height * 0.042) * scale
+            let size = (compact ? max(9, geo.size.height * 0.075) : max(16, geo.size.height * 0.042)) * scale
             VStack(spacing: 6) {
                 ForEach(active) { line in
                     switch line {
@@ -1057,7 +1065,7 @@ struct SubtitleOverlay: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, geo.size.height * 0.07)
+            .padding(.bottom, geo.size.height * (compact ? 0.05 : 0.07))
         }
         .allowsHitTesting(false)
     }
@@ -1161,6 +1169,8 @@ struct UpNextLayout {
 #if DEBUG
 /// Builds and posts key events for `-PlayerKeyScript`.
 enum DebugKeys {
+    /// The launch key script runs once, not again when the player reappears (mini player).
+    static var scriptRan = false
     static func post(_ token: String) {
         let parts = token.lowercased().split(separator: "+").map(String.init)
         var flags: NSEvent.ModifierFlags = []

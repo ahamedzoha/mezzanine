@@ -343,6 +343,12 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - Transient glyphs (play, pause, ±10) flash centred in a 70 pt glass circle for 0.65 s; sound changes show a corner readout with a volume bar to 400 % and a tick at 100 %.
 - Click toggles play; double click toggles full screen.
 
+## Mini player
+
+- The owner's pick: the film shrinks into the corner of the window (not a separate window; Picture in Picture already floats over other apps). ⌥M, the player's bottom-right row (next to PiP) or Playback ▸ Mini Player.
+- A 340 pt tile at the film's shape, bottom-right on the 24 pt inset: square corners with a 1 pt rule (the video is an AppKit layer; rounding can't be painted over browsing content), a deep shadow, a 2 pt ink progress line along the bottom. Hover (or pause) shows the title line and dark-glass play/pause, expand and close; a click grows it back into the player from where it sits.
+- The window is the library again around it: toolbar, sidebar, search, Quick Open. Bare player keys stay off; ⌥M expands; the Playback menu's play, skip, volume and next-episode items act on the tile (the rest expand first). Choosing another title to play opens the full player; the next episode autoplays in the tile when Up Next autoplay is on, otherwise the tile closes at the end. Profiles can't be switched while it plays.
+
 ## Detail page
 
 - Hero: full-width backdrop dissolving into the room, clear logo (≤ 620 × 170 pt), ruled caption, tagline, then Play/Resume (lilac; on shows "Resume S2 E4"), Trailer, and Mark Watched. On shows and seasons the button names its scope ("Mark Show Watched") and confirms first, because it changes every episode.

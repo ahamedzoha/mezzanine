@@ -15,6 +15,25 @@ final class PlaybackCoordinator {
     private(set) var origin: CGRect?
     private(set) var error: String?
     var isPresented: Bool { item != nil }
+    /// The film plays in a corner tile while the window goes back to browsing.
+    private(set) var isMini = false
+    /// The film fills the window (the player owns keys, toolbar and focus).
+    var ownsWindow: Bool { item != nil && !isMini }
+
+    /// Shrinks the playing film into the corner tile; browsing comes back around it.
+    func shrink() {
+        guard item != nil, !isMini else { return }
+        player.fillsView = false
+        withAnimation(Theme.Motion.object) { isMini = true }
+    }
+
+    /// Grows the corner tile back into the full player, from where it sits (`from`).
+    func expand(from rect: CGRect?) {
+        guard isMini else { return }
+        origin = rect
+        player.fillsView = pictureMode == .fill
+        withAnimation(Theme.Motion.object) { isMini = false }
+    }
 
     /// The room's light: the focused title's colours (set by Home and the
     /// library), dimmed to nothing while a film plays.
@@ -117,6 +136,8 @@ final class PlaybackCoordinator {
     /// a season or show.
     func play(_ item: PlexMetadata, from origin: CGRect?, mediaIndex: Int = 0) async {
         self.mediaIndex = mediaIndex
+        // Choosing a title to play opens the full player, even from the corner tile.
+        if isMini { isMini = false }
         await play(item, from: origin, autoplayed: false)
     }
 
@@ -407,6 +428,7 @@ final class PlaybackCoordinator {
 
     func close() {
         requestGeneration += 1
+        isMini = false
         let item = self.item
         let time = player.currentTime, duration = player.duration
         let reporter = self.reporter

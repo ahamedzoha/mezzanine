@@ -38,6 +38,8 @@ final class AppCommandCenter {
     /// The main window is key: bare-letter player shortcuts only act then, so typing in
     /// Settings or another window never pauses or mutes the film.
     var mainWindowIsKey = true
+    /// A film plays in the corner tile while browsing.
+    var hasMiniPlayer = false
     /// Home's summary panel is open (View ▸ Show/Hide Details).
     var detailsShown = false
     /// Detail pages pushed over the current section.
@@ -280,7 +282,7 @@ struct MezzanineCommands: Commands {
     var body: some Commands {
         CommandGroup(after: .appSettings) {
             Menu("Switch Profile") { ProfileMenuItems(session: session, commands: center) }
-                .disabled(center.isPlayerOpen || center.isModalShown)
+                .disabled(center.isPlayerOpen || center.hasMiniPlayer || center.isModalShown)
         }
         CommandGroup(replacing: .help) {
             Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
@@ -459,6 +461,10 @@ struct MezzanineCommands: Commands {
                 }
                 Divider()
                 item(.fullScreen)
+                Button(center.hasMiniPlayer ? "Expand Player" : PlayerKey.miniPlayer.menuTitle) { center.player(.key(.miniPlayer)) }
+                    // The one player key that stays live in the corner (it grows the tile back).
+                    .keyboardShortcut((center.isPlayerOpen || center.hasMiniPlayer) && center.mainWindowIsKey
+                                      ? shortcuts.menuShortcut(.miniPlayer) : nil)
                 Menu("Picture Size") {
                     item(.pictureMode)
                     Divider()
@@ -476,7 +482,7 @@ struct MezzanineCommands: Commands {
                 Button("Close Player") { center.player(.close) }
                     .keyboardShortcut(playerKeys ? KeyboardShortcut(.escape, modifiers: []) : nil)
             }
-            .disabled(!center.isPlayerOpen)
+            .disabled(!center.isPlayerOpen && !center.hasMiniPlayer)
             Divider()
             Menu("Sound Profile for \(sound.deviceName)") {
                 Picker("Profile", selection: Binding(get: { sound.current.kind }, set: { sound.setKind($0) })) {

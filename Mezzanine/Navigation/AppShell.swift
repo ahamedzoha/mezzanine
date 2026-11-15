@@ -32,26 +32,30 @@ struct AppShell: View {
             // Once connected, the library stays on screen through reconnects.
             if showsLibrary {
                 split
-                    .disabled(playback.isPresented)
-                    .accessibilityHidden(playback.isPresented)
+                    .disabled(playback.ownsWindow)
+                    .accessibilityHidden(playback.ownsWindow)
             } else {
                 OnboardingView().navigationTitle("")
             }
         }
         .overlay {
             if let item = playback.item {
-                GeometryReader { geo in
-                    PlayerStage(item: item, origin: playback.origin, window: geo.size)
+                if playback.isMini {
+                    MiniPlayerTile(item: item)
+                } else {
+                    GeometryReader { geo in
+                        PlayerStage(item: item, origin: playback.origin, window: geo.size)
+                    }
+                    .ignoresSafeArea()
+                    .transition(.opacity)
                 }
-                .ignoresSafeArea()
-                .transition(.opacity)
             }
         }
         // While a film plays the window is only the film: no toolbar, no toolbar
         // material, no title (AppKit draws those above SwiftUI content).
-        .toolbarVisibility(playback.isPresented ? .hidden : .visible, for: .windowToolbar)
+        .toolbarVisibility(playback.ownsWindow ? .hidden : .visible, for: .windowToolbar)
         .toolbarBackgroundVisibility(chromeHidden ? .hidden : .automatic, for: .windowToolbar)
-        .background(WindowChrome(hidden: chromeHidden, hidesToolbar: playback.isPresented))
+        .background(WindowChrome(hidden: chromeHidden, hidesToolbar: playback.ownsWindow))
         .background(MainWindowWatcher(keyChanged: { commands.mainWindowIsKey = $0 },
                                       willClose: { if playback.isPresented { playback.close() } }))
         .frame(minWidth: 900, minHeight: 600)
@@ -81,14 +85,15 @@ struct AppShell: View {
             commands.selection = .downloads
             AccessibilityNotification.Announcement("Offline. Showing downloads.").post()
         }
-        .onChange(of: playback.isPresented, initial: true) { _, presented in
-            commands.isPlayerOpen = presented
-            if !presented { contentFocused = true }
+        .onChange(of: playback.ownsWindow, initial: true) { _, owns in
+            commands.isPlayerOpen = owns
+            if !owns { contentFocused = true }
         }
+        .onChange(of: playback.isMini, initial: true) { _, mini in commands.hasMiniPlayer = mini }
     }
 
     /// The film, or onboarding, owns the whole window.
-    private var chromeHidden: Bool { playback.isPresented || !showsLibrary }
+    private var chromeHidden: Bool { playback.ownsWindow || !showsLibrary }
 
     /// Onboarding until it's done; then the library, kept through reconnects (and the
     /// Downloads page alone when Plex can't be reached).
@@ -150,12 +155,12 @@ struct AppShell: View {
                     .modifier(PagePanels(onTop: commands.path.isEmpty, showsSearchPanel: showsSearchPanel))
                     .navigationDestination(for: DetailRoute.self) { route in
                         DetailView(route: route, contentFocus: $contentFocused)
-                            .background { RoomLight(palette: playback.roomPalette, intensity: playback.isPresented ? 0 : 1) }
+                            .background { RoomLight(palette: playback.roomPalette, intensity: playback.ownsWindow ? 0 : 1) }
                             .modifier(PagePanels(onTop: commands.path.last == route, showsSearchPanel: showsSearchPanel))
                     }
             }
             .background {
-                RoomLight(palette: playback.roomPalette, intensity: playback.isPresented ? 0 : 1)
+                RoomLight(palette: playback.roomPalette, intensity: playback.ownsWindow ? 0 : 1)
             }
         }
         .sheet(item: $commands.artworkRequest) { request in
@@ -225,7 +230,7 @@ struct AppShell: View {
     private var showsSearchPanel: Bool {
         let q = commands.query.trimmingCharacters(in: .whitespaces)
         return !q.isEmpty && !commands.showsAllResults && commands.searchPanelDismissedFor != commands.query
-            && !commands.isQuickOpenShown && !playback.isPresented
+            && !commands.isQuickOpenShown && !playback.ownsWindow
     }
 
     /// The current section's own page (the full search results after See all).
@@ -315,7 +320,7 @@ private struct PagePanels: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .topLeading) {
-                if onTop && commands.isQuickOpenShown && !playback.isPresented {
+                if onTop && commands.isQuickOpenShown && !playback.ownsWindow {
                     QuickOpen().transition(.opacity)
                 }
             }

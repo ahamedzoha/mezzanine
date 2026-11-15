@@ -16,6 +16,8 @@
   the stack; Quick Open had the same bug). Both now hang on the top page; verified with captures
   on a title page, a library page and Home. Ranking: titles starting with the text, then a word
   of the title, then the rest; lessons (personal-media libraries) after films and shows.
+- Mini player (owner's pick: corner of the window): ⌥M shrinks the film into a 340 pt tile while
+  browsing; click or ⌥M grows it back. Verified with captures (shrink, browse, expand).
 - Picture size: Fit / Fill / Zoom (Z, ⋯ ▸ Picture, Playback ▸ Picture Size), kept per film or show.
 - Faster starts: a title page warms its Play target's file half a second after opening (Home
   warms a poster that keeps focus 0.7 s); home network only, 8 MB each, never for downloads.
