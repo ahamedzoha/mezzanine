@@ -5,6 +5,8 @@
 # screen for a few seconds. Regression cases (see CLAUDE.md):
 #   Scripts/ui-case.sh detail-search 13 -MezzanineOpen 11998 -SearchQuery alien
 #   Scripts/ui-case.sh detail-quickopen 13 -MezzanineOpen 11998 -QuickOpenQuery arch
+#   Scripts/ui-case.sh detail-season 14 -MezzanineOpen 58207 -DetailSeason 3 -DetailSection episodes
+#     (Breaking Bad opens on S5 and then switches; rows must read 1. No Más, 2. Caballo sin Nombre)
 name=$1; wait=$2; shift 2
 root=~/Code/mezzanine
 bin=$root/build.noindex/DerivedData/Build/Products/Debug/Mezzanine.app/Contents/MacOS/Mezzanine

@@ -3,6 +3,11 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 0.2.2 — 2026-11-15
+
+- Fixed: switching seasons on a show's page now shows that season's episodes. Before, some rows
+  kept the previous season's titles, details and thumbnails.
+
 ## 0.2.1 — 2026-11-15
 
 - The first update delivered by Mezzanine's own updater. Nothing else changes.

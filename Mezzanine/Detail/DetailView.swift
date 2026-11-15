@@ -196,20 +196,22 @@ struct DetailView: View {
                 .help("Seasons (⌥← / ⌥→)")
             }
             LazyVStack(alignment: .leading, spacing: 2) {
+                // Rows are identified by ratingKey only. An extra `.id("ep-\(i)")` here once gave
+                // every season's rows the same ids, and the lazy stack kept showing the previous
+                // season's rows after a switch. Scroll by ratingKey instead.
                 ForEach(Array(episodes.enumerated()), id: \.element.ratingKey) { i, episode in
                     EpisodeRow(episode: episode, isFocused: focusedEpisode == i,
                                onFocus: { focusedEpisode = i; if let e = sectionIDs.firstIndex(of: "episodes") { section = e } },
                                onPlay: { frame in play(episode, from: frame) },
                                onToggleWatched: { requestToggleWatched(episode) },
                                onPlayVersion: { v in Task { await playback.play(episode, from: nil, mediaIndex: v) } })
-                        .id("ep-\(i)")
                 }
             }
             .padding(.horizontal, Theme.Space.gutter - Theme.Space.m)
         }
         .onChange(of: focusedEpisode) { _, i in
-            guard let i else { return }
-            withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo("ep-\(i)", anchor: nil) }
+            guard let i, episodes.indices.contains(i) else { return }
+            withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo(episodes[i].ratingKey, anchor: nil) }
         }
     }
 
