@@ -76,9 +76,21 @@ final class PlaybackCoordinator {
     private(set) var mediaIndex = 0
     private var transcodeSession: String?
 
+    /// Subtitles made on this Mac: generated from speech, translated, timing matched (M12).
+    let onDevice: OnDeviceSubtitles
+
     init(player: MezzaninePlayer, session: SessionStore) {
         self.player = player
         self.session = session
+        onDevice = OnDeviceSubtitles(player: player)
+        onDevice.selectTrack = { [weak self] id in self?.selectSubtitle(trackID: id) }
+    }
+
+    /// After a title loads: its generated subtitles come back. An episode keeps generating
+    /// when the one before it, from the same show, was.
+    private func beginOnDevice(_ detail: PlexMetadata, carryFrom previous: (show: String?, generating: Bool)) {
+        let carry = previous.generating && detail.kind == .episode && previous.show != nil && previous.show == detail.grandparentRatingKey
+        onDevice.begin(ratingKey: detail.ratingKey, serverID: savedServerID, carry: carry)
     }
 
     /// Plays a movie or episode (resuming), or the next unwatched episode of
@@ -119,6 +131,8 @@ final class PlaybackCoordinator {
                 return
             }
             self.origin = origin
+            let previous = (show: self.item?.grandparentRatingKey, generating: onDevice.showsGenerated)
+            onDevice.end()
             withAnimation(Theme.Motion.object) { self.item = detail }
             if let reporter { await reporter.stop(at: player.currentTime, duration: player.duration) }
             let start = detail.viewOffset.map { Double($0) / 1000 }
@@ -138,6 +152,7 @@ final class PlaybackCoordinator {
                 }
             }
             if let lastError { throw lastError }
+            beginOnDevice(detail, carryFrom: previous)
             let reporter = ActivityReporter(client: client, item: detail, player: player)
             self.reporter = reporter
             reporter.start()
@@ -229,6 +244,8 @@ final class PlaybackCoordinator {
         lastRequest = item
         error = nil
         self.origin = origin
+        let previous = (show: self.item?.grandparentRatingKey, generating: onDevice.showsGenerated)
+        onDevice.end()
         withAnimation(Theme.Motion.object) { self.item = detail }
         let streams = detail.media.first?.parts.first?.streams ?? []
         let subtitle = streams.first { $0.streamType == .subtitle && $0.selected == true }?.languageCode
@@ -241,6 +258,7 @@ final class PlaybackCoordinator {
                 preferredSubtitleLanguages: subtitle.map { [$0] } ?? [],
                 externalSubtitles: local + saved.map(\.subtitle)))
             restoreSavedSubtitle(saved, after: local.count)
+            beginOnDevice(detail, carryFrom: previous)
             mode = .direct
             playingDownload = true
             reporter = nil
@@ -271,6 +289,8 @@ final class PlaybackCoordinator {
         fallbackNotice = nil
         do {
             try await load(item, mode: newMode, start: at, client: client)
+            // Generated subtitles stay on screen across the reload.
+            if onDevice.showsGenerated { player.selectSubtitle(id: nil) }
         } catch is CancellationError {
         } catch {
             self.error = (error as? PlexError)?.userMessage ?? "Couldn’t switch to \(newMode.label.lowercased())."
@@ -301,6 +321,8 @@ final class PlaybackCoordinator {
     }
 
     func selectSubtitle(trackID: Int?) {
+        onDevice.hideGenerated()
+        onDevice.trackChanged()
         player.selectSubtitle(id: trackID)
         if let item {
             SavedSubtitles.setActive(trackID.flatMap { savedTracks[$0] }, serverID: savedServerID, ratingKey: item.ratingKey)
@@ -360,6 +382,7 @@ final class PlaybackCoordinator {
             await reporter?.stop(at: time, duration: duration)
             if let item { onStopped?(item, time, duration) }
         }
+        onDevice.end()
         player.stop()
         stopTranscode()
         mode = .direct

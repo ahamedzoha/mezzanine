@@ -24,7 +24,7 @@ nonisolated enum SavedSubtitles {
         URL.applicationSupportDirectory.appending(path: "Mezzanine/Subtitles", directoryHint: .isDirectory)
     }
 
-    private static func folder(serverID: String, ratingKey: String) -> URL {
+    static func folder(serverID: String, ratingKey: String) -> URL {
         root.appending(path: safe(serverID), directoryHint: .isDirectory).appending(path: safe(ratingKey), directoryHint: .isDirectory)
     }
 
@@ -84,6 +84,38 @@ nonisolated enum SavedSubtitles {
             guard FileManager.default.fileExists(atPath: url.path) else { return nil }
             return (entry, ExternalSubtitle(entry, url: url))
         }
+    }
+}
+
+// MARK: Generated from speech
+
+extension SavedSubtitles {
+    /// Subtitles written from the dialogue on this Mac, kept beside the downloaded ones (but
+    /// not handed to the engine: the player draws them itself while they're still growing).
+    struct Generated: Codable, Equatable, Sendable {
+        /// Two-letter code of the spoken language.
+        var language: String
+        /// On screen when the title was last watched.
+        var active: Bool
+    }
+
+    static func generated(serverID: String?, ratingKey: String) -> (meta: Generated, lines: [TimedLine])? {
+        guard let serverID, !serverID.isEmpty else { return nil }
+        let dir = folder(serverID: serverID, ratingKey: ratingKey)
+        guard let data = try? Data(contentsOf: dir.appending(path: "generated.json")),
+              let meta = try? JSONDecoder().decode(Generated.self, from: data) else { return nil }
+        let text = (try? String(contentsOf: dir.appending(path: "generated.srt"), encoding: .utf8)) ?? ""
+        return (meta, SRT.parse(text))
+    }
+
+    static func saveGenerated(_ lines: [TimedLine], meta: Generated, serverID: String?, ratingKey: String) {
+        guard let serverID, !serverID.isEmpty else { return }
+        let dir = folder(serverID: serverID, ratingKey: ratingKey)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try Data(SRT.write(lines).utf8).write(to: dir.appending(path: "generated.srt"), options: .atomic)
+            try JSONEncoder().encode(meta).write(to: dir.appending(path: "generated.json"), options: .atomic)
+        } catch {}
     }
 }
 

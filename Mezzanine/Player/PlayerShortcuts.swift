@@ -10,6 +10,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
     case skipMarker, nextEpisode, previousEpisode
     case volumeUp, volumeDown, mute, dialogueBoost, nightMode
     case cycleAudio, cycleSubtitles, subtitleOptions, findSubtitles, subtitlesEarlier, subtitlesLater
+    case generateSubtitles, translateSubtitles, matchSubtitleTiming
     case fullScreen, pictureInPicture, options, stats
 
     var id: String { rawValue }
@@ -39,6 +40,9 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .cycleSubtitles: "Next subtitle track"
         case .subtitleOptions: "Subtitle options"
         case .findSubtitles: "Find subtitles"
+        case .generateSubtitles: "Generate subtitles from speech"
+        case .translateSubtitles: "Translate subtitles"
+        case .matchSubtitleTiming: "Match subtitle timing to speech"
         case .subtitlesEarlier: "Subtitles earlier (0.1 s)"
         case .subtitlesLater: "Subtitles later (0.1 s)"
         case .fullScreen: "Full screen"
@@ -74,6 +78,9 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .cycleSubtitles: "Next Subtitle Track"
         case .subtitleOptions: "Subtitle Options…"
         case .findSubtitles: "Find Subtitles…"
+        case .generateSubtitles: "Generate Subtitles from Speech"
+        case .translateSubtitles: "Translate Subtitles"
+        case .matchSubtitleTiming: "Match Subtitle Timing to Speech"
         case .subtitlesEarlier: "Subtitles Earlier"
         case .subtitlesLater: "Subtitles Later"
         case .fullScreen: "Enter Full Screen"
@@ -94,7 +101,8 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
              .previousFrame, .nextFrame, .slower, .faster: .playback
         case .skipMarker, .nextEpisode, .previousEpisode: .episodes
         case .volumeUp, .volumeDown, .mute, .dialogueBoost, .nightMode: .sound
-        case .cycleAudio, .cycleSubtitles, .subtitleOptions, .findSubtitles, .subtitlesEarlier, .subtitlesLater: .subtitles
+        case .cycleAudio, .cycleSubtitles, .subtitleOptions, .findSubtitles, .subtitlesEarlier, .subtitlesLater,
+             .generateSubtitles, .translateSubtitles, .matchSubtitleTiming: .subtitles
         case .fullScreen, .pictureInPicture, .options, .stats: .view
         }
     }
@@ -124,6 +132,9 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .cycleSubtitles: [.char("c")]
         case .subtitleOptions: [.char("C")]
         case .findSubtitles: [.char("f", option: true)]
+        case .generateSubtitles: [.char("g", option: true)]
+        case .translateSubtitles: [.char("t", option: true)]
+        case .matchSubtitleTiming: [.char("h", option: true)]
         case .subtitlesEarlier: [.char("g")]
         case .subtitlesLater: [.char("h")]
         case .fullScreen: [.char("f")]

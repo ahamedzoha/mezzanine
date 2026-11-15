@@ -14,5 +14,9 @@
 	     *.plex.direct names that resolve to a LAN IP. -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Mezzanine connects to your Plex Media Server, which is usually on your local network.</string>
+	<!-- Generate from Speech and Match Timing to Speech recognize the film's dialogue on
+	     this Mac (never the microphone). -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Mezzanine turns a video’s dialogue into subtitles and matches subtitle timing to it. The audio is processed on this Mac and never sent anywhere.</string>
 </dict>
 </plist>

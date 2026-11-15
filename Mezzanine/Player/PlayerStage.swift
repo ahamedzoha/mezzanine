@@ -1,4 +1,5 @@
 import SwiftUI
+import Translation
 import MezzanineKit
 import MezzaninePlayback
 
@@ -78,7 +79,11 @@ struct PlayerStage: View {
                                 convert: playback.mode == .direct ? { Task { await playback.setMode(.convert(nil)) } } : nil,
                                 close: { playback.clearError(); _ = perform(.close) })
             }
-            if let toast { SoundToast(text: toast, volume: sound.current.volumePercent).transition(.opacity) }
+            // A brief readout wins; otherwise a running on-device task (model download, timing
+            // match) holds its own until it ends.
+            if let text = toast ?? playback.onDevice.status {
+                SoundToast(text: text, volume: sound.current.volumePercent).transition(.opacity)
+            }
             upNextLayer
         }
         .frame(width: frame.width, height: frame.height)
@@ -140,6 +145,7 @@ struct PlayerStage: View {
         .onChange(of: statsVisible, initial: true) { _, v in commands.statsVisible = v }
         .onChange(of: player.canPictureInPicture, initial: true) { _, v in commands.canPictureInPicture = v }
         .onChange(of: player.rate, initial: true) { _, r in commands.playbackRate = r }
+        .modifier(OnDeviceHost(onDevice: playback.onDevice, commands: commands, toast: { showToast($0, long: $1) }))
         .onChange(of: upNext) { _, state in
             switch state {
             case .counting(let s) where s == playback.binge.upNextCountdown:
@@ -176,7 +182,7 @@ struct PlayerStage: View {
             let rect = upNextShown ? UpNextLayout(size: geo.size, aspect: videoAspect).picture : CGRect(origin: .zero, size: geo.size)
             ZStack {
                 PlayerSurface(player: player)
-                SubtitleOverlay(player: player)
+                SubtitleOverlay(player: player, onDevice: playback.onDevice)
                 // The video is an AppKit layer, so its rounding is painted in the stage's black
                 // rather than left to SwiftUI clipping of a hosted view.
                 PictureCorners(radius: upNextShown ? Theme.Radius.panel : 0)
@@ -596,6 +602,9 @@ struct PlayerStage: View {
         case .findSubtitles: setOptions(open: !(optionsOpen && optionsPage == .search), page: .search)
         case .subtitlesEarlier: shiftSubtitles(by: -0.1)
         case .subtitlesLater: shiftSubtitles(by: 0.1)
+        case .generateSubtitles: playback.onDevice.toggleGenerate()
+        case .translateSubtitles: playback.onDevice.toggleTranslate()
+        case .matchSubtitleTiming: playback.onDevice.toggleMatching()
         case .fullScreen: NSApp.keyWindow?.toggleFullScreen(nil)
         case .pictureInPicture:
             guard player.canPictureInPicture else { return .ignored }
@@ -719,11 +728,12 @@ struct PlayerStage: View {
         }
     }
 
-    private func showToast(_ text: String) {
+    /// `long`: a problem, kept up long enough to read.
+    private func showToast(_ text: String, long: Bool = false) {
         withAnimation(Theme.Motion.quick) { toast = text }
         toastTask?.cancel()
         toastTask = Task {
-            try? await Task.sleep(for: .seconds(1.4))
+            try? await Task.sleep(for: .seconds(long ? 5 : 1.4))
             guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.3)) { toast = nil }
         }
@@ -944,23 +954,76 @@ struct HairlineScrub: View {
     }
 }
 
-/// Text and bitmap subtitles over the picture, styled from the ⋯ panel.
+/// The stage's part in on-device subtitles (M12): readouts, the menu's checkmarks, and the
+/// translation session, which runs here while the player is up (the system asks to
+/// download a language pair the first time).
+private struct OnDeviceHost: ViewModifier {
+    let onDevice: OnDeviceSubtitles
+    let commands: AppCommandCenter
+    let toast: (String, Bool) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: onDevice.announcement?.id) { _, _ in
+                if let note = onDevice.announcement { toast(note.text, note.long) }
+            }
+            .onChange(of: onDevice.showsGenerated, initial: true) { _, v in commands.generatingSubtitles = v }
+            .onChange(of: onDevice.translates, initial: true) { _, v in commands.translatingSubtitles = v }
+            .onChange(of: onDevice.isMatching, initial: true) { _, v in commands.matchingSubtitleTiming = v }
+            .onChange(of: onDevice.canMatch, initial: true) { _, v in commands.canMatchSubtitleTiming = v }
+            .onChange(of: onDevice.targetLanguage, initial: true) { _, code in
+                commands.subtitleTranslateTarget = OnDeviceSubtitles.languageName(code)
+            }
+            .translationTask(onDevice.translationConfiguration) { session in
+                await onDevice.serve(session)
+            }
+    }
+}
+
+/// Text and bitmap subtitles over the picture, styled from the ⋯ panel. Generated lines
+/// (from speech) replace the engine's when they're on; Translate swaps each text line for
+/// its translation once it has arrived.
 struct SubtitleOverlay: View {
     let player: MezzaninePlayer
+    let onDevice: OnDeviceSubtitles
     @AppStorage("subtitleScale") private var scale: Double = 1
     @AppStorage("subtitleBackground") private var background = false
     @AppStorage("subtitleOffset") private var offset: Double = 0
 
-    var body: some View {
+    private enum Shown: Identifiable {
+        case text(id: String, String)
+        case image(id: Int, CGImage)
+        var id: String {
+            switch self {
+            case .text(let id, _): id
+            case .image(let id, _): "image-\(id)"
+            }
+        }
+    }
+
+    private var shown: [Shown] {
         let now = player.currentTime - offset
-        let active = player.cues.filter { $0.start <= now && now < $0.end }
+        if onDevice.showsGenerated {
+            return onDevice.lines.filter { $0.start <= now && now < $0.end }
+                .map { .text(id: "g-\($0.start)", onDevice.display($0.text)) }
+        }
+        return player.cues.filter { $0.start <= now && now < $0.end }.map { cue in
+            switch cue.content {
+            case .text(let text): .text(id: "c-\(cue.id)", onDevice.display(text))
+            case .image(let image, _): .image(id: cue.id, image)
+            }
+        }
+    }
+
+    var body: some View {
+        let active = shown
         GeometryReader { geo in
             // Size follows the picture so subtitles read the same in a window and full screen.
             let size = max(16, geo.size.height * 0.042) * scale
             VStack(spacing: 6) {
-                ForEach(active) { cue in
-                    switch cue.content {
-                    case .text(let text):
+                ForEach(active) { line in
+                    switch line {
+                    case .text(_, let text):
                         Text(text)
                             .font(.system(size: size, weight: .semibold))
                             .multilineTextAlignment(.center)
@@ -971,7 +1034,7 @@ struct SubtitleOverlay: View {
                             .padding(.vertical, background ? 4 : 0)
                             .background(background ? RoundedRectangle(cornerRadius: 6).fill(.black.opacity(0.72)) : nil)
                             .padding(.horizontal, 24)
-                    case .image(let image, _):
+                    case .image(_, let image):
                         Image(decorative: image, scale: 1).resizable().scaledToFit()
                             .frame(maxHeight: geo.size.height * 0.2 * scale)
                     }

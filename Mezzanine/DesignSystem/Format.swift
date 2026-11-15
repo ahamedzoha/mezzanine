@@ -18,6 +18,13 @@ enum Format {
         return m == 0 ? "\(h) h" : "\(h) h \(m) min"
     }
 
+    /// "42:10", "1:02:05": a position in a film.
+    static func clock(_ seconds: Double) -> String {
+        let t = Int(max(0, seconds.isFinite ? seconds : 0))
+        let h = t / 3600, m = t / 60 % 60, s = t % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+    }
+
     /// "S2 E3".
     static func episodeCode(_ item: PlexMetadata) -> String? {
         guard item.kind == .episode, let s = item.parentIndex, let e = item.index else { return nil }

@@ -32,9 +32,9 @@ enum SubtitleHTTP {
 }
 
 /// Language names and codes the sites use.
-enum SubtitleLanguage {
+public enum SubtitleLanguage {
     /// "en" → "English" (Addic7ed's names are English names).
-    static func englishName(_ code: String) -> String? {
+    public static func englishName(_ code: String) -> String? {
         Locale(identifier: "en").localizedString(forLanguageCode: code)
     }
 
@@ -47,10 +47,17 @@ enum SubtitleLanguage {
         return map
     }()
 
+    /// ISO 639-2/B codes (Plex and Matroska use them) that ICU doesn't map.
+    private static let bibliographic = ["fre": "fr", "ger": "de", "chi": "zh", "cze": "cs", "dut": "nl", "gre": "el",
+                                        "per": "fa", "rum": "ro", "slo": "sk", "alb": "sq", "arm": "hy", "baq": "eu",
+                                        "bur": "my", "geo": "ka", "ice": "is", "mac": "mk", "mao": "mi", "may": "ms",
+                                        "tib": "bo", "wel": "cy"]
+
     /// "pt-BR", "por", "English" → "pt".
-    static func code(_ raw: String) -> String {
+    public static func code(_ raw: String) -> String {
         let lower = raw.lowercased()
         if lower.count == 2 { return lower }
+        if let code = bibliographic[lower] { return code }
         if let dash = lower.firstIndex(where: { $0 == "-" || $0 == "_" }) {
             let head = String(lower[..<dash])
             return head == "br" ? "pt" : head

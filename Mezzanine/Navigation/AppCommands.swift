@@ -62,6 +62,13 @@ final class AppCommandCenter {
     var playbackRate: Double = 1
     var isMuted = false
     var statsVisible = false
+    /// On-device subtitles (M12), mirrored from the player for the menu's checkmarks.
+    var generatingSubtitles = false
+    var translatingSubtitles = false
+    var matchingSubtitleTiming = false
+    var canMatchSubtitleTiming = false
+    /// "English": Translate's target, named in the menu.
+    var subtitleTranslateTarget = "English"
 
     // Shelves (Home, or a library's Shelves layout).
     /// Shelf pages on screen (a counter: the next page can appear before the last disappears).
@@ -218,14 +225,14 @@ struct MezzanineCommands: Commands {
 
     /// A player key as a menu item, showing its current (rebindable) key. The key router
     /// handles the key itself first, so these never fire while typing in a field.
-    private func item(_ key: PlayerKey, disabled: Bool = false) -> some View {
-        Button(key.menuTitle) { center.player(.key(key)) }
+    private func item(_ key: PlayerKey, title: String? = nil, disabled: Bool = false) -> some View {
+        Button(title ?? key.menuTitle) { center.player(.key(key)) }
             .keyboardShortcut(shortcuts.menuShortcut(key))
             .disabled(disabled)
     }
 
-    private func toggle(_ key: PlayerKey, isOn: Bool) -> some View {
-        Toggle(key.menuTitle, isOn: Binding(get: { isOn }, set: { _ in center.player(.key(key)) }))
+    private func toggle(_ key: PlayerKey, isOn: Bool, title: String? = nil) -> some View {
+        Toggle(title ?? key.menuTitle, isOn: Binding(get: { isOn }, set: { _ in center.player(.key(key)) }))
             .keyboardShortcut(shortcuts.menuShortcut(key))
     }
 
@@ -382,8 +389,14 @@ struct MezzanineCommands: Commands {
                 item(.cycleSubtitles)
                 item(.subtitleOptions)
                 item(.findSubtitles)
+                // Actions that start and stop name what they'll do; Translate is a setting.
+                item(.generateSubtitles, title: center.generatingSubtitles ? "Stop Generating Subtitles" : nil)
+                toggle(.translateSubtitles, isOn: center.translatingSubtitles,
+                       title: "Translate Subtitles to \(center.subtitleTranslateTarget)")
                 item(.subtitlesEarlier)
                 item(.subtitlesLater)
+                item(.matchSubtitleTiming, title: center.matchingSubtitleTiming ? "Stop Matching Subtitle Timing" : nil,
+                     disabled: !center.matchingSubtitleTiming && !center.canMatchSubtitleTiming)
                 Divider()
                 item(.volumeUp)
                 item(.volumeDown)

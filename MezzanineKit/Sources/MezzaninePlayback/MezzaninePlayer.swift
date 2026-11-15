@@ -260,6 +260,34 @@ public final class MezzaninePlayer {
         if let id { engine.selectSubtitleTrack(index: id) } else { engine.clearSubtitle() }
     }
 
+    // MARK: Speech audio (on-device subtitles)
+
+    /// The playing audio for speech recognition: mono 48 kHz from the centre (dialogue)
+    /// channel when the mix has one, else the downmix. On the native route it's read up to
+    /// ~10 s ahead of the picture from data already fetched, so it costs no extra network.
+    /// Nil when this session's audio can't be read. The stream ends on any reload (audio or
+    /// subtitle track switch, quality change, next title): ask again to follow the new session.
+    public func speechAudio() -> AsyncStream<SpeechAudio>? {
+        let tap = engine.installAudioTap(channels: .dialogue)
+        guard engine.audioTapHasDeliverySource else {
+            engine.removeAudioTap()
+            return nil
+        }
+        return AsyncStream(bufferingPolicy: .bufferingNewest(400)) { continuation in
+            let pump = Task.detached {
+                for await slice in tap {
+                    continuation.yield(SpeechAudio(buffer: slice.buffer, time: slice.sourceTime, discontinuity: slice.discontinuity))
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in pump.cancel() }
+        }
+    }
+
+    public func stopSpeechAudio() {
+        engine.removeAudioTap()
+    }
+
     // MARK: Audio shaping
 
     /// Maps the device profile plus the volume boost onto the engine.

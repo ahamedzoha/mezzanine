@@ -1,5 +1,33 @@
 # Progress
 
+## 2026-11-15 (afternoon) — M12 on-device subtitles, new app icon
+
+- App icon replaced by the owner's pick: stacked glass slabs with a standing play triangle
+  (hand-built from a Gemini reference; `Scripts/make-icon.py` writes the Icon Composer document).
+- M12, owner's choices: translation replaces the line; generating starts only when asked; Match
+  Timing is a row under Timing. All in ⋯ ▸ Subtitles, Playback menu toggles, ⌥G / ⌥T / ⌥H.
+- Generate from Speech: AetherEngine's audio tap (centre channel, ~10 s ahead) into
+  SpeechAnalyzer; lines built like a subtitler's (two rows, ~6 s, sentence and pause breaks) and
+  kept per title (`generated.srt`), back on screen next time; carries to the next episode.
+- Live on Severance S1E2 (no play history): continuous for 90 s, 27 lines, starts within ~0.3 s
+  of the official SRT once word starts were tightened (raw recognizer starts absorb the pause
+  before a word: up to 1 s early).
+- Match Timing to Speech: words matched against the subtitle (any language falls back to speech
+  spans). Live: Timing +3.0 s → −0.1 s after 6 lines (~23 s of dialogue). Bug found and fixed in
+  testing: a seek now restarts the listening window.
+- Translate: `.translationTask` on the stage, lines translated 90 s ahead, swapped in when ready.
+  Not live-tested: no language pair is installed on this Mac yet, and the first use shows the
+  system's download prompt.
+- Kit: `OnDevice/` (SpeechListener, CueBuilder, SRT, TimingMatcher, TranslationPieces) with 13
+  tests, plus an opt-in real-recognizer test (`MEZZANINE_SPEECH`).
+- Design finish review (fix) and HIG review (Needs Work) applied in one batch: running tasks hold
+  the readout (model %, lines matched), problems stay 5 s and live on in the panel, Match says why
+  it's disabled (row and menu), menu Generate/Match swap to Stop…, Translate names its language,
+  Stop Generating and failed starts put back the previous subtitle, a refused translation pair
+  retries on track change, switch rows are whole-row and hueless (One Lilac Rule; also Background
+  box and Night mode), readout copy in the house style, privacy wording made exact.
+- Next: owner tries Translate once (system language download), then M13.
+
 ## 2026-11-15 (overnight) — Find Subtitles from every free source
 
 - Owner asked for subtitles searchable from OpenSubtitles and other free popular sources

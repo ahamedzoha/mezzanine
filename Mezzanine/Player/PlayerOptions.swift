@@ -25,6 +25,7 @@ struct PlayerOptions: View {
     enum Page { case root, audio, subtitles, search, sound, speed, quality }
 
     private var player: MezzaninePlayer { playback.player }
+    private var onDevice: OnDeviceSubtitles { playback.onDevice }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -87,22 +88,104 @@ struct PlayerOptions: View {
     private var subtitles: some View {
         Group {
             header("Subtitles")
-            boundedList(selected: player.selectedSubtitleID) {
-                choice("Off", detail: nil, selected: player.selectedSubtitleID == nil) { playback.selectSubtitle(trackID: nil) }
+            boundedList(selected: onDevice.showsGenerated ? Self.generatedRowID : player.selectedSubtitleID) {
+                choice("Off", detail: nil, selected: player.selectedSubtitleID == nil && !onDevice.showsGenerated) {
+                    playback.selectSubtitle(trackID: nil)
+                }
                 ForEach(player.subtitleTracks) { track in
-                    choice(trackLabel(track), detail: subtitleDetail(track), selected: track.id == player.selectedSubtitleID) {
+                    choice(trackLabel(track), detail: subtitleDetail(track),
+                           selected: track.id == player.selectedSubtitleID && !onDevice.showsGenerated) {
                         playback.selectSubtitle(trackID: track.id)
                     }
                     .id(track.id)
                 }
+                if onDevice.hasGenerated {
+                    choice(generatedLabel, detail: generatedDetail, selected: onDevice.showsGenerated,
+                           busy: onDevice.showsGenerated && onDevice.generation != .listening) {
+                        if !onDevice.showsGenerated { onDevice.showGenerated() }
+                    }
+                    .id(Self.generatedRowID)
+                }
             }
             Divider().overlay(Theme.rule).padding(.vertical, 4)
             row("Find Subtitles…", value: nil) { page = .search }
+            row(onDevice.showsGenerated ? "Stop Generating" : "Generate from Speech", value: generateValue,
+                symbol: onDevice.showsGenerated ? "stop.circle" : "waveform") { onDevice.toggleGenerate() }
+                .accessibilityHint(onDevice.showsGenerated ? "Puts back the subtitle shown before; what was written is kept"
+                                   : "Writes subtitles from the dialogue. The audio stays on this Mac")
+            if case .failed(let message) = onDevice.generation { problemNote(message) }
+            toggleRow("Translate to \(OnDeviceSubtitles.languageName(onDevice.targetLanguage))",
+                      isOn: Binding(get: { onDevice.translates }, set: { _ in onDevice.toggleTranslate() }))
+            if let note = translateNote { note.problem ? AnyView(problemNote(note.text)) : AnyView(self.note(note.text)) }
+            if case .unavailable = onDevice.translating, onDevice.translates {
+                row("Translation Languages…", value: nil, symbol: "arrow.up.forward.app") { openTranslationLanguages() }
+                    .accessibilityHint("Opens Language & Region in System Settings")
+            }
             stepper("Size", value: "\(Int(subtitleScale * 100)) %",
                     minus: { subtitleScale = max(0.6, subtitleScale - 0.1) }, plus: { subtitleScale = min(2, subtitleScale + 0.1) })
             toggleRow("Background box", isOn: $subtitleBackground)
             stepper("Timing", value: offsetLabel,
                     minus: { subtitleOffset = (subtitleOffset - 0.1).rounded(to: 0.1) }, plus: { subtitleOffset = (subtitleOffset + 0.1).rounded(to: 0.1) })
+            row(onDevice.isMatching ? "Stop Matching" : "Match Timing to Speech", value: matchValue ?? onDevice.matchBlocker,
+                symbol: onDevice.isMatching ? "stop.circle" : "waveform.badge.magnifyingglass") { onDevice.toggleMatching() }
+                .disabled(!onDevice.isMatching && !onDevice.canMatch)
+                .accessibilityValue(matchValue ?? onDevice.matchBlocker ?? "")
+                .accessibilityHint(onDevice.isMatching ? "Stops listening and keeps the current Timing"
+                                   : "Listens to the dialogue while the video plays and sets Timing so the lines land on the words")
+            if case .failed(let message) = onDevice.matching { problemNote(message) }
+        }
+    }
+
+    // MARK: On-device subtitles (M12)
+
+    private static let generatedRowID = -2
+
+    private var generatedLabel: String {
+        "\(onDevice.generatedLanguage.map(OnDeviceSubtitles.languageName) ?? onDevice.spokenLanguageName ?? "Speech") · Generated"
+    }
+
+    private var generatedDetail: String {
+        let written = onDevice.lines.last.map { "written to \(Format.clock($0.end))" }
+        if onDevice.showsGenerated {
+            if let p = onDevice.modelProgress { return "Downloading the speech model · \(Int(p * 100)) %" }
+            switch onDevice.generation {
+            case .preparing: return "Starting…"
+            case .listening: return ["From the dialogue", written, "writing ahead"].compactMap { $0 }.joined(separator: " · ")
+            default: break
+            }
+        }
+        return ["From the dialogue", written ?? "on this Mac"].joined(separator: " · ")
+    }
+
+    private var generateValue: String? {
+        guard !onDevice.showsGenerated, let name = onDevice.spokenLanguageName else { return nil }
+        return "\(name) speech"
+    }
+
+    private var translateNote: (text: String, problem: Bool)? {
+        guard onDevice.translates else { return nil }
+        if let blocker = onDevice.translateBlocker { return (blocker + ".", false) }
+        if let source = onDevice.sourceLanguage, source == onDevice.targetLanguage {
+            return ("Already in \(OnDeviceSubtitles.languageName(source)).", false)
+        }
+        switch onDevice.translating {
+        case .unavailable(_, let message): return (message, true)
+        case .working: return ("Translated on this Mac · a minute ahead", false)
+        case .idle, .preparing: return ("Preparing translation…", false)
+        }
+    }
+
+    private var matchValue: String? {
+        guard case .listening(let n) = onDevice.matching else { return nil }
+        if player.status == .paused { return "Paused · play to match" }
+        if onDevice.modelProgress != nil { return "Downloading model" }
+        return n == 0 ? "Listening…" : (n == 1 ? "1 line matched" : "\(n) lines matched")
+    }
+
+    /// System Settings ▸ General ▸ Language & Region, where Translation Languages live.
+    private func openTranslationLanguages() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension") {
+            NSWorkspace.shared.open(url)
         }
     }
 
@@ -285,6 +368,7 @@ struct PlayerOptions: View {
                 Spacer(minLength: Theme.Space.s)
                 if let value { Text(value).font(Theme.Typeface.caption).foregroundStyle(Theme.inkSecondary).lineLimit(1) }
                 Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.inkTertiary)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, Theme.Space.m)
             .frame(height: 40)
@@ -355,12 +439,27 @@ struct PlayerOptions: View {
         .frame(height: 40)
     }
 
+    /// A switch row: the whole row flips it, and the switch sits on the trailing edge. Hueless
+    /// (lilac is for the selection and the primary action only).
     private func toggleRow(_ title: String, isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) { Text(title).font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink) }
-            .toggleStyle(.switch)
-            .tint(Theme.lilac)
+        Button { isOn.wrappedValue.toggle() } label: {
+            HStack(spacing: Theme.Space.m) {
+                Text(title).font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink)
+                Spacer(minLength: Theme.Space.s)
+                Toggle(title, isOn: isOn)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .tint(Theme.inkSecondary)
+                    .allowsHitTesting(false)
+            }
             .padding(.horizontal, Theme.Space.m)
             .frame(height: 40)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(OptionRowStyle())
+        .focusEffectDisabled(false)
+        .accessibilityRepresentation { Toggle(title, isOn: isOn) }
     }
 
     private func sliderRow(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double, label: String) -> some View {
@@ -380,7 +479,8 @@ struct PlayerOptions: View {
     }
 
     private var currentSubtitle: String {
-        player.subtitleTracks.first { $0.id == player.selectedSubtitleID }.map(trackLabel) ?? "Off"
+        if onDevice.showsGenerated { return generatedLabel }
+        return player.subtitleTracks.first { $0.id == player.selectedSubtitleID }.map(trackLabel) ?? "Off"
     }
 
     private var soundSummary: String {

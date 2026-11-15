@@ -70,6 +70,19 @@ Subtitles: Find Subtitles' sources live in `MezzanineKit/Subtitles/`; the keys i
 server); internet results only write under the Debug container's Application Support.
 Debug builds open onboarding unless launched with `-onboardingComplete YES`.
 
+On-device subtitles (M12): `MezzanineKit/OnDevice/` (SpeechListener over SpeechAnalyzer, CueBuilder,
+TimingMatcher, SRT, TranslationPieces); the app side is `Mezzanine/Subtitles/OnDeviceSubtitles.swift`,
+fed by `MezzaninePlayer.speechAudio()` (AetherEngine's audio tap, centre channel, ~10 s ahead on the
+native route; it ends on every reload and is re-installed). Real recognizer test, opt-in:
+`MEZZANINE_SPEECH=/path/speech.aiff swift test --filter SpeechListenerLiveTests` (`say -o speech.aiff "…"`).
+Word ranges run edge to edge, so starts are capped by `SpokenWord.tightened` (else lines land up to 1 s
+early). Debug builds print `HEARD`, `MATCHING`, `MATCH`, `TAP ENDED`; run
+`script -q /dev/null Scripts/dev-run.sh … < /dev/null` so prints reach a log line by line. A title's generated
+subtitles (`generated.srt` + `.json` in its Subtitles folder) come back on screen if they were on, and
+then Match Timing is refused: delete them between tests. Set the Debug Timing with
+`defaults write ~/Library/Containers/com.mezzanine.mac.debug/Data/Library/Preferences/com.mezzanine.mac.debug.plist subtitleOffset -float 3`
+(an `-subtitleOffset` launch argument would shadow what the app writes).
+
 SwiftUI gotcha: never mutate a `@Binding` array twice in one transaction (remove, then insert):
 the second read sees the stale array and duplicates the element. Build the new array, assign once.
 
