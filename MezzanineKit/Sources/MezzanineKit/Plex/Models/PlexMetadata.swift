@@ -27,9 +27,9 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
     public let addedAt: Date?
     public let updatedAt: Date?
     public let lastViewedAt: Date?
-    public let viewCount: Int?
+    public private(set) var viewCount: Int?
     /// Resume position in milliseconds.
-    public let viewOffset: Int?
+    public private(set) var viewOffset: Int?
     public let leafCount: Int?
     public let viewedLeafCount: Int?
     public let childCount: Int?
@@ -81,6 +81,15 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
         default:
             return (viewCount ?? 0) > 0 && (viewOffset ?? 0) == 0
         }
+    }
+
+    /// The same title as it reads once marked watched or unwatched (for showing the change at
+    /// once, before the server's copy arrives). The resume point goes either way, as Plex does.
+    public func markedWatched(_ watched: Bool) -> PlexMetadata {
+        var copy = self
+        copy.viewCount = watched ? max(1, viewCount ?? 0) : 0
+        copy.viewOffset = nil
+        return copy
     }
 
     /// 0…1 progress for a partly watched movie or episode.

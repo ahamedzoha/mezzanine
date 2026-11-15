@@ -147,3 +147,18 @@ import Testing
         #expect(bare.users.first?.protected == true)
     }
 }
+
+@Suite("Watched marks")
+struct WatchedMarkTests {
+    @Test func markingShowsAtOnce() throws {
+        let c = try DecodingTests.container(MetadataContainer.self, "season-episodes")
+        let episode = try #require(c.metadata.first)
+        let watched = episode.markedWatched(true)
+        #expect(watched.isWatched)
+        #expect(watched.progress == nil)
+        let unwatched = watched.markedWatched(false)
+        #expect(!unwatched.isWatched)
+        #expect(unwatched.viewOffset == nil)
+        #expect(watched.ratingKey == episode.ratingKey && watched.title == episode.title)
+    }
+}

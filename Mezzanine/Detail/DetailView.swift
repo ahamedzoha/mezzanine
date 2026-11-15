@@ -326,16 +326,37 @@ struct DetailView: View {
 
     private func toggleWatched(_ target: PlexMetadata) async {
         guard let client = session.client else { return }
+        let watched = !target.isWatched
+        // Show it at once; the server's copy replaces it when it arrives.
+        if let i = episodes.firstIndex(where: { $0.ratingKey == target.ratingKey }) {
+            episodes[i] = episodes[i].markedWatched(watched)
+        } else if target.kind == .show || (target.kind == .season && target.ratingKey == season?.ratingKey) {
+            episodes = episodes.map { $0.markedWatched(watched) }
+        }
+        if item?.ratingKey == target.ratingKey, target.kind == .movie || target.kind == .episode {
+            item = item?.markedWatched(watched)
+        }
+        AccessibilityNotification.Announcement(watched ? "Marked as watched" : "Marked as unwatched").post()
         do {
-            if target.isWatched { try await client.unscrobble(ratingKey: target.ratingKey) }
-            else { try await client.scrobble(ratingKey: target.ratingKey) }
-            await library.syncAll()
-            let fresh = try await client.metadata(route.ratingKey)
-            item = fresh
+            if watched { try await client.scrobble(ratingKey: target.ratingKey) }
+            else { try await client.unscrobble(ratingKey: target.ratingKey) }
+            item = try await client.metadata(route.ratingKey)
+            await refreshSeasons()
             await refreshEpisodes()
+            // Home, the library grids and smart shelves catch up in the background.
+            Task { await library.syncAll() }
         } catch {
+            await refreshEpisodes()
             actionError = (error as? PlexError)?.userMessage ?? "The server didn’t accept the change."
         }
+    }
+
+    /// The season chips' ticks (each season's watched count) after a change.
+    private func refreshSeasons() async {
+        guard let client = session.client, let item, item.kind == .show,
+              let fresh = try? await client.children(item.ratingKey).filter({ $0.kind == .season }) else { return }
+        seasons = fresh
+        if let current = season, let same = fresh.first(where: { $0.ratingKey == current.ratingKey }) { season = same }
     }
 
     // MARK: Keys
