@@ -302,8 +302,8 @@ final class OnDeviceSubtitles {
             modelProgress = 0
             announce("Speech model · Downloading \(name)")
             do {
-                try await SpeechListener.install(locale) { fraction in
-                    Task { @MainActor [weak self] in
+                try await SpeechListener.install(locale) { [weak self] fraction in
+                    Task { @MainActor in
                         guard let self, self.modelProgress != nil else { return }
                         self.modelProgress = min(fraction, 0.99)
                     }
