@@ -3,6 +3,10 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 0.2.1 — 2026-11-15
+
+- The first update delivered by Mezzanine's own updater. Nothing else changes.
+
 ## 0.2.0 — 2026-11-15
 
 - Mezzanine now updates itself: new versions download in the background and install when you
