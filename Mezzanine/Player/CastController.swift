@@ -19,7 +19,17 @@ final class CastController {
     }
 
     private(set) var devices: [CastDevice] = []
-    private(set) var state: State = .idle
+    private(set) var state: State = .idle {
+        didSet {
+            guard state != oldValue else { return }
+            switch state {
+            case .connecting(let name): AccessibilityNotification.Announcement("Connecting to \(name)").post()
+            case .casting(let name): AccessibilityNotification.Announcement("Playing on \(name)").post()
+            case .failed(let message): AccessibilityNotification.Announcement("Couldn’t cast. \(message)").post()
+            case .idle: if case .casting = oldValue { AccessibilityNotification.Announcement("Playing on this Mac").post() }
+            }
+        }
+    }
     private(set) var status: CastSession.Status?
     /// The device the film is on.
     private(set) var device: CastDevice?
@@ -51,6 +61,7 @@ final class CastController {
     /// Where the film was when the cast started (the Mac resumes here if the TV never played).
     @ObservationIgnored private(set) var startPosition: Double = 0
     @ObservationIgnored private var reachedPlay = false
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
     /// This cast asks Plex for H.264 video.
     @ObservationIgnored private var convertsVideo = false
     /// Where the film was when casting stopped (the Mac picks up from here).
@@ -88,13 +99,23 @@ final class CastController {
         let plain = media?.videoCodec?.lowercased() == "h264" && (media?.audioChannels ?? 2) <= 2
         convertsVideo = !plain && UserDefaults.standard.bool(forKey: Self.noHEVCKey(device))
         state = .connecting(device.name)
-        await load(at: position)
+        let task = Task { await load(at: position) }
+        loadTask = task
+        await task.value
+    }
+
+    /// Casts the last title to the last TV again (Try Again after a failure).
+    func retry() async {
+        guard case .failed = state, let device, let client, let item = castItem else { return }
+        await cast(item, mediaIndex: castMediaIndex, at: reachedPlay ? position : startPosition, to: device,
+                   client: client, isLocal: castIsLocal)
     }
 
     private func load(at position: Double) async {
         guard let device, let client, let item = castItem else { return }
         do {
             let token = try await client.transientToken()
+            try Task.checkCancellation()
             // Compatible: Plex converts to H.264 with stereo AAC (no copying of what the TV refused).
             let options = TranscodeOptions(directStream: !convertsVideo, mediaIndex: castMediaIndex, isLocal: castIsLocal)
             let identity = client.identityHeaders
@@ -103,6 +124,7 @@ final class CastController {
                                                          identity: identity, compatible: convertsVideo) {
                 try await client.decideTranscode(decision)
             }
+            try Task.checkCancellation()
             guard let stream = client.urls.castTranscode("start.m3u8", ratingKey: item.ratingKey, options, token: token,
                                                          identity: identity, compatible: convertsVideo)
             else { throw PlexError.notFound }
@@ -117,15 +139,19 @@ final class CastController {
                 session = CastSession(device: device)
                 self.session = session
                 try await session.start()
+                try Task.checkCancellation()
                 follow(session)
             }
             try await session.load(url: stream, contentType: "application/x-mpegURL", title: Format.displayTitle(item),
                                    subtitle: item.kind == .episode ? [Format.episodeCode(item), item.title].compactMap { $0 }.joined(separator: " · ") : nil,
                                    image: image, startTime: position)
+            try Task.checkCancellation()
             state = .casting(device.name)
             #if DEBUG
             print("CAST loaded on \(device.name) video=\(codecs)")
             #endif
+        } catch is CancellationError {
+            // Cancelled while connecting (Cancel, Close, another TV): stop() has tidied up.
         } catch {
             #if DEBUG
             print("CAST failed: \(error)")
@@ -168,6 +194,10 @@ final class CastController {
                     return
                 }
             }
+            // The connection closed without a word (the TV went away, Wi-Fi dropped).
+            if let self, self.session === session, self.isCasting {
+                await self.fail("\(self.device?.name ?? "The TV") disconnected")
+            }
         }
     }
 
@@ -204,24 +234,31 @@ final class CastController {
 
     func seek(to seconds: Double) {
         guard let session else { return }
-        status?.currentTime = max(0, seconds)
+        let seconds = min(max(0, seconds), max(0, (status?.duration ?? .infinity) - 5))
+        status?.currentTime = seconds
         statusAt = Date()
         Task { await session.seek(to: seconds) }
     }
 
     func changeVolume(by delta: Double) {
         guard let session, let level = status?.volume else { return }
-        status?.volume = min(1, max(0, level + delta))
-        Task { await session.setVolume(level + delta) }
+        let target = min(1, max(0, level + delta))
+        status?.volume = target
+        Task { await session.setVolume(target) }
     }
 
     /// Ends the cast: the TV stops, and (with `resume`) the Mac picks up at the TV's position
     /// (or where it left off, if the TV never got going).
     func stop(resume: Bool) async {
-        guard let session else { return }
+        let connecting: Bool
+        if case .connecting = state { connecting = true } else { connecting = false }
+        guard session != nil || connecting else { return }
+        loadTask?.cancel()
+        loadTask = nil
         let at = reachedPlay ? position : startPosition
+        let session = self.session
         self.session = nil
-        await session.stop()
+        await session?.stop()
         endTranscode()
         state = .idle
         status = nil
@@ -246,36 +283,48 @@ final class CastController {
     }
 }
 
-/// The player's Cast button: the TVs on the network, or the one the film is on.
+/// The player's Cast button: where the film plays. "This Mac" and every TV on the network,
+/// the current one checked (as AirPlay's picker does); picking another TV moves the film there.
 struct CastButton: View {
     @Environment(PlaybackCoordinator.self) private var playback
 
     var body: some View {
         let cast = playback.cast
-        if !cast.devices.isEmpty || cast.isCasting {
-            Menu {
-                if cast.isCasting, let device = cast.device {
-                    Button("Stop Casting to \(device.name)") { Task { await playback.stopCasting() } }
-                } else {
-                    Section("Cast to") {
-                        ForEach(cast.devices) { device in
-                            Button(device.name) { Task { await playback.startCasting(to: device) } }
-                        }
-                    }
+        Menu {
+            Section("Play On") {
+                Toggle(isOn: Binding(get: { !cast.isCasting }, set: { on in
+                    if on { Task { await playback.stopCasting() } }
+                })) { Label("This Mac", systemImage: "laptopcomputer") }
+                ForEach(cast.devices) { device in
+                    Toggle(isOn: Binding(get: { cast.isCasting && cast.device == device }, set: { on in
+                        if on { Task { await playback.startCasting(to: device) } }
+                    })) { Label(device.name, systemImage: "tv") }
                 }
-            } label: {
-                Image(systemName: cast.isCasting ? "tv.badge.wifi.fill" : "tv.badge.wifi")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 40, height: 40)
-                    .contentShape(Circle())
             }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
-            .glassEffect(.regular.tint(.black.opacity(0.55)), in: Circle())
-            .help(cast.isCasting ? "Casting to \(cast.device?.name ?? "TV")" : "Cast to a TV")
-            .accessibilityLabel(cast.isCasting ? "Casting to \(cast.device?.name ?? "TV")" : "Cast to a TV")
+            if cast.devices.isEmpty {
+                Text("Looking for TVs… (needs Local Network access in System Settings ▸ Privacy & Security)")
+            }
+        } label: {
+            Image(systemName: cast.isCasting ? "tv.badge.wifi.fill" : "tv.badge.wifi")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .frame(width: 40, height: 40)
+                .contentShape(Circle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .glassEffect(.regular.tint(.black.opacity(0.55)), in: Circle())
+        .help(helpText(cast))
+        .accessibilityLabel("Cast")
+        .accessibilityValue(helpText(cast))
+    }
+
+    private func helpText(_ cast: CastController) -> String {
+        switch cast.state {
+        case .connecting(let name): return "Connecting to \(name)"
+        case .casting(let name): return "Playing on \(name)"
+        default: return "Play on a TV"
         }
     }
 }
@@ -298,11 +347,18 @@ struct CastingPanel: View {
                         ProgressView().controlSize(.small)
                         Text("Connecting to \(name)…").font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink)
                     }
+                    Button("Cancel") { Task { await playback.stopCasting() } }
+                        .buttonStyle(.bordered).controlSize(.large)
                 case .failed(let message):
                     Label(message, systemImage: "exclamationmark.triangle")
                         .font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink)
-                    Button("OK") { cast.clearFailure() }
-                        .buttonStyle(.borderedProminent).tint(Theme.lilac)
+                    HStack(spacing: Theme.Space.s) {
+                        Button("Resume on This Mac") { cast.clearFailure() }
+                            .buttonStyle(.borderedProminent).tint(Theme.lilac)
+                        Button("Try Again") { Task { await cast.retry() } }
+                            .buttonStyle(.bordered)
+                    }
+                    .controlSize(.large)
                 default:
                     Text("Playing on \(cast.device?.name ?? "the TV")")
                         .font(Theme.Typeface.cardMeta.weight(.semibold)).foregroundStyle(Theme.inkSecondary)
@@ -320,10 +376,9 @@ struct CastingPanel: View {
                                 .frame(minWidth: 84)
                         }
                         .buttonStyle(.borderedProminent).tint(Theme.lilac)
-                        .keyboardShortcut(.space, modifiers: [])
                         Button("Stop Casting") { Task { await playback.stopCasting() } }
                             .buttonStyle(.bordered)
-                        Text("Space plays or pauses · ←/→ skip · ↑/↓ TV volume")
+                        Text(keyHint)
                             .font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkTertiary)
                     }
                     .controlSize(.large)
@@ -334,6 +389,13 @@ struct CastingPanel: View {
             .frame(maxWidth: 640, alignment: .leading)
         }
         .accessibilityElement(children: .contain)
+        .accessibilityLabel("Casting to \(cast.device?.name ?? "a TV")")
+    }
+
+    /// The keys as bound now (they're rebindable).
+    private var keyHint: String {
+        let keys = PlayerShortcuts.shared
+        return "\(keys.display(.playPause, separator: "/")) plays or pauses · \(keys.display(.back10, separator: "/")) / \(keys.display(.forward10, separator: "/")) skip · \(keys.display(.volumeUp, separator: "/")) / \(keys.display(.volumeDown, separator: "/")) TV volume"
     }
 
     private func progress(_ cast: CastController) -> some View {
@@ -345,13 +407,19 @@ struct CastingPanel: View {
                     Capsule().fill(Theme.ink.opacity(0.25))
                     Capsule().fill(Theme.ink).frame(width: max(3, geo.size.width * fraction))
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { point in cast.seek(to: duration * Double(point.x / max(1, geo.size.width))) }
             }
-            .frame(width: 420, height: 3)
+            .frame(width: 420, height: 6)
             Text("\(Format.clock(cast.position)) of \(Format.clock(duration))")
                 .font(Theme.Typeface.cardMeta.monospacedDigit()).foregroundStyle(Theme.inkSecondary)
         }
         .padding(.vertical, 6)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(Format.clock(cast.position)) of \(Format.clock(duration))")
+        .accessibilityLabel("Position on the TV")
+        .accessibilityValue("\(Format.clock(cast.position)) of \(Format.clock(duration))")
+        .accessibilityAdjustableAction { direction in
+            cast.seek(by: direction == .increment ? 10 : -10)
+        }
     }
 }

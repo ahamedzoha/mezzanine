@@ -40,6 +40,9 @@ final class AppCommandCenter {
     var mainWindowIsKey = true
     /// A film plays in the corner tile while browsing.
     var hasMiniPlayer = false
+    /// Cast devices on the network (id, name) and the one the film is on, for Playback ▸ Play On.
+    var castTargets: [(id: String, name: String)] = []
+    var castingTo: String?
     /// Home's summary panel is open (View ▸ Show/Hide Details).
     var detailsShown = false
     /// Detail pages pushed over the current section.
@@ -91,7 +94,7 @@ final class AppCommandCenter {
     var isFolderBrowserVisible = false
 
     /// A Playback menu item or key: a rebindable player key, or one of the fixed ones.
-    enum PlayerAction: Equatable { case key(PlayerKey), speed(Double), jump(Int), picture(String), snapshot, close }
+    enum PlayerAction: Equatable { case key(PlayerKey), speed(Double), jump(Int), picture(String), cast(String?), snapshot, close }
     // Player state the Playback menu enables and checks items from.
     var hasActiveMarker = false
     var hasNextEpisode = false
@@ -460,6 +463,14 @@ struct MezzanineCommands: Commands {
                     toggle(.nightMode, isOn: sound.current.profile.nightMode)
                 }
                 Divider()
+                Menu("Play On") {
+                    Toggle("This Mac", isOn: Binding(get: { center.castingTo == nil }, set: { on in if on { center.player(.cast(nil)) } }))
+                    ForEach(center.castTargets, id: \.id) { target in
+                        Toggle(target.name, isOn: Binding(get: { center.castingTo == target.id },
+                                                          set: { on in if on { center.player(.cast(target.id)) } }))
+                    }
+                    if center.castTargets.isEmpty { Text("No TVs found") }
+                }
                 item(.fullScreen)
                 Button(center.hasMiniPlayer ? "Expand Player" : PlayerKey.miniPlayer.menuTitle) { center.player(.key(.miniPlayer)) }
                     // The one player key that stays live in the corner (it grows the tile back).

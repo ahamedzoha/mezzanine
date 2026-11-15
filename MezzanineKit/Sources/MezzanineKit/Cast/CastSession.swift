@@ -138,6 +138,15 @@ public actor CastSession {
                 }
             }
             connection.start(queue: queue)
+            // A TV that's off or gone never answers: give up after ten seconds.
+            let connection = self.connection
+            Task {
+                try? await Task.sleep(for: .seconds(10))
+                box.resume {
+                    connection.cancel()
+                    continuation.resume(throwing: Failure.unreachable)
+                }
+            }
         }
         connection.stateUpdateHandler = { [weak self] state in
             if case .failed = state { Task { await self?.connectionLost() } }

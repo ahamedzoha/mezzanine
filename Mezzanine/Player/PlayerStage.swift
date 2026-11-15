@@ -171,6 +171,12 @@ struct PlayerStage: View {
         .onChange(of: player.rate, initial: true) { _, r in commands.playbackRate = r }
         .modifier(OnDeviceHost(onDevice: playback.onDevice, commands: commands, toast: { showToast($0, long: $1) }))
         .onChange(of: playback.pictureMode, initial: true) { _, m in commands.pictureMode = m.rawValue }
+        .onChange(of: playback.cast.devices.map(\.id), initial: true) { _, _ in
+            commands.castTargets = playback.cast.devices.map { ($0.id, $0.name) }
+        }
+        .onChange(of: playback.cast.isCasting, initial: true) { _, casting in
+            commands.castingTo = casting ? playback.cast.device?.id : nil
+        }
         .onChange(of: upNext) { _, state in
             switch state {
             case .counting(let s) where s == playback.binge.upNextCountdown:
@@ -278,8 +284,10 @@ struct PlayerStage: View {
                         GlassIconButton(symbol: player.isPictureInPicture ? "pip.exit" : "pip.enter",
                                         label: "Picture in Picture", help: PlayerShortcuts.shared.help("Picture in Picture", .pictureInPicture)) { _ = perform(.key(.pictureInPicture)) }
                     }
-                    GlassIconButton(symbol: "rectangle.inset.bottomright.filled", label: "Mini Player",
-                                    help: PlayerShortcuts.shared.help("Mini player: keep browsing", .miniPlayer)) { _ = perform(.key(.miniPlayer)) }
+                    if !playback.cast.isCasting {
+                        GlassIconButton(symbol: "rectangle.inset.bottomright.filled", label: "Mini Player",
+                                        help: PlayerShortcuts.shared.help("Mini player: keep browsing", .miniPlayer)) { _ = perform(.key(.miniPlayer)) }
+                    }
                     GlassIconButton(symbol: "ellipsis", label: "Audio, subtitles, sound and speed",
                                     help: PlayerShortcuts.shared.help("Audio, subtitles, sound, speed", .options)) {
                         setOptions(open: !optionsOpen)
@@ -594,6 +602,12 @@ struct PlayerStage: View {
         switch action {
         case .key(let key): return perform(key)
         case .speed(let rate): setRate(rate)
+        case .cast(let id):
+            if let id, let device = playback.cast.devices.first(where: { $0.id == id }) {
+                Task { await playback.startCasting(to: device) }
+            } else {
+                Task { await playback.stopCasting() }
+            }
         case .picture(let raw):
             guard let mode = PictureMode(rawValue: raw) else { return .ignored }
             withAnimation(Theme.Motion.object(reduceMotion)) { playback.pictureMode = mode }
@@ -613,9 +627,13 @@ struct PlayerStage: View {
         return false
     }
 
-    /// While casting, the transport keys drive the TV.
+    /// While casting, the transport keys drive the TV; after a failed cast, Space resumes here.
     private func performOnTV(_ key: PlayerKey) -> KeyPress.Result? {
         let cast = playback.cast
+        if isCastFailure {
+            if key == .playPause { cast.clearFailure(); return .handled }
+            return key == .options || key == .fullScreen ? nil : .ignored
+        }
         guard cast.isCasting else { return nil }
         switch key {
         case .playPause: cast.togglePlay()
@@ -623,10 +641,13 @@ struct PlayerStage: View {
         case .forward10: cast.seek(by: 10)
         case .back60: cast.seek(by: -60)
         case .forward60: cast.seek(by: 60)
-        case .volumeUp: cast.changeVolume(by: 0.05)
-        case .volumeDown: cast.changeVolume(by: -0.05)
-        case .stats, .options, .fullScreen, .miniPlayer: return nil
-        default: return .ignored
+        case .volumeUp, .volumeDown:
+            cast.changeVolume(by: key == .volumeUp ? 0.05 : -0.05)
+            showToast("TV volume \(Int(((cast.status?.volume ?? 0) * 100).rounded())) %")
+        case .stats, .options, .fullScreen: return nil
+        default:
+            showToast("Not while casting · Stop Casting first")
+            return .handled
         }
         return .handled
     }

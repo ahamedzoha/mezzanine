@@ -57,6 +57,13 @@ struct SettingsView: View {
                             Text("New episodes")
                             Text("A notification when a show you’re watching gets new episodes, while Mezzanine is open.")
                         }
+                        if notifier.enabled && notifier.authorization == .notDetermined {
+                            LabeledContent {
+                                Button("Allow Notifications…") { Task { await notifier.requestIfNeeded() } }
+                            } label: {
+                                Text("Mezzanine hasn’t been allowed to post notifications yet.")
+                            }
+                        }
                         if notifier.enabled && notifier.authorization == .denied {
                             LabeledContent {
                                 Button("Open Notification Settings…") {
@@ -71,6 +78,9 @@ struct SettingsView: View {
                         }
                     }
                     .task { await notifier.refreshStatus() }
+                    .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                        Task { await notifier.refreshStatus() }
+                    }
                     Section("Films") {
                         Toggle("Suggest what to watch next at the credits", isOn: Binding(
                             get: { playback.showsPostPlay }, set: { playback.showsPostPlay = $0 }))

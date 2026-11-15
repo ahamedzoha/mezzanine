@@ -22,7 +22,8 @@ final class PlaybackCoordinator {
 
     /// Shrinks the playing film into the corner tile; browsing comes back around it.
     func shrink() {
-        guard item != nil, !isMini else { return }
+        // The film is on a TV: the remote stays on the full player.
+        guard item != nil, !isMini, !cast.isCasting else { return }
         player.fillsView = false
         withAnimation(Theme.Motion.object) { isMini = true }
     }
@@ -103,8 +104,10 @@ final class PlaybackCoordinator {
     /// Sends the film to a Cast device from where it is; the Mac pauses.
     func startCasting(to device: CastDevice) async {
         guard let item, let client = session.client else { return }
+        // From one TV to another, the film carries on from the TV's position.
+        let at = cast.isCasting ? cast.position : player.currentTime
         player.pause()
-        await cast.cast(item, mediaIndex: mediaIndex, at: player.currentTime, to: device, client: client,
+        await cast.cast(item, mediaIndex: mediaIndex, at: at, to: device, client: client,
                         isLocal: session.connection?.connection.route == .local)
     }
 

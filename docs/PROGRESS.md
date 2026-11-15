@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-11-15 (late) — HIG review fixes: Google Cast, mini player, notifications
+
+- Cast: the button's menu is now a "Play On" picker (This Mac + each TV, current one checked;
+  "Looking for TVs…" names the Local Network permission), mirrored in Playback ▸ Play On.
+  Connecting shows Cancel; a failure offers Resume on This Mac and Try Again (Try Again reuses
+  the remembered stream choice). The position line seeks on click and is adjustable for
+  VoiceOver; state changes are announced; the key hint follows rebinding; keys the TV can't
+  take say so. Seek and volume are clamped; a load replaced by another is cancelled.
+- Mini player: VoiceOver sees one button with the title, state and time, plus Expand/Play/Close
+  actions; buttons stay reachable while hidden; ↑/↓ volume works on the tile; the end of a film
+  is announced. (The tile's body was split: the long chain timed out the type checker.)
+- Notifications: alerts only (no sound); the delegate is set at launch so a click that launched
+  the app opens the show; a click while a film owns the window waits until it closes; while
+  watching they go to Notification Centre without a banner; more than six shows → five and a
+  summary; the checked mark waits while the prompt is unanswered; Settings re-reads the status
+  when the app comes forward and offers Allow Notifications… before the first answer.
+- Checked: build, kit tests (64), mini tile capture, test banner (Archer S14 E9 with poster).
+  No TV cast in this round.
+
 ## 2026-11-15 (night) — search panel, owner's bug reports
 
 - Search: results for an earlier keystroke could land last and replace the newer ones ("south"

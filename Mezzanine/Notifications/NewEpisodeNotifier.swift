@@ -4,8 +4,10 @@ import MezzanineKit
 
 /// "New episode of Severance": after each library sync, shows the profile is watching (an
 /// episode seen in the past year) that gained unwatched episodes since the last check get one
-/// notification each, with the poster. Clicking it opens the show's page. Settings ▸
-/// Playback turns it off. Runs while Mezzanine is open (the sync runs every ten minutes).
+/// notification each, with the poster (more than six at once: five and a summary). Clicking
+/// one opens the show's page, once the library is ready and the film (if one is playing) is
+/// closed. Settings ▸ Playback turns it off. Runs while Mezzanine is open (the sync runs every
+/// ten minutes). While a film owns the window they go quietly to Notification Centre.
 @MainActor @Observable
 final class NewEpisodeNotifier: NSObject, UNUserNotificationCenterDelegate {
     var enabled = UserDefaults.standard.object(forKey: "notifyNewEpisodes") as? Bool ?? true {
@@ -20,6 +22,16 @@ final class NewEpisodeNotifier: NSObject, UNUserNotificationCenterDelegate {
     @ObservationIgnored private weak var session: SessionStore?
     @ObservationIgnored private weak var commands: AppCommandCenter?
     @ObservationIgnored private var started = false
+    /// A clicked notification waiting for the index, or for the film to close.
+    @ObservationIgnored private var pendingShow: String?
+
+    static let maxSingles = 6
+
+    override init() {
+        super.init()
+        // Before the app finishes launching, so a click that launched it still arrives here.
+        UNUserNotificationCenter.current().delegate = self
+    }
 
     func start(library: LibraryStore, session: SessionStore, commands: AppCommandCenter) {
         guard !started else { return }
@@ -27,7 +39,6 @@ final class NewEpisodeNotifier: NSObject, UNUserNotificationCenterDelegate {
         self.library = library
         self.session = session
         self.commands = commands
-        UNUserNotificationCenter.current().delegate = self
         library.onSynced = { [weak self] in Task { await self?.check() } }
         Task {
             await refreshStatus()
@@ -39,10 +50,11 @@ final class NewEpisodeNotifier: NSObject, UNUserNotificationCenterDelegate {
         authorization = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 
-    /// Asks once (the owner agreed to the prompt); never again after an answer.
-    private func requestIfNeeded() async {
+    /// Asks once (the owner agreed to the prompt); never again after an answer. Banners only:
+    /// a new episode isn't worth a sound.
+    func requestIfNeeded() async {
         guard enabled, authorization == .notDetermined else { return }
-        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])
         await refreshStatus()
     }
 
@@ -50,14 +62,33 @@ final class NewEpisodeNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     func check() async {
         guard enabled, let library, let index = library.index, let key = library.indexKey else { return }
+        await refreshStatus()
         let defaultsKey = "newEpisodesCheckedAt.\(key)"
         let last = UserDefaults.standard.double(forKey: defaultsKey)
         let now = Date().timeIntervalSince1970
+        // The first check for a profile only sets the mark: no flood of old arrivals. While the
+        // permission prompt is unanswered the mark stays put, so nothing found meanwhile is lost;
+        // once refused, it moves on (turning them on later doesn't replay months of episodes).
+        if last > 0, authorization == .notDetermined { return }
         UserDefaults.standard.set(now, forKey: defaultsKey)
-        // The first check for a profile only sets the mark: no flood of old arrivals.
         guard last > 0, authorization == .authorized || authorization == .provisional else { return }
         let found = await Task.detached(priority: .utility) { (try? index.newEpisodes(since: last)) ?? [] }.value
-        for (show, episodes) in found.prefix(6) { await post(show: show, episodes: episodes) }
+        guard enabled, library.indexKey == key else { return }
+        let singles = found.count > Self.maxSingles ? Self.maxSingles - 1 : found.count
+        for (show, episodes) in found.prefix(singles) { await post(show: show, episodes: episodes) }
+        let rest = found.dropFirst(singles).map(\.0)
+        if !rest.isEmpty { await postSummary(rest) }
+    }
+
+    /// The overflow: "New episodes of 4 more shows", naming them.
+    private func postSummary(_ shows: [IndexedItem]) async {
+        let content = UNMutableNotificationContent()
+        content.title = "New episodes of \(shows.count) more shows"
+        content.body = ListFormatter.localizedString(byJoining: shows.map(\.title))
+        content.threadIdentifier = "new-episodes"
+        let stamp = Int(Date().timeIntervalSince1970)
+        let request = UNNotificationRequest(identifier: "new-more-\(stamp)", content: content, trigger: nil)
+        try? await UNUserNotificationCenter.current().add(request)
     }
 
     private func post(show: IndexedItem, episodes: [IndexedItem]) async {
@@ -95,20 +126,30 @@ final class NewEpisodeNotifier: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: Delegate
 
+    /// In front: a banner, unless a film owns the window (then straight to Notification Centre).
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async
         -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        let watching = await MainActor.run { commands?.isPlayerOpen ?? false }
+        return watching ? [.list] : [.banner, .list]
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard let key = response.notification.request.content.userInfo["show"] as? String else { return }
-        await MainActor.run { open(showKey: key) }
+        let key = response.notification.request.content.userInfo["show"] as? String
+        await MainActor.run {
+            NSApp.activate()
+            guard let key else { return }
+            pendingShow = key
+            openPending()
+        }
     }
 
-    private func open(showKey: String) {
-        NSApp.activate()
-        guard let library, let commands, let meta = try? library.index?.item(showKey)?.metadata() else { return }
-        if commands.isPlayerOpen { return }
+    /// Opens a clicked show once it can: the index is open and no film owns the window.
+    /// AppShell calls this again when either changes.
+    func openPending() {
+        guard let key = pendingShow, let library, let commands, let index = library.index,
+              !commands.isPlayerOpen else { return }
+        pendingShow = nil
+        guard let meta = try? index.item(key)?.metadata() else { return }
         commands.open(meta)
     }
 
