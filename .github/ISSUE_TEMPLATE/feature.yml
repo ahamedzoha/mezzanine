@@ -1,0 +1,21 @@
+name: Feature idea
+description: Something Mezzanine could do
+labels: [idea]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you want to do
+      description: The situation and what gets in the way today. The "why" helps more than a proposed design.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+  - type: checkboxes
+    id: roadmap
+    attributes:
+      label: Roadmap
+      options:
+        - label: I checked docs/ROADMAP.md and it isn't already planned

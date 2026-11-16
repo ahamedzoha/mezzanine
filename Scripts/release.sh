@@ -48,6 +48,7 @@ fi
 git push --quiet origin main
 git push --quiet origin "v$version"
 if $here; then
+  Scripts/github-release.sh
   echo "Mezzanine $version is out: https://github.com/ahamedzoha/mezzanine-releases/releases/tag/v$version"
 else
   echo "Tagged v$version; CI builds and publishes it: gh run watch \$(gh run list -w Release -L 1 --json databaseId -q '.[0].databaseId')"

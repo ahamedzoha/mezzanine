@@ -1,0 +1,44 @@
+# Builds Mezzanine and runs the core tests on every push to main and every pull request.
+# Unsigned (CODE_SIGNING_ALLOWED=NO): signing only happens in the Release workflow.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**", ".github/ISSUE_TEMPLATE/**"]
+  pull_request:
+    paths-ignore: ["**.md", "docs/**", ".github/ISSUE_TEMPLATE/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: xcode-27
+    timeout-minutes: 40
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            build.noindex/DerivedData/SourcePackages
+            MezzanineKit/.build
+          key: ci-spm-${{ hashFiles('Mezzanine.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'MezzanineKit/Package.resolved') }}
+
+      - name: Core tests
+        working-directory: MezzanineKit
+        run: swift test 2>&1 | tail -n 30
+
+      - name: Build the app
+        run: |
+          xcodebuild -project Mezzanine.xcodeproj -scheme Mezzanine -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath build.noindex/DerivedData \
+            CODE_SIGNING_ALLOWED=NO build -quiet

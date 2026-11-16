@@ -1,0 +1,42 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a show's page
+        2. Switch to season 2
+        3. …
+  - type: input
+    id: version
+    attributes:
+      label: Mezzanine version
+      description: Mezzanine ▸ About Mezzanine, or Settings ▸ Updates.
+      placeholder: 0.2.3 (64)
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and Mac
+      placeholder: macOS 26.1, MacBook Pro M3
+  - type: textarea
+    id: media
+    attributes:
+      label: The file, if it's about playback
+      description: Container, video and audio codecs (the title page's facts line or Plex's Media Info). No links to files, please.
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or a screen recording
+      description: Blur names, server addresses and anything personal.

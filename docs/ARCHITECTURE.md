@@ -481,6 +481,7 @@ Scripts/release.sh x.y.z ─ bump + tag ─▶ CI (Release, xcode-27) ─▶ Scr
    Release build (build number = commit count) ─▶ sign-sparkle.sh ─▶ dmgbuild DMG ─▶ sign_update
    ─▶ Scripts/ci/publish.sh (deploy key) ─▶ mezzanine-releases: staging/ commit
    ─▶ Publish workflow: GitHub Release + releases.json + appcast.xml, history reset to one commit
+   ─▶ Scripts/github-release.sh: the same DMG as a GitHub Release on this repo (downloads)
 App: AppUpdater ─▶ SPUStandardUpdaterController ─▶ raw.githubusercontent.com/…/appcast.xml
    ─▶ DMG from the release ─▶ EdDSA check ─▶ installer XPC service ─▶ installs on quit
 ```

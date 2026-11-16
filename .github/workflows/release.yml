@@ -15,7 +15,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write # the GitHub Release on this repo
 
 concurrency:
   group: release
@@ -80,6 +80,12 @@ jobs:
         env:
           RELEASES_DEPLOY_KEY: ${{ secrets.RELEASES_DEPLOY_KEY }}
         run: Scripts/ci/publish.sh
+
+      - name: GitHub Release
+        if: steps.published.outputs.skip != 'true' && (github.ref_type == 'tag' || inputs.publish)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: Scripts/github-release.sh
 
       - name: Clean up
         if: always() && steps.published.outputs.skip != 'true'

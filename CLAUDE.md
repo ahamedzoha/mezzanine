@@ -32,10 +32,13 @@ Scripts/release.sh 0.3.0 --local          # same, built and published from this 
   (`.github/workflows/release.yml`, runner `xcode-27`, Xcode 27.2) tests, builds, re-signs
   Sparkle's helpers (`Scripts/sign-sparkle.sh`), makes the DMG (`Scripts/build-release.sh`,
   dmgbuild + `Scripts/dmg/`) and stages it in the public `ahamedzoha/mezzanine-releases` repo
-  through a deploy key; that repo's Publish workflow creates the GitHub Release and the appcast
-  entry and resets its history. Installed copies download it and install on quit.
-- CI runs only on tags and "Run workflow" (Mac minutes bill 10× on private repos). Prefer
-  `--local` when iterating on the pipeline.
+  through a deploy key; that repo's Publish workflow creates its Release and the appcast entry and
+  resets its history. The same DMG becomes a GitHub Release on this repo (`Scripts/github-release.sh`),
+  the page people download from. Installed copies download it and install on quit.
+- `CI` (`.github/workflows/ci.yml`) builds unsigned and runs the kit tests on every push and PR
+  (free on a public repo). README screenshots: `Scripts/screenshots/` (capture, then frame; the
+  profile row is blurred).
+- The Release workflow runs on tags and "Run workflow"; `--local` builds on the Mac instead.
 - Build number = `git rev-list --count HEAD` (local installs too), so releases always compare newer.
 - Secrets (private repo): `MAC_CERT_P12`/`MAC_CERT_PASSWORD` (the Apple Development identity,
   expires 2027-08-27: renew, re-export, reset both), `SPARKLE_ED_KEY` (EdDSA private key; the
