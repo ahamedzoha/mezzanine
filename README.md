@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/ahamedzoha/mezzanine/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/ahamedzoha/mezzanine?color=a08cff&label=release"></a>
+  <a href="https://github.com/ahamedzoha/mezzanine/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ahamedzoha/mezzanine/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="macOS 26" src="https://img.shields.io/badge/macOS-26%2B-1a1c20">
   <img alt="Apple silicon" src="https://img.shields.io/badge/Apple%20silicon-arm64-1a1c20">
   <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-f05138">
