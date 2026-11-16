@@ -18,6 +18,27 @@ Open, waiting on the owner:
 - Cast's Connecting/Cancel and failure panels haven't been seen on the TV (only on the Mac).
 - Whether the logo still goes missing in full screen (see the grey-band entry).
 
+Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
+a GitHub Pages website that looks professional and asks for donations.
+
+## 2026-11-16 — Public repository
+
+- Owner asked to make the repo public with screenshots (profile name blurred) and releases.
+- Audit of all 66 commits: no secrets (the one access token in a fixture was always redacted).
+  Personal details were there: design-review captures showing real profiles and the server, and
+  the home public IP, LAN IP, plex.direct id, machine id, server name and domain in fixtures and
+  docs. Owner chose to keep the history but scrub it: `git filter-repo` dropped
+  `.impeccable/review/` from every commit and replaced those strings with neutral values
+  (TEST-NET IP, `plex.example.com`, "Example Plex Server"), commit messages included; tags
+  re-pointed; force-pushed. A bundle of the old history is kept privately on the owner's Mac.
+- Owner-specific notes (server, homelab, casting TV) live in the gitignored `CLAUDE.local.md`;
+  review captures stay local (gitignored); `Scripts/plex.sh` reads `PLEX_SERVER` from the env file.
+- Added: README with framed screenshots (`Scripts/screenshots/`: capture, then frame with the
+  profile row blurred), MIT LICENSE (owner's pick, as Playbill), THIRD-PARTY-NOTICES, CONTRIBUTING,
+  SECURITY, issue templates, CI on push/PR (free once public), GitHub Releases on this repo for
+  every version (`Scripts/github-release.sh`; backfilled 0.2.0–0.2.3). The Sparkle feed stays in
+  `mezzanine-releases`.
+
 ## 2026-11-16 — Continue Watching kept the finished episode (0.2.3)
 
 - Owner: after True Detective E1 ended and E2 autoplayed, closing the player left E1 in Continue
