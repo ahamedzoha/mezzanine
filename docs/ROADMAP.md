@@ -3,7 +3,8 @@
 Written 2026-11-16, after 0.2.3. Nothing here is built yet; the owner picks the order. Status of
 what exists lives in `docs/PROGRESS.md`; the binding look in `DESIGN.md`. Every UI surface below
 still gets an `/impeccable` round before it's built and an `apple:hig-reviewer` pass before it
-ships, and every action gets a menu item and a rebindable key (CLAUDE.md).
+ships, and every action gets a menu item and a rebindable key (CLAUDE.md). Keys named below are
+proposals: check each against the shortcut table (`PlayerShortcuts`, `AppCommands`) when built.
 
 The owner's stack: Plex, Tautulli, Playbill (`~/Code/playbill`, the owner's own), Seerr (formerly
 Jellyseerr), Sonarr, Radarr, Bazarr, Kometa, qBittorrent, Prowlarr. Mezzanine must stay a
@@ -224,8 +225,8 @@ client (recorded JSON under `MezzanineKit/Tests/Fixtures/Services/`).
 - **Search finds what you don't have:** the search panel and See All grid gain a section "Not on
   the server" (from Seerr's search: posters, year, overview), below on-server results. Without Seerr
   the section is filled by Plex Discover search and offers only Add to Watchlist.
-- **Request** (lilac primary on those cards and pages; Item ▸ Request…, ⌘R is taken by Read
-  Library Again in libraries, so ⌥⌘R): films request in one step; shows open a sheet to pick
+- **Request** (lilac primary on those cards and pages; Item ▸ Request…, proposed ⌘R): films
+  request in one step; shows open a sheet to pick
   seasons (All, latest, specific), showing which seasons are already on the server. Respect the
   person's Seerr permissions and quota (`/api/v1/auth/me` → permissions, quota left), and show
   "Needs approval" when auto-approve is off.

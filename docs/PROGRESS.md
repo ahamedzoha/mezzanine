@@ -5,7 +5,9 @@
 Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
 picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
 watch, and distribution: Sparkle updates, the DMG installer and release CI (see below).
-Ship with `Scripts/release.sh <x.y.z>` (CLAUDE.md ▸ Releases and updates).
+Ship with `Scripts/release.sh <x.y.z>` (CLAUDE.md ▸ Releases and updates). Next features:
+`docs/ROADMAP.md` (Plex-only features first, then optional Seerr, Sonarr/Radarr, Bazarr,
+Tautulli and Playbill integrations); the owner picks the order.
 
 Open, waiting on the owner:
 - API work, deferred by the owner: OpenSubtitles and Subdl keys (Find Subtitles skips those two

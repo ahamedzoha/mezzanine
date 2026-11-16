@@ -1,7 +1,8 @@
 # Mezzanine — notes for agents
 
 Private native macOS 26 client for the owner's Plex Media Server (replaces Infuse). Read
-`docs/PROGRESS.md` first (status and open items), then the approved plan
+`docs/PROGRESS.md` first (status and open items), `docs/ROADMAP.md` for what's next (optional
+service integrations; Plex alone must stay a complete app), then the approved plan
 `~/.claude/plans/eventual-plotting-storm.md`, `docs/ARCHITECTURE.md`,
 `PRODUCT.md`, `DESIGN.md`.
 
