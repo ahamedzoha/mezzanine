@@ -185,15 +185,33 @@ final class LibraryStore {
         return "\(f(films)) \(noun)"
     }
 
-    /// Applies a finished playback session to the index (resume point, or watched past 90 %).
+    /// Playbacks that stopped in the last two minutes, for Home's Continue Watching while Plex
+    /// catches up (`ContinueWatching`).
+    private(set) var recentStops: [PlaybackStop] = []
+
+    /// Applies a finished playback session to the index (resume point, or watched past 90 %),
+    /// and has Home read Plex again now and once more a few seconds later, when Plex has
+    /// processed the last reports.
     func recordStop(_ item: PlexMetadata, at time: TimeInterval, duration: TimeInterval) {
-        guard let index, duration > 0 else { return }
-        let watched = time / duration >= 0.9
-        try? index.updateProgress(ratingKey: item.ratingKey,
-                                  viewOffset: watched ? 0 : Int(time * 1000),
-                                  viewCount: watched ? (item.viewCount ?? 0) + 1 : nil)
+        guard duration > 0 else { return }
+        let now = Date()
+        recentStops = recentStops.filter { now.timeIntervalSince($0.at) < ContinueWatching.window }
+            + [PlaybackStop(item: item, time: time, duration: duration, at: now)]
+        if let index {
+            let watched = time / duration >= 0.9
+            try? index.updateProgress(ratingKey: item.ratingKey,
+                                      viewOffset: watched ? 0 : Int(time * 1000),
+                                      viewCount: watched ? (item.viewCount ?? 0) + 1 : nil)
+        }
         revision += 1
+        followUp?.cancel()
+        followUp = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled else { return }
+            self?.revision += 1
+        }
     }
+    @ObservationIgnored private var followUp: Task<Void, Never>?
 
     // MARK: Posters
 

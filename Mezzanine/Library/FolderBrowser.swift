@@ -41,10 +41,10 @@ struct FolderBrowser: View {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         if let listing {
                             ForEach(Array(listing.folders.enumerated()), id: \.element.id) { i, folder in
-                                folderRow(folder, index: i).id(i)
+                                folderRow(folder, index: i)
                             }
                             ForEach(Array(listing.items.enumerated()), id: \.element.ratingKey) { j, item in
-                                lessonRow(item, index: listing.folders.count + j).id(listing.folders.count + j)
+                                lessonRow(item, index: listing.folders.count + j)
                             }
                         }
                     }
@@ -56,8 +56,12 @@ struct FolderBrowser: View {
                     .opacity(loading ? 0.5 : 1)
                 }
                 .onChange(of: focused) { _, i in
-                    guard let i else { return }
-                    withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo(i) }
+                    guard let i, let listing else { return }
+                    // Rows are identified by folder id / item key (the ForEach ids), not position.
+                    let id: AnyHashable? = i < listing.folders.count ? AnyHashable(listing.folders[i].id)
+                        : listing.items.indices.contains(i - listing.folders.count) ? AnyHashable(listing.items[i - listing.folders.count].ratingKey) : nil
+                    guard let id else { return }
+                    withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo(id) }
                 }
             }
         }

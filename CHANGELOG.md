@@ -3,6 +3,14 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 0.2.3 — 2026-11-16
+
+- Continue Watching shows the episode you stopped on as soon as you close the player. After an
+  episode ended and the next one played, the row could keep the earlier episode until a restart.
+- Rows on Home and in libraries always redraw in the right order after they refresh.
+- The episode that just ended is marked watched in the library right away when the next one
+  starts, not only when the player closes.
+
 ## 0.2.2 — 2026-11-15
 
 - Fixed: switching seasons on a show's page now shows that season's episodes. Before, some rows

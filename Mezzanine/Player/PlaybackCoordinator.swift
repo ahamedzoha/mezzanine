@@ -216,9 +216,15 @@ final class PlaybackCoordinator {
             }
             self.origin = origin
             let previous = (show: self.item?.grandparentRatingKey, generating: onDevice.showsGenerated)
+            // What was playing (the episode that just ended, before Up Next): its final report,
+            // and the same bookkeeping a close does, so the index and Home know it's done.
+            let stopped = self.item.map { (item: $0, time: stopTime, duration: player.duration) }
             onDevice.end()
             withAnimation(Theme.Motion.object) { self.item = detail }
-            if let reporter { await reporter.stop(at: player.currentTime, duration: player.duration) }
+            if let reporter { await reporter.stop(at: stopped?.time, duration: stopped?.duration) }
+            if let stopped, stopped.item.ratingKey != detail.ratingKey {
+                onStopped?(stopped.item, stopped.time, stopped.duration)
+            }
             guard generation == requestGeneration else { return }
             let start = detail.viewOffset.map { Double($0) / 1000 }
             fallbackNotice = nil
@@ -463,13 +469,19 @@ final class PlaybackCoordinator {
         Task { try? await client.setStreams(partID: partID, audioStreamID: audio, subtitleStreamID: subtitle) }
     }
 
+    /// Where playback stopped, for reports: an item that played to its end counts as its full
+    /// length (the engine's clock may already have moved off the end).
+    private var stopTime: TimeInterval {
+        player.status == .ended && player.duration > 0 ? player.duration : player.currentTime
+    }
+
     func close() {
         requestGeneration += 1
         isMini = false
         // Closing the player while casting stops the TV too.
         if cast.isCasting { Task { await cast.stop(resume: false) } }
         let item = self.item
-        let time = player.currentTime, duration = player.duration
+        let time = stopTime, duration = player.duration
         let reporter = self.reporter
         self.reporter = nil
         // Played offline: nothing could reach Plex; keep the position to send later.

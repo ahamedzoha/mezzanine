@@ -16,6 +16,22 @@ Open, waiting on the owner:
 - Cast's Connecting/Cancel and failure panels haven't been seen on the TV (only on the Mac).
 - Whether the logo still goes missing in full screen (see the grey-band entry).
 
+## 2026-11-16 — Continue Watching kept the finished episode (0.2.3)
+
+- Owner: after True Detective E1 ended and E2 autoplayed, closing the player left E1 in Continue
+  Watching until a restart. The server was right (Plex DB: E1 scrobbled 12:18:32, E2 stopped at
+  7:06 at 12:21:12) and Home did reload after the close (logged), but every poster row used
+  `.id(column)` for ScrollViewReader, which overrode the item key: when a reload reordered the
+  row, the old cards stayed on screen (the hero, read straight from the model, was already right).
+  Rows now keep the item key and scroll by it (Home shelves, the three library layouts, Courses).
+- Hardening: Home lays the last two minutes of local stops over Plex's continue rows
+  (`ContinueWatching`, unit-tested) and reads Plex again six seconds after a stop, in case Plex
+  answers before it has processed the last report; the episode that ends before Up Next is now
+  recorded in the index when the next one starts (it was only recorded on close), with an ended
+  item counted at its full length.
+- Verified in a Debug run (no activity sent): Rick and Morty S1E2 ended, S1E3 autoplayed, close:
+  the row leads with S1E3 and S1E2 is gone; keyboard focus still scrolls the row.
+
 ## 2026-11-15 (night, late) — auto-updates, installer, release CI
 
 - Sparkle 2.10.1 (Release builds only): feed and DMGs in the public `ahamedzoha/mezzanine-releases`

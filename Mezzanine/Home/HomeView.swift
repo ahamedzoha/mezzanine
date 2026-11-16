@@ -74,7 +74,7 @@ struct HomeView: View {
             // A shelf just added has nothing resolved yet: fetch its posters for the strip's peek.
             if let client = session.client {
                 for spec in specs where model.resolved[spec.id] == nil {
-                    Task { await model.refresh(spec, client: client, index: library.index) }
+                    Task { await model.refresh(spec, client: client, index: library.index, stops: library.recentStops) }
                 }
             }
             // Save as the edit happens (debounced), so a quit mid-edit keeps it.
@@ -105,7 +105,7 @@ struct HomeView: View {
             SmartShelfSheet(existing: target.spec, scope: scope, sections: commands.sections) { spec in
                 if let i = editSpecs.firstIndex(where: { $0.id == spec.id }) {
                     editSpecs[i] = spec
-                    if let client = session.client { Task { await model.refresh(spec, client: client, index: library.index) } }
+                    if let client = session.client { Task { await model.refresh(spec, client: client, index: library.index, stops: library.recentStops) } }
                 } else {
                     editSpecs.append(spec)
                 }
@@ -303,12 +303,13 @@ struct HomeView: View {
             guard !Task.isCancelled else { return }
         }
         let saved = layouts.saved(scope)
-        await model.load(scope: scope, saved: saved, client: client, index: library.index)
+        await model.load(scope: scope, saved: saved, client: client, index: library.index, stops: library.recentStops)
         // A newer load (the layout changed) supersedes this one.
         guard !Task.isCancelled else { return }
         loadedSaved = .some(saved)
         #if DEBUG
         PerfLog.mark("home loaded (\(model.shelves.count) shelves)")
+        print("HOME row0 \(model.shelves.first?.items.prefix(5).map(\.ratingKey) ?? []) stops \(library.recentStops.map { "\($0.item.ratingKey)@\(Int($0.time))\($0.finished ? "✓" : "")" })")
         #endif
         if editing { return }
         if !editing { updateRoom() }

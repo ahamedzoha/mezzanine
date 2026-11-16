@@ -36,7 +36,8 @@ struct ShelfView: View {
                                        onOpen: { (onOpen ?? commands.open)(item) },
                                        // Under Reduce Motion the fold is a plain crossfade: nothing flies.
                                        fold: column < 5 && !reduceMotion ? fold.map { FoldID(id: "\(shelf.id)-\(column)", namespace: $0) } : nil)
-                                .id(column)
+                            // No `.id(column)`: a position as identity kept the old cards on screen
+                            // when a reload reordered the row (Continue Watching after a stop).
                         }
                     }
                     .padding(.horizontal, Theme.Space.gutter)
@@ -46,8 +47,8 @@ struct ShelfView: View {
                 .scrollIndicators(.never)
                 .scrollClipDisabled()
                 .onChange(of: focusedColumn) { _, column in
-                    guard let column, scrollsToFocus else { return }
-                    withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo(column) }
+                    guard let column, scrollsToFocus, shelf.items.indices.contains(column) else { return }
+                    withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo(shelf.items[column].ratingKey) }
                 }
             }
             .padding(.vertical, -Theme.Space.m)

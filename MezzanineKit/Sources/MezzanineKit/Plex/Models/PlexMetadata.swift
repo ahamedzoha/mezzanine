@@ -92,6 +92,13 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
         return copy
     }
 
+    /// The same title with a new resume point (a stop the server hasn't reflected yet).
+    public func resumed(atMilliseconds offset: Int) -> PlexMetadata {
+        var copy = self
+        copy.viewOffset = offset
+        return copy
+    }
+
     /// 0…1 progress for a partly watched movie or episode.
     public var progress: Double? {
         guard let viewOffset, viewOffset > 0, let duration, duration > 0 else { return nil }

@@ -125,8 +125,10 @@ struct LibraryView: View {
                         }
                     }
                     .onChange(of: focused) { _, index in
-                        guard let index, keyboardMoved else { return }
-                        withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo(index) }
+                        // Scroll by the title's key: cards are identified by key, never by position
+                        // (a position as identity kept stale cards on screen after a reorder).
+                        guard let index, keyboardMoved, items.indices.contains(index) else { return }
+                        withAnimation(Theme.Motion.object(reduceMotion)) { proxy.scrollTo(items[index].ratingKey) }
                     }
                 }
                 .onChange(of: geo.size.width, initial: true) { _, w in columns = columnCount(w) }
@@ -458,7 +460,6 @@ struct PosterGrid: View {
                   alignment: .leading, spacing: Theme.Space.xl) {
             ForEach(Array(items.enumerated()), id: \.element.ratingKey) { index, item in
                 GridPoster(item: item, isFocused: focused == index, index: index, actions: actions)
-                    .id(index)
             }
         }
         .padding(.horizontal, Theme.Space.gutter)
@@ -478,7 +479,6 @@ private struct WideGrid: View {
                   alignment: .leading, spacing: Theme.Space.xl) {
             ForEach(Array(items.enumerated()), id: \.element.ratingKey) { index, item in
                 WideCard(item: item, isFocused: focused == index, index: index, actions: actions)
-                    .id(index)
             }
         }
         .padding(.horizontal, Theme.Space.gutter)
@@ -581,7 +581,6 @@ private struct TitleList: View {
             .accessibilityHidden(true)
             ForEach(Array(items.enumerated()), id: \.element.ratingKey) { index, item in
                 TitleRow(item: item, isFocused: focused == index, index: index, actions: actions)
-                    .id(index)
             }
         }
         .padding(.horizontal, Theme.Space.gutter - Theme.Space.m)

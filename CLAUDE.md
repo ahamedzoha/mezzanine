@@ -122,6 +122,10 @@ Async loads that fill a list (search, season episodes, folders) must drop their 
 newer request started (`Task.isCancelled` or compare the request after the await): three bugs came
 from a slower, older answer landing last.
 
+SwiftUI gotcha: never give ForEach rows a position as identity (`.id(column)` for ScrollViewReader):
+it overrides the item key, and after a reload reorders the list the old cards stay on screen (Continue
+Watching kept the finished episode until a restart). Scroll with the item key (`proxy.scrollTo(item.ratingKey)`).
+
 SwiftUI gotcha: never mutate a `@Binding` array twice in one transaction (remove, then insert):
 the second read sees the stale array and duplicates the element. Build the new array, assign once.
 
