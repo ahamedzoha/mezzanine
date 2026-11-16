@@ -167,11 +167,12 @@ final class PlaybackCoordinator {
 
     /// Plays a movie or episode (resuming), or the next unwatched episode of
     /// a season or show.
-    func play(_ item: PlexMetadata, from origin: CGRect?, mediaIndex: Int = 0) async {
+    /// `startAt` plays from that time instead of the resume point (a Plex app asking for a time).
+    func play(_ item: PlexMetadata, from origin: CGRect?, mediaIndex: Int = 0, startAt: TimeInterval? = nil) async {
         self.mediaIndex = mediaIndex
         // Choosing a title to play opens the full player, even from the corner tile.
         if isMini { isMini = false }
-        await play(item, from: origin, autoplayed: false)
+        await play(item, from: origin, autoplayed: false, startAt: startAt)
     }
 
     /// Starts the next episode (Up Next, or N while playing).
@@ -190,7 +191,7 @@ final class PlaybackCoordinator {
     /// title up stops at the next check instead of loading over the newer one.
     @ObservationIgnored private var requestGeneration = 0
 
-    private func play(_ item: PlexMetadata, from origin: CGRect?, autoplayed: Bool) async {
+    private func play(_ item: PlexMetadata, from origin: CGRect?, autoplayed: Bool, startAt: TimeInterval? = nil) async {
         #if DEBUG
         PerfLog.mark("play requested \(item.ratingKey) autoplayed=\(autoplayed)")
         #endif
@@ -226,7 +227,7 @@ final class PlaybackCoordinator {
                 onStopped?(stopped.item, stopped.time, stopped.duration)
             }
             guard generation == requestGeneration else { return }
-            let start = detail.viewOffset.map { Double($0) / 1000 }
+            let start = startAt ?? detail.viewOffset.map { Double($0) / 1000 }
             fallbackNotice = nil
             // Direct play first; if the file won't open, let Plex remux it, then convert it.
             var lastError: Error?

@@ -27,6 +27,7 @@ struct MezzanineApp: App {
     @State private var library = LibraryStore()
     @State private var notifier = NewEpisodeNotifier()
     @State private var updater = AppUpdater()
+    @State private var remote = RemoteControl()
     @State private var layouts = HomeLayoutStore()
     @State private var downloads = DownloadStore()
     @State private var sound: SoundSettings
@@ -61,6 +62,7 @@ struct MezzanineApp: App {
                 .environment(subtitleFinder)
                 .environment(notifier)
                 .environment(updater)
+                .environment(remote)
                 .task {
                     playback.downloads = downloads
                     updater.isWatching = { [playback] in playback.item != nil }
@@ -70,7 +72,9 @@ struct MezzanineApp: App {
                         Task { try? await Task.sleep(for: .seconds(8)); await notifier.postTest() }
                     }
                     #endif
-                    appDelegate.beforeQuit = { [playback, downloads] in
+                    remote.start(playback: playback, session: session)
+                    appDelegate.beforeQuit = { [playback, downloads, remote] in
+                        remote.stop()
                         await playback.finishForQuit()
                         await downloads.suspendForQuit()
                     }
@@ -98,6 +102,7 @@ struct MezzanineApp: App {
                 .environment(subtitleSources)
                 .environment(notifier)
                 .environment(updater)
+                .environment(remote)
         }
 
         Window("Keyboard Shortcuts", id: "shortcuts") {

@@ -21,6 +21,23 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
+## 2026-11-16 — Phone as a remote: Plex Companion (0.3.0)
+
+- Owner asked for the remote spike first (ROADMAP 3.7). Research (plex-mpv-shim, Music Assistant's
+  Plex Connect, the Plex wiki): players advertise over GDM (UDP 32412, 239.0.0.250; HELLO/BYE to
+  32413) and serve `/resources`, `/player/playback/*` and `/player/timeline/*` over HTTP; controllers
+  send commands directly to the player and get timelines POSTed to their `/:/timeline`.
+- Built `MezzanineKit/Companion/` (GDM over BSD sockets: NWConnectionGroup would need the multicast
+  entitlement; a minimal HTTP/1.1 server on NWListener; the protocol actor with subscribers and
+  timelines; 7 unit tests) and `RemoteControl` in the app (commands to the player and coordinator,
+  which gained a start time for "play from"). Settings ▸ Playback switch, on by default.
+- Verified: GDM replies; the PMS searches every few seconds and lists "<the Mac's name> (Debug)"
+  at `/clients` (port 32500); `Scripts/companion-check.py` (a scripted controller) played The Wild
+  Robot from 10:00, paused, seeked to 20:00, resumed, polled and stopped, with 26 timelines in the
+  right states and command ids.
+- Not yet tried from the iPhone app: this Mac is on the 5 GHz Wi-Fi, which isolates wireless
+  clients, so the phone can't reach it until isolation is off or one side moves (2.4 GHz, wired).
+
 ## 2026-11-16 — Public repository
 
 - Owner asked to make the repo public with screenshots (profile name blurred) and releases.

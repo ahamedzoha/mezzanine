@@ -439,6 +439,14 @@ Keychain from the `MEZZANINE_DEV_TOKEN` environment variable when no token exist
   `SUEnableInstallerLauncherService`, the `-spks`/`-spki` mach-lookup exceptions, and Sparkle's
   helpers re-signed with our identity (`Scripts/sign-sparkle.sh`; Xcode leaves them ad-hoc). The
   `SUPublicEDKey` must match the Keychain key (account `mezzanine`) and the CI secret.
+- **Plex Companion (remote control).** `MezzanineKit/Companion/`: `CompanionGDM` (UDP 32412, group
+  239.0.0.250; HELLO/BYE to 32413), `CompanionHTTPServer` (one request per connection, port 32500 or
+  any free one), `CompanionService` (routes `/resources`, `/player/playback/*`, `/player/timeline/*`,
+  keeps subscribers, pushes timelines to `<controller>/:/timeline`). App side: `RemoteControl`
+  (commands to `PlaybackCoordinator`/`MezzaninePlayer`, the timeline from them). Controllers talk to
+  the player directly (the PMS only lists it at `/clients`), so Wi-Fi client isolation breaks it.
+  Like other Plex players there is no request auth; callbacks go only to the requesting address and
+  `playMedia` only plays the signed-in server's titles.
 - **Full-screen title strip.** AppKit keeps the title bar in a separate window as an opaque band.
   `WindowChrome` hides it while the player owns the window; verify with full-display captures
   (`screencapture -D 1`), not window captures.

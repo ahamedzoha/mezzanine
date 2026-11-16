@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(NewEpisodeNotifier.self) private var notifier
     @Environment(AppUpdater.self) private var updater
+    @Environment(RemoteControl.self) private var remote
     @State private var confirmSignOut = false
     @AppStorage("settingsTab") private var tab = "account"
 
@@ -79,6 +80,18 @@ struct SettingsView: View {
                         }
                     }
                     .task { await notifier.refreshStatus() }
+                    Section {
+                        @Bindable var remote = remote
+                        Toggle(isOn: $remote.enabled) {
+                            Text("Plex apps can control Mezzanine")
+                            Text("The Plex app on your phone and Plex Web list “\(remote.name)” as a player on this network: pick it to play here, then pause, seek and skip from the phone.")
+                        }
+                        if let problem = remote.problem {
+                            Label(problem, systemImage: "exclamationmark.triangle")
+                        } else if remote.enabled, let controller = remote.lastController {
+                            LabeledContent("Last controlled by", value: controller)
+                        }
+                    }
                     .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                         Task { await notifier.refreshStatus() }
                     }

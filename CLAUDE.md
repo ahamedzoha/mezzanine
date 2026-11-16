@@ -126,6 +126,13 @@ Async loads that fill a list (search, season episodes, folders) must drop their 
 newer request started (`Task.isCancelled` or compare the request after the await): three bugs came
 from a slower, older answer landing last.
 
+Remote control (Plex Companion): `MezzanineKit/Companion/`, app side `Mezzanine/Remote/RemoteControl.swift`.
+Debug builds print `REMOTE …` (searches, commands). Check it without a phone: run the Debug build
+(`-MezzanineNoActivity YES`), then `Scripts/companion-check.py $(Scripts/plex.sh pms /identity | jq -r .MediaContainer.machineIdentifier)`
+(GDM search, resources, subscribe, play/pause/seek/stop); the server lists the player at
+`Scripts/plex.sh pms /clients`. A phone can only control it when the two can reach each other
+(the owner's 5 GHz Wi-Fi isolates wireless clients: `CLAUDE.local.md`).
+
 SwiftUI gotcha: never give ForEach rows a position as identity (`.id(column)` for ScrollViewReader):
 it overrides the item key, and after a reload reorders the list the old cards stay on screen (Continue
 Watching kept the finished episode until a restart). Scroll with the item key (`proxy.scrollTo(item.ratingKey)`).

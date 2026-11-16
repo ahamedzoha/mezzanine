@@ -3,6 +3,13 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 0.3.0 — 2026-11-16
+
+- Control Mezzanine from the Plex app on your phone or from Plex Web: Mezzanine shows up as a
+  player on your network. Pick it to play a title on the Mac, then pause, seek, skip and change
+  audio or subtitles from the phone. Settings ▸ Playback has the switch. The phone and the Mac
+  need to reach each other on the network (some routers keep Wi-Fi devices apart).
+
 ## 0.2.3 — 2026-11-16
 
 - Continue Watching shows the episode you stopped on as soon as you close the player. After an
