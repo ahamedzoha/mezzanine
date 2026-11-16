@@ -86,6 +86,25 @@ struct SettingsView: View {
                             Text("Plex apps can control Mezzanine")
                             Text("The Plex app on your phone and Plex Web list “\(remote.name)” as a player on this network: pick it to play here, then pause, seek and skip from the phone.")
                         }
+                        if remote.enabled {
+                            LabeledContent {
+                                if remote.isListed {
+                                    Label("Listed", systemImage: "checkmark.circle.fill").labelStyle(.titleAndIcon)
+                                } else if remote.isLinking {
+                                    HStack(spacing: 8) {
+                                        ProgressView().controlSize(.small)
+                                        Button("Cancel") { remote.cancelLinking() }
+                                    }
+                                } else {
+                                    Button("Show in Plex Apps…") { remote.showInPlexApps() }
+                                }
+                            } label: {
+                                Text("Plex mobile apps")
+                                Text(remote.isLinking
+                                     ? "Approve Mezzanine on the Plex page in your browser."
+                                     : "The iPhone and Android apps only list players on your Plex account. You approve Mezzanine once, in the browser.")
+                            }
+                        }
                         if let problem = remote.problem {
                             Label(problem, systemImage: "exclamationmark.triangle")
                         } else if remote.enabled, let controller = remote.lastController {

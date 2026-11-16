@@ -3,6 +3,12 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 0.3.1 — 2026-11-16
+
+- The Plex iPhone and Android apps only list players on your Plex account. Settings ▸ Playback ▸
+  Plex mobile apps ▸ Show in Plex Apps… opens Plex's page in your browser; approve Mezzanine
+  once and it appears in the apps' cast list from then on.
+
 ## 0.3.0 — 2026-11-16
 
 - Control Mezzanine from the Plex app on your phone or from Plex Web: Mezzanine shows up as a

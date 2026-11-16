@@ -201,9 +201,11 @@ Already built: per-show **Keep Downloaded** (next 1/3/5/10 unwatched, watched on
 
 **Spike result:** works. Mezzanine answers GDM, the server lists it at `/clients`, and a scripted
 controller started a title at 10:00, paused, seeked, resumed and stopped it with timelines pushed
-every second (`Scripts/companion-check.py`). Still to do: confirm the Plex iPhone app lists and
-drives it (owner, once the phone can reach the Mac); plex.tv registration (`provides=player`) if the
-app only lists registered players; Plex Web (CORS preflight); play queues (`containerKey`) so the
+every second (`Scripts/companion-check.py`). The iPhone app showed "No devices found" until Pi-hole
+allowed `config.claspws.tv`, then listed only the Google TV: it lists players from the account's
+plex.tv devices only. 0.3.1 adds owner-approved registration (PIN, `provides=client,player,
+pubsub-player`, then the LAN address on `PUT /devices/<id>`). Still to do: confirm the app lists and
+drives it; Plex Web (CORS preflight); play queues (`containerKey`) so the
 phone's Up Next follows; titles from other servers; request auth if wanted (other players have
 none); couch mode.
 

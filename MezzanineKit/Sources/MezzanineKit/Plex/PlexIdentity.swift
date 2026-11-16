@@ -13,6 +13,9 @@ public struct PlexIdentity: Sendable, Equatable {
     public var platform: String
     public var platformVersion: String
     public var device: String
+    /// What plex.tv records this client as (`player`; the remote-control registration adds
+    /// `client,player,pubsub-player`).
+    public var provides: String = "player"
 
     public init(clientIdentifier: String,
                 product: String = "Mezzanine",
@@ -41,7 +44,7 @@ public struct PlexIdentity: Sendable, Equatable {
             "X-Plex-Platform": platform,
             "X-Plex-Platform-Version": platformVersion,
             "X-Plex-Device": device,
-            "X-Plex-Provides": "player",
+            "X-Plex-Provides": provides,
         ]
     }
 }

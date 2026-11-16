@@ -35,8 +35,13 @@ a GitHub Pages website that looks professional and asks for donations.
   at `/clients` (port 32500); `Scripts/companion-check.py` (a scripted controller) played The Wild
   Robot from 10:00, paused, seeked to 20:00, resumed, polled and stopped, with 26 timelines in the
   right states and command ids.
-- Not yet tried from the iPhone app: this Mac is on the 5 GHz Wi-Fi, which isolates wireless
-  clients, so the phone can't reach it until isolation is off or one side moves (2.4 GHz, wired).
+- From the iPhone (on the 2.4 GHz network): "No devices found" was Pi-hole blocking
+  `config.claspws.tv` (allowlisted with the owner's OK); then the cast sheet listed only the Google
+  TV: the Plex mobile apps list players from plex.tv's device list (the iPhone's own entry has
+  `provides=…player,pubsub-player` and its LAN address), never from GDM. Silently linking a player
+  with the account token was refused by the safety check (it would authorize a device without the
+  owner), so 0.3.1 asks: Settings ▸ Playback ▸ Show in Plex Apps… opens Plex's approval page; once
+  approved, every launch publishes the LAN address (`CompanionRegistration`).
 
 ## 2026-11-16 — Public repository
 

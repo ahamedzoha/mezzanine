@@ -96,10 +96,99 @@ final class RemoteControl: CompanionPlayer {
             #if DEBUG
             print("REMOTE listening on \(port) as \(shown)")
             #endif
+            await registerOnPlexTV(port: port)
         } catch {
             http.stop()
             problem = "Couldn’t listen for Plex apps (\(error))."
         }
+    }
+
+    // MARK: plex.tv
+
+    @ObservationIgnored private let keychain = Keychain(service: (Bundle.main.bundleIdentifier ?? "com.mezzanine.mac") + ".remote",
+                                                       label: "Mezzanine — remote control")
+    /// Approved on plex.tv, so the Plex mobile apps list it.
+    private(set) var isListed = false
+    /// Waiting for the owner to approve in the browser.
+    private(set) var isLinking = false
+    @ObservationIgnored private var linkTask: Task<Void, Never>?
+    @ObservationIgnored private var listeningPort: UInt16 = 0
+
+    /// The Plex mobile apps list only players on the account's plex.tv device list, with an
+    /// address. Once the owner has approved Mezzanine (`showInPlexApps`), every start publishes
+    /// the Mac's current LAN addresses.
+    private func registerOnPlexTV(port: UInt16) async {
+        listeningPort = port
+        guard let session, let token = keychain.read("playerToken") else { isListed = false; return }
+        do {
+            try await CompanionRegistration(identity: session.identity).publish(connections: Self.connections(port), token: token)
+            isListed = true
+            #if DEBUG
+            print("REMOTE published on plex.tv: \(Self.connections(port).map(\.absoluteString))")
+            #endif
+        } catch {
+            // Removed on plex.tv (Authorized Devices) or the token was revoked: ask again.
+            keychain.delete("playerToken")
+            isListed = false
+            #if DEBUG
+            print("REMOTE plex.tv publish failed: \(error)")
+            #endif
+        }
+    }
+
+    /// Settings ▸ Show in the Plex Mobile Apps…: opens Plex's approval page for this player
+    /// (the owner clicks Allow, as when signing in), then publishes the Mac's address.
+    func showInPlexApps() {
+        guard let session, !isLinking else { return }
+        let registration = CompanionRegistration(identity: session.identity)
+        isLinking = true
+        problem = nil
+        linkTask = Task {
+            defer { isLinking = false }
+            do {
+                let (pin, url) = try await registration.beginLink()
+                NSWorkspace.shared.open(url)
+                let token = try await registration.finishLink(pin)
+                try? keychain.write(token, for: "playerToken")
+                if listeningPort > 0 { await registerOnPlexTV(port: listeningPort) }
+                if !isListed { problem = "Approved, but plex.tv didn’t take Mezzanine’s address yet. It retries at the next launch." }
+            } catch is CancellationError {
+            } catch {
+                problem = "Couldn’t list Mezzanine for the Plex mobile apps (\(error))."
+            }
+        }
+    }
+
+    func cancelLinking() {
+        linkTask?.cancel()
+        linkTask = nil
+        isLinking = false
+    }
+
+    private static func connections(_ port: UInt16) -> [URL] {
+        lanAddresses().compactMap { URL(string: "http://\($0):\(port)") }
+    }
+
+    /// This Mac's IPv4 addresses on the local network (Wi-Fi, Ethernet), private ranges only.
+    static func lanAddresses() -> [String] {
+        var out: [String] = []
+        var list: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&list) == 0, let first = list else { return [] }
+        defer { freeifaddrs(list) }
+        var cursor: UnsafeMutablePointer<ifaddrs>? = first
+        while let entry = cursor?.pointee {
+            defer { cursor = entry.ifa_next }
+            let name = String(cString: entry.ifa_name)
+            guard name.hasPrefix("en"), let addr = entry.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET),
+                  (entry.ifa_flags & UInt32(IFF_UP)) != 0 else { continue }
+            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            guard getnameinfo(addr, socklen_t(addr.pointee.sa_len), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
+            let ip = String(cString: host)
+            if ip.hasPrefix("192.168.") || ip.hasPrefix("10.") || (ip.hasPrefix("172.") && (16...31).contains(Int(ip.split(separator: ".")[1]) ?? 0)) {
+                out.append(ip)
+            }
+        }
+        return out
     }
 
     // MARK: CompanionPlayer

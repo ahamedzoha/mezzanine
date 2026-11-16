@@ -72,6 +72,20 @@ import Testing
         #expect(body.components(separatedBy: "\r\n").count == 10)
     }
 
+    @Test func readsTheAccountDeviceList() {
+        let xml = #"""
+        <MediaContainer>
+          <Device name="iPhone" id="11" clientIdentifier="phone" provides="client,player"><Connection uri="http://192.168.1.26:32500"/></Device>
+          <Device name="Mac" id="22" clientIdentifier="mezzanine-abc" provides="client,player,pubsub-player"/>
+        </MediaContainer>
+        """#
+        let devices = CompanionRegistration.parseDevices(Data(xml.utf8))
+        #expect(devices.count == 2)
+        #expect(devices[0].connections == ["http://192.168.1.26:32500"])
+        #expect(devices[1].id == "22")
+        #expect(devices[1].provides.contains("player"))
+    }
+
     @Test func escapesAttributeValues() {
         #expect(CompanionTimeline.escape(#"Tom & "Jerry" <1>"#) == "Tom &amp; &quot;Jerry&quot; &lt;1&gt;")
     }
