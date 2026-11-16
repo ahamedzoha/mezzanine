@@ -3,6 +3,11 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## Unreleased
+
+- Remote control from Plex apps is now off by default (Settings ▸ Playback): Plex's current
+  iPhone and Android apps only cast to Google Cast devices, not to Plex players like Mezzanine.
+
 ## 0.3.1 — 2026-11-16
 
 - The Plex iPhone and Android apps only list players on your Plex account. Settings ▸ Playback ▸

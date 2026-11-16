@@ -21,6 +21,17 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
+## 2026-11-16 — Phone remote parked
+
+- After 0.3.1's plex.tv registration (verified: plex.tv lists Mezzanine as a player with its LAN
+  address, like the iPhone's own entry), the iPhone's cast sheet still showed only the Google TV.
+  Checks: a logger on the Companion port saw no request from the Plex app (Safari on the phone did
+  reach it, so the network is fine); the Debug build logged no GDM search from the phone (only the
+  server's); no Plex Bonjour services exist on the LAN. The 2025 Plex mobile apps dropped casting
+  to Plex players (Plex forum reports). Owner: skip the remote for now (ROADMAP 3.7). Remote control
+  is now off by default (next release); the plex.tv device "Mezzanine" stays in the owner's
+  Authorized Devices until removed there.
+
 ## 2026-11-16 — Phone as a remote: Plex Companion (0.3.0)
 
 - Owner asked for the remote spike first (ROADMAP 3.7). Research (plex-mpv-shim, Music Assistant's

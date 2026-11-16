@@ -197,7 +197,17 @@ Already built: per-show **Keep Downloaded** (next 1/3/5/10 unwatched, watched on
   views, not durations; durations come from item lengths. Tautulli replaces this with exact
   numbers when connected (7.1).
 
-### 3.7 Your phone as a remote · L (spike done 2026-11-16, shipped in 0.3.0)
+### 3.7 Your phone as a remote · parked by the owner (2026-11-16)
+
+**Outcome:** the Plex mobile apps (2025 redesign) no longer cast to Plex players: the iPhone app
+sent no GDM search and never contacted the registered player (plex.tv listed it correctly, with
+its address, and Safari on the phone reached it); only Google Cast devices appear. Plex forum
+reports match. Mezzanine's Companion side works (server `/clients`, plex.tv registration, scripted
+controller) and stays, off by default, for Plex Web and any future Plex app. Options if picked up
+again: test Plex Web's player list; or Mezzanine's own phone remote (a small web page served by
+the Mac, added to the Home Screen, paired with a code). The owner chose to skip both for now.
+
+Earlier notes:
 
 **Spike result:** works. Mezzanine answers GDM, the server lists it at `/clients`, and a scripted
 controller started a title at 10:00, paused, seeked, resumed and stopped it with timelines pushed

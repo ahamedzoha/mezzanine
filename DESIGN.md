@@ -463,6 +463,6 @@ All three run on this Mac (SpeechAnalyzer, Translation): the audio and the text 
 
 - Mezzanine appears in the Plex apps' player list (iPhone, Android, Plex Web) under the Mac's name (System Settings ▸ General ▸ Sharing; Debug builds add "(Debug)"). Picking it there and playing a title opens the player here, in front, at the time the phone asked for (or the resume point).
 - The phone's controls act on the player: play, pause, seek, ±30/15 s steps, next and previous episode, volume (0–100 % of Mezzanine's volume), audio and subtitle tracks, stop (closes the player). The phone's timeline follows every second while playing.
-- Settings ▸ Playback ▸ "Plex apps can control Mezzanine" (on by default), with "Last controlled by <app>" and any problem (a title from another server, or the port couldn't open).
+- Settings ▸ Playback ▸ "Plex apps can control Mezzanine" (off by default since the Plex mobile apps stopped casting to Plex players), with "Last controlled by <app>" and any problem (a title from another server, or the port couldn't open).
 - Only titles from the signed-in server play; another server's titles are refused with a note in Settings.
 - The Plex mobile apps list only players on the account's plex.tv device list, so Settings has a "Plex mobile apps" row: **Show in Plex Apps…** opens Plex's approval page in the browser (the sign-in page, for Mezzanine's player identity); while waiting, a small spinner and Cancel; then "Listed" with a check. Never linked without the owner's approval. Each launch republishes the Mac's LAN addresses.

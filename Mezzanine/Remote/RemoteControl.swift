@@ -13,7 +13,9 @@ import MezzaninePlayback
 /// it). Settings ▸ Playback ▸ Plex apps can control Mezzanine.
 @MainActor @Observable
 final class RemoteControl: CompanionPlayer {
-    var enabled = UserDefaults.standard.object(forKey: "remoteControlEnabled") as? Bool ?? true {
+    /// Off by default (2026-11-16): the 2025 Plex mobile apps don't cast to Plex players, so the
+    /// LAN port and GDM adverts only help Plex Web and other Companion controllers.
+    var enabled = UserDefaults.standard.object(forKey: "remoteControlEnabled") as? Bool ?? false {
         didSet {
             UserDefaults.standard.set(enabled, forKey: "remoteControlEnabled")
             Task { await apply() }
