@@ -12,7 +12,7 @@ complete Plex client for people who run **only Plex**.
 
 Contents: 1 Principles · 2 Services architecture · 3 Phase 1, Plex only · 4 Phase 2, Seerr ·
 5 Phase 3, Sonarr and Radarr · 6 Phase 4, Bazarr · 7 Phase 5, Tautulli and Playbill ·
-8 Not planned · 9 Testing and safety · 10 Open questions · 11 Parked
+8 Not planned · 9 Testing and safety · 10 Owner's answers · 11 Parked
 
 ---
 
@@ -103,8 +103,9 @@ requested with `includeGuids=1`): `tmdb://`, `tvdb://`, `imdb://`.
 
 ### 2.5 Networking
 
-- LAN addresses work as they are (`NSAllowsLocalNetworking` is already set). Public HTTPS names
-  need nothing extra.
+- Services are added by their public domain names (owner's choice): local DNS answers with LAN
+  addresses at home, so the same URL works at home and away. LAN addresses still work
+  (`NSAllowsLocalNetworking` is set) for people without local DNS.
 - **Authentik:** if a service sits behind Authentik forward-auth on `*.example.com`, the app's API
   calls are redirected to a login page. Either give the API paths a bypass in Authentik/NPM
   (`/api/*` with the service's own key check) or add the service by LAN address. The Test button
@@ -372,17 +373,20 @@ history while testing":
 
 ---
 
-## 10. Open questions for the owner
+## 10. Owner's answers (2026-11-16)
 
-1. Where should the services be reached from: LAN addresses only, or the `*.example.com` names
-   (and are any behind Authentik forward-auth)?
-2. Seerr: is watchlist sync on for you (so Add to Watchlist already requests)? Do members request
-   in Seerr today, and should Mezzanine show them approve/decline on your Mac?
-3. Playbill: is a small public API in Playbill fine (it's open source)?
-4. Stats: owner-only at first, or each Home profile sees their own?
-5. Phone remote: worth the spike now, or after Phases 1–2?
-6. Order: the recommendation is 3.1 Watchlist → 4.1–4.2 Services + Seerr → 3.4 Smarter
-   downloads → 5 Sonarr/Radarr → 3.5 macOS integration → 3.7 remote spike → 6 Bazarr → 7.
+1. **Addresses:** always the public domain names. They resolve to LAN addresses at home (local
+   DNS), so there's no extra round trip at home and nothing breaks away from home. Settings ▸
+   Services asks for the domain name; the Test button still detects an Authentik login page.
+2. **Seerr watchlist sync:** unknown. Check read-only when Phase 2 starts (`GET /api/v1/settings/main`
+   and the owner's `GET /api/v1/user/<id>/settings/main` with the admin key) and say so in
+   Settings if it's on.
+3. **Playbill API:** yes, add the small public API to Playbill (7.2).
+4. **Stats:** per profile: each Home profile sees its own stats; the owner's Mac can show all.
+5. **Phone remote:** now. The remote spike (3.7) comes right after the repo goes public, ahead
+   of the rest of Phase 1.
+6. **Order:** confirmed: (3.7 remote spike, then) 3.1 Watchlist → 4.1–4.2 Services + Seerr →
+   3.4 Smarter downloads → 5 Sonarr/Radarr → 3.5 macOS integration → 6 Bazarr → 7.
 
 ---
 

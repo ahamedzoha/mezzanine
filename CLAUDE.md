@@ -143,8 +143,7 @@ captures (`screencapture -D 1`): window captures (`-l`) never include the strip.
 
 ## Server
 
-Owner's server "Example Plex Server" (PMS 1.43.5, a homelab container): LAN
-`https://192-168-1-20.<hash>.plex.direct:32400` (resolves fine through Pi-hole) and
-`https://plex.example.com` (NPM, HTTP/2). The account also sees a friend's shared server, so
-multi-server must keep working. Library facts and read-only DB query recipes:
-`the owner's private homelab notes`. Homelab rules: the `homelab` skill.
+The owner's server details (addresses, homelab notes, the casting TV) are in `CLAUDE.local.md`
+(gitignored; read it if it exists). The account sees more than one server (the owner's and a
+friend's shared one), so multi-server must keep working. `Scripts/plex.sh` needs `PLEX_SERVER`
+in `.mezzanine-live.env`.

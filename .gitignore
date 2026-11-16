@@ -20,3 +20,9 @@ xcuserdata/
 
 # Machine-local SwiftPM mirrors (Scripts/spm-mirrors.sh)
 Mezzanine.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/
+
+# The owner's machine-specific notes (server, homelab) — never commit
+CLAUDE.local.md
+
+# Design-review captures (show real profiles and servers) — kept locally only
+.impeccable/review/
