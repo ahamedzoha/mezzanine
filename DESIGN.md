@@ -358,6 +358,10 @@ A solid graphite column (40 %) beside a wall of the library's own posters (edge 
 - The position line is a control: click to seek the TV; VoiceOver adjusts it 10 s at a time. The key hint names the keys as currently bound. Keys the TV can't take (tracks, picture, frames) show "Not while casting · Stop Casting first"; ↑/↓ show "TV volume 40 %".
 - The TV fetches Plex's HLS of the title with a short-lived token (never the account token). It first gets the file's own video and sound re-packaged; a TV that refuses them gets H.264 with stereo AAC from Plex instead, and keeps getting it (remembered per TV). An episode that ends on the TV hands over to the next one there when Up Next autoplay is on.
 
+## Staying awake
+
+- While a video plays (full player or the corner tile, loading and seeking included) the display and the Mac stay awake; paused, closed or casting, they dim and sleep as usual. Nothing to set.
+
 ## Mini player
 
 - The owner's pick: the film shrinks into the corner of the window (not a separate window; Picture in Picture already floats over other apps). ⌥M, the player's bottom-right row (next to PiP) or Playback ▸ Mini Player.

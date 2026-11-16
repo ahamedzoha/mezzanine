@@ -439,6 +439,10 @@ Keychain from the `MEZZANINE_DEV_TOKEN` environment variable when no token exist
   `SUEnableInstallerLauncherService`, the `-spks`/`-spki` mach-lookup exceptions, and Sparkle's
   helpers re-signed with our identity (`Scripts/sign-sparkle.sh`; Xcode leaves them ad-hoc). The
   `SUPublicEDKey` must match the Keychain key (account `mezzanine`) and the CI secret.
+- **Display sleep.** AetherEngine keeps the display awake only on its software route; `KeepAwake`
+  (driven from `AppShell`: an item, status playing/loading/seeking, not casting) holds a
+  `ProcessInfo` activity with `.idleDisplaySleepDisabled` for every route. Check with
+  `pmset -g assertions` (PreventUserIdleDisplaySleep while playing, none when paused).
 - **Plex Companion (remote control).** `MezzanineKit/Companion/`: `CompanionGDM` (UDP 32412, group
   239.0.0.250; HELLO/BYE to 32413), `CompanionHTTPServer` (one request per connection, port 32500 or
   any free one), `CompanionService` (routes `/resources`, `/player/playback/*`, `/player/timeline/*`,

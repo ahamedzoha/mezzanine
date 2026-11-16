@@ -21,6 +21,17 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
+## 2026-11-16 — Screen dimmed during playback (0.3.2)
+
+- Owner: the display dimmed and slept mid-film without a key press. AetherEngine sets
+  `preventsDisplaySleepDuringVideoPlayback` only on its software renderer; on the native AVPlayer
+  route (most files) nothing asked macOS to stay awake, and Mezzanine didn't either. `KeepAwake`
+  now holds a `ProcessInfo` activity (`.idleDisplaySleepDisabled`, `.userInitiated`) while a video
+  plays in the player or the mini player, loading and seeking included (letting go during a
+  rebuffer after a long idle stretch would blank the screen at once); released on pause, close and
+  casting. Verified with `pmset -g assertions`: PreventUserIdleDisplaySleep and
+  PreventUserIdleSystemSleep while playing, none paused or closed.
+
 ## 2026-11-16 — Phone remote parked
 
 - After 0.3.1's plex.tv registration (verified: plex.tv lists Mezzanine as a player with its LAN
