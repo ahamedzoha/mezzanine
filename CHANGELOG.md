@@ -3,6 +3,11 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 0.3.3 — 2026-11-23
+
+- Mezzanine no longer quits when the Mac's sound output changes, such as connecting AirPods or
+  plugging in headphones while the app is in the background.
+
 ## 0.3.2 — 2026-11-16
 
 - The screen no longer dims or goes to sleep in the middle of a film. While a video plays (in the

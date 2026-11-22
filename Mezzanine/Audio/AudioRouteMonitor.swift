@@ -54,8 +54,17 @@ final class AudioRouteMonitor {
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
                                                  mScope: kAudioObjectPropertyScopeGlobal,
                                                  mElement: kAudioObjectPropertyElementMain)
-        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, queue) { [weak self] _, _ in
-            Task { @MainActor in self?.refresh() }
+        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, queue, Self.listener(self))
+    }
+
+    /// CoreAudio calls listeners on `queue`, never the main thread. A closure written
+    /// inside this MainActor class inherits MainActor isolation, and Swift 6 traps when
+    /// CoreAudio runs it off the main thread (crashed 0.3.2 when the output device
+    /// changed with the app in the background). Built here, the block is nonisolated
+    /// and only hops to the main actor.
+    private nonisolated static func listener(_ monitor: AudioRouteMonitor) -> AudioObjectPropertyListenerBlock {
+        { [weak monitor] _, _ in
+            Task { @MainActor in monitor?.refresh() }
         }
     }
 
@@ -67,9 +76,7 @@ final class AudioRouteMonitor {
             var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyDataSource,
                                                      mScope: kAudioDevicePropertyScopeOutput,
                                                      mElement: kAudioObjectPropertyElementMain)
-            AudioObjectAddPropertyListenerBlock(id, &address, queue) { [weak self] _, _ in
-                Task { @MainActor in self?.refresh() }
-            }
+            AudioObjectAddPropertyListenerBlock(id, &address, queue, Self.listener(self))
         }
         let next = OutputDevice(uid: Self.string(id, kAudioDevicePropertyDeviceUID) ?? "unknown",
                                 name: Self.string(id, kAudioObjectPropertyName) ?? "Output",
