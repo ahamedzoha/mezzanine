@@ -39,8 +39,8 @@ donations wait for the Patreon page.
   automated downloads (429), so files come from download.blender.org and studio.blender.org.
 - All public pictures were replaced: no studio artwork, no real server behind them.
 - App: Up Next shows a film's backdrop instead of cropping its poster (1.0.2).
-- Donations: GitHub Sponsors can't pay out to the owner's country; Patreon instead. Waiting for the
-  owner to publish the page, then `sponsors: true` and `.github/FUNDING.yml`.
+- Donations: GitHub Sponsors can't pay out to the owner's country; Patreon instead. Parked by
+  the owner (2026-11-24) until the page is published; then `sponsors: true` and `.github/FUNDING.yml`.
 
 ## 2026-11-24 — 1.0.1: no get-task-allow in Release
 
