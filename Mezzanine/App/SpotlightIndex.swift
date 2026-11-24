@@ -8,7 +8,7 @@ import MezzanineKit
 @MainActor
 @Observable
 final class SpotlightIndex {
-    var enabled = UserDefaults.standard.object(forKey: "spotlight") as? Bool ?? true {
+    var enabled = UserDefaults.standard.object(forKey: "spotlight") == nil || UserDefaults.standard.bool(forKey: "spotlight") {
         didSet {
             UserDefaults.standard.set(enabled, forKey: "spotlight")
             if !enabled { clear() }

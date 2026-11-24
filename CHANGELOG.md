@@ -12,6 +12,7 @@ the update window shows it.
   on your server say so.
 - Films and shows in Spotlight (Settings ▸ Library turns it off).
 - Shortcuts and Siri: Resume Watching, Play Next Episode, Open Title, Surprise Me.
+- Surprise Me and Activity are in the toolbar on title and collection pages too.
 
 ## 0.5.0 — 2026-11-24
 

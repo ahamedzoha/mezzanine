@@ -36,8 +36,14 @@ a GitHub Pages website that looks professional and asks for donations.
   offline from downloads; watchlist changes are laid over Plex's list until it answers; Shuffle keeps
   the old queue until it plays; Shortcuts ids carry the server and profile.
 - Not changed: casting doesn't ask Still Watching before the next title (it never did).
-- Not yet: anything on screen, Spotlight and Siri for real. Watchlist add and remove have never been
-  sent: try each once on a title the owner names.
+- Checked on screen (Debug, muted, owner's OK): watchlist page and row, the bookmark button, the
+  activity popover on a title page, the queue page, and a film's end autoplaying the queue's head.
+  Spotlight: 345 titles written once, nothing on the second run, then cleared. Fixed from it: pushed
+  pages had no Surprise Me or Activity (since 0.4), a short queue left empty space, `-spotlight NO`.
+- A film played to its end in a test marks itself watched in the Debug index only; the server wasn't
+  touched (checked: Cars unwatched, 190 unwatched films, no play history).
+- Not yet: opening a Spotlight result, Siri and Shortcuts, menus by pointer, offline, VoiceOver.
+  Watchlist add and remove have never been sent: try each once on a title the owner names.
 
 ## 2026-11-24 — 0.5.0: player comforts and diagnostics
 

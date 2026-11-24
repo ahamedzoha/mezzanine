@@ -341,14 +341,15 @@ struct PlayerOptions: View {
             if entries.isEmpty {
                 note("Nothing queued. Choose Play Next or Add to Queue on a title, or Shuffle on a show or collection.")
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(Array(entries.enumerated()), id: \.element.id) { i, entry in
-                            queueRow(entry, isFirst: i == 0, isLast: i == entries.count - 1)
-                        }
-                    }
+                let rows = ForEach(Array(entries.enumerated()), id: \.element.id) { i, entry in
+                    queueRow(entry, isFirst: i == 0, isLast: i == entries.count - 1)
                 }
-                .frame(maxHeight: 300)
+                // A short queue is as tall as it is; a long one scrolls.
+                if entries.count <= 6 {
+                    VStack(spacing: 2) { rows }
+                } else {
+                    ScrollView { LazyVStack(spacing: 2) { rows } }.frame(height: 300)
+                }
                 Button("Clear Queue") { playback.queue.change { $0.clear() }; say("Queue cleared") }
                     .buttonStyle(SecondaryButtonStyle())
                     .focusEffectDisabled(false)

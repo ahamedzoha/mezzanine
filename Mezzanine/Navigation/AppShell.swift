@@ -224,6 +224,15 @@ struct AppShell: View {
     #if DEBUG
     /// Launch arguments for tests and captures.
     private func launchHooks() async {
+        // -QueueSeed "58528,57206" queues titles; -SpotlightClear YES takes a test's titles out again.
+        if let keys = UserDefaults.standard.string(forKey: "QueueSeed"), let client = session.client {
+            playback.queue.change { $0.clear() }
+            for key in keys.split(separator: ",") {
+                if let item = try? await client.metadata(String(key)) { playback.queue.change { $0.add([QueueStore.entry(item)]) } }
+            }
+            print("QUEUE seeded \(playback.queue.queue.entries.map(\.title))")
+        }
+        if UserDefaults.standard.bool(forKey: "SpotlightClear") { spotlight.clear(); print("SPOTLIGHT cleared") }
         // -SidebarSelect "slice:unwatched:1" (a SidebarItem storage key) and -ActivityOpen YES: captures.
         if let raw = UserDefaults.standard.string(forKey: "SidebarSelect"), let item = SidebarItem(storageKey: raw) {
             try? await Task.sleep(for: .seconds(4))
@@ -324,6 +333,8 @@ struct AppShell: View {
             }
         }
         .background { roomLight }
+        // A pushed page has a toolbar of its own.
+        .toolbar { ShellToolbar(shown: !isOffline, canSurprise: canSurprise) }
         .modifier(PagePanels(onTop: commands.path.last == route, showsSearchPanel: showsSearchPanel))
     }
 

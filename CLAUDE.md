@@ -89,6 +89,7 @@ defaults and Keychain item), so test runs never change the installed app's setti
 (`-MezzanineAutoClose`) so the session stops, and check `Scripts/plex.sh pms /transcode/sessions`).
 
 Sidebar and top bar: `-SidebarSelect "slice:unwatched:1"` (a `SidebarItem` storage key), `-ActivityOpen YES`, `-WindowSize 900x600`,
+`-QueueSeed "58528,57206"` (queues titles), `-SpotlightClear YES` (with `-SpotlightIndex YES`: takes a test's titles out),
 `-SidebarKeyScript "down,right,down"` (prints `SIDEBAR` with the selection after each key).
 `TitleActions` writes (watched marks, Continue Watching removal) print `ACTION …` and send nothing under `-MezzanineNoActivity YES`; so do watchlist changes. Spotlight is only written by
 Debug builds with `-SpotlightIndex YES`. `Scripts/plex.sh discover …` reads plex.tv's watchlist service.
