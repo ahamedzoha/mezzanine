@@ -30,6 +30,8 @@ struct AppShell: View {
     @FocusState private var contentFocused: Bool
     @FocusState private var sidebarFocused: Bool
     @State private var sectionsError: String?
+    /// `playback.ownsWindow`, changed outside any animation (the toolbar follows it).
+    @State private var filmOwnsToolbar = false
     @AppStorage("onboardingComplete") private var onboardingComplete = false
 
     var body: some View {
@@ -58,9 +60,17 @@ struct AppShell: View {
         }
         // While a film plays the window is only the film: no toolbar, no toolbar
         // material, no title (AppKit draws those above SwiftUI content).
-        .toolbarVisibility(playback.ownsWindow ? .hidden : .visible, for: .windowToolbar)
-        .toolbarBackgroundVisibility(chromeHidden ? .hidden : .automatic, for: .windowToolbar)
-        .background(WindowChrome(hidden: chromeHidden, hidesToolbar: playback.ownsWindow))
+        .toolbarVisibility(filmOwnsToolbar ? .hidden : .visible, for: .windowToolbar)
+        .toolbarBackgroundVisibility(filmOwnsToolbar || !showsLibrary ? .hidden : .automatic, for: .windowToolbar)
+        .background(WindowChrome(hidden: filmOwnsToolbar || !showsLibrary, hidesToolbar: filmOwnsToolbar))
+        // Never inside the player's opening animation: SwiftUI then animates the window's size
+        // too, and loses the toolbar's height again on every frame (the window shrank to its
+        // minimum each time a film opened).
+        .onChange(of: playback.ownsWindow, initial: true) { _, owns in
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) { filmOwnsToolbar = owns }
+        }
         .background(MainWindowWatcher(keyChanged: { commands.mainWindowIsKey = $0 },
                                       willClose: { if playback.isPresented { playback.close() } }))
         .frame(minWidth: 900, minHeight: 600)
@@ -152,9 +162,6 @@ struct AppShell: View {
         .onChange(of: playback.item?.kind, initial: true) { _, kind in commands.playsEpisode = kind == .episode }
         .onChange(of: playback.isMini, initial: true) { _, mini in commands.hasMiniPlayer = mini }
     }
-
-    /// The film, or onboarding, owns the whole window.
-    private var chromeHidden: Bool { playback.ownsWindow || !showsLibrary }
 
     /// Onboarding until it's done; then the library, kept through reconnects (and the
     /// Downloads page alone when Plex can't be reached).

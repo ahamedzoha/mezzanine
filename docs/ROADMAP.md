@@ -122,7 +122,7 @@ round, HIG review, tests and docs.
 
 ## 3. Phase 1 — Plex only (every user)
 
-### 3.1 Watchlist · M
+### 3.1 Watchlist · M · done in 1.0.0
 
 - **What:** the Plex account's watchlist (shared with every Plex app). Add or remove from a title
   page (W is taken for Watched: **⇧W**, Item ▸ Add to Watchlist), from search results, and from
@@ -149,7 +149,7 @@ round, HIG review, tests and docs.
   exists.
 - A smart-shelf rule "My rating ≥ n" joins the rule builder (the index stores `userRating`).
 
-### 3.3 Playlists, Play Next and Shuffle · M
+### 3.3 Playlists, Play Next and Shuffle · M · Play Next and Shuffle done in 1.0.0
 
 - **Add to Playlist** (Item ▸ Add to Playlist ▸ list of video playlists, New Playlist…) from title
   pages, episode rows and grids (context menu). Playlist pages (already reachable as shelves) get
@@ -175,7 +175,7 @@ Already built: per-show **Keep Downloaded** (next 1/3/5/10 unwatched, watched on
 - **Storage budget:** a cap (e.g. 50 GB); rule-made downloads stop at the cap and say so; manual
   downloads may exceed it after a confirm.
 
-### 3.5 Built into macOS · M–L
+### 3.5 Built into macOS · M–L · Spotlight, Shortcuts and Siri done in 1.0.0
 
 - **Spotlight** (S): index titles from the local GRDB index into `CSSearchableIndex` (title, year,
   show, poster thumbnail); opening a result opens its page. Re-indexed after each sync; removed on

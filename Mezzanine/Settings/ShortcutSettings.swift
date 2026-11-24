@@ -284,6 +284,8 @@ enum ShortcutReference {
         .init(keys: "⌘F", action: "Find"),
         .init(keys: "⌘↩", action: "Play the focused title"),
         .init(keys: "W", action: "Watched or unwatched (the focused title on Home, in a library or in search)"),
+        .init(keys: "⇧W", action: "Add to or remove from the watchlist"),
+        .init(keys: "⌃⌘W", action: "Watchlist"),
         .init(keys: "⇧⌘R", action: "Surprise Me: a random unwatched title"),
         .init(keys: "⌥⌘A", action: "Show or hide activity"),
         .init(keys: "⌘[ ⌘]", action: "Back / forward"),

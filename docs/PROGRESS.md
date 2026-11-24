@@ -1,6 +1,6 @@
 # Progress
 
-## Where things stand (2026-11-15)
+## Where things stand (2026-11-24: 1.0.0)
 
 Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
 picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
@@ -21,7 +21,7 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
-## 2026-11-24 — 0.6 under way: queue, watchlist, Spotlight, Shortcuts
+## 2026-11-24 — 1.0.0: queue, watchlist, Spotlight, Shortcuts (built as 0.6)
 
 - Spike (GET only): `discover.provider.plex.tv/library/sections/watchlist/all` pages and answers
   `plex://` guids that match the server's. The index keeps guids (migration v3, filled from the JSON
@@ -42,6 +42,10 @@ a GitHub Pages website that looks professional and asks for donations.
   pages had no Surprise Me or Activity (since 0.4), a short queue left empty space, `-spotlight NO`.
 - A film played to its end in a test marks itself watched in the Debug index only; the server wasn't
   touched (checked: Cars unwatched, 190 unwatched films, no play history).
+- Fixed: every film shrank the window to its minimum height. The toolbar hid inside the player's
+  opening animation, and SwiftUI animated the window's size with it, 20 pt lost per frame. The
+  toolbar now changes in a transaction without animation (`filmOwnsToolbar` in `AppShell`).
+- README rewritten with the full feature list; new screenshots from `Scripts/screenshots/all.sh`.
 - Not yet: opening a Spotlight result, Siri and Shortcuts, menus by pointer, offline, VoiceOver.
 - Watchlist add and remove: sent once each through `PlexDiscover` on a title the owner named. Plex took
   both, the list showed it first in between and was identical after.

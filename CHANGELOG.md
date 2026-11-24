@@ -3,7 +3,7 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
-## 0.6.0 — unreleased
+## 1.0.0 — 2026-11-24
 
 - Play Next and Add to Queue on any film, episode or show; the queue plays before the next episode.
   Q shows it in the player.
@@ -13,6 +13,7 @@ the update window shows it.
 - Films and shows in Spotlight (Settings ▸ Library turns it off).
 - Shortcuts and Siri: Resume Watching, Play Next Episode, Open Title, Surprise Me.
 - Surprise Me and Activity are in the toolbar on title and collection pages too.
+- The window no longer shrinks to its smallest size when a film opens.
 
 ## 0.5.0 — 2026-11-24
 

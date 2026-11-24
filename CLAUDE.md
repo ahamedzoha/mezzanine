@@ -36,8 +36,8 @@ Scripts/release.sh 0.3.0 --local          # same, built and published from this 
   resets its history. The same DMG becomes a GitHub Release on this repo (`Scripts/github-release.sh`),
   the page people download from. Installed copies download it and install on quit.
 - `CI` (`.github/workflows/ci.yml`) builds unsigned and runs the kit tests on every push and PR
-  (free on a public repo). README screenshots: `Scripts/screenshots/` (capture, then frame; the
-  profile row is blurred).
+  (free on a public repo). README screenshots: `Scripts/screenshots/all.sh` (window-only
+  captures of the Debug app with `-PublicNames YES`, then framed; look at every one before a commit).
 - The Release workflow runs on tags and "Run workflow"; `--local` builds on the Mac instead.
 - Build number = `git rev-list --count HEAD` (local installs too), so releases always compare newer.
 - Secrets (private repo): `MAC_CERT_P12`/`MAC_CERT_PASSWORD` (the Apple Development identity,
@@ -142,6 +142,10 @@ Debug builds print `REMOTE …` (searches, commands). Check it without a phone: 
 SwiftUI gotcha: never give ForEach rows a position as identity (`.id(column)` for ScrollViewReader):
 it overrides the item key, and after a reload reorders the list the old cards stay on screen (Continue
 Watching kept the finished episode until a restart). Scroll with the item key (`proxy.scrollTo(item.ratingKey)`).
+
+SwiftUI gotcha: never change toolbar visibility inside an animated transaction: SwiftUI animates the
+window's size with it and loses height every frame (films shrank the window to its minimum).
+`AppShell.filmOwnsToolbar` changes with animations disabled.
 
 SwiftUI gotcha: never mutate a `@Binding` array twice in one transaction (remove, then insert):
 the second read sees the stale array and duplicates the element. Build the new array, assign once.

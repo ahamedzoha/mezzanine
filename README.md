@@ -35,49 +35,91 @@ light. Everything works from the keyboard, every action has a menu item and a ke
 
 ## Features
 
-**Watching**
-- Direct play of the original file (HEVC, AV1, HDR10, Dolby Vision, multichannel audio), with an
-  automatic fallback to Plex remux, then transcode, only when a file won't open.
-- Skip Intro and Skip Credits from Plex's markers, with per-show auto-skip rules; Up Next
-  autoplay with the next episode warmed up in advance; "Still watching?"; post-play suggestions.
-- Scrub previews, chapters, speed, snapshots, Picture in Picture, a mini player in the corner of
-  the window, and picture size (Fit, Fill, Zoom) remembered per film or show.
-- AirPlay and Google Cast (no SDK needed on the Mac): play on a TV, control it from the Mac.
+### Playback
+- **Direct play** of the original file: H.264, HEVC, AV1 and the older formats; HDR10 and Dolby
+  Vision; stereo to Atmos. If a file won't open, Plex remuxes it, and only then converts it. You can
+  also cap the quality yourself.
+- **The binge flow.** Skip Intro and Skip Credits from Plex's markers, by key, button or automatic
+  rule per show; Up Next with a countdown and the next episode already warmed up; "Still watching?";
+  suggestions after a film.
+- **Queue and Shuffle.** Play Next and Add to Queue on anything; Shuffle or Shuffle Unwatched for a
+  show, season, collection, playlist or page. The queue plays before the next episode.
+- **What did they say?** One key goes back ten seconds with subtitles, then turns them off again.
+- **Sleep timer** for 15 to 90 minutes or the end of the episode or film. The sound fades out first.
+- **Ends at** by the clock, **Go to Time**, chapters, scrub previews, frame steps, speed from 0.5× to
+  2×, full-size snapshots.
+- **Picture** Fit, Fill or Zoom, remembered per film or show; Picture in Picture; a mini player in
+  the corner while you browse; full screen with nothing but the film.
+- **AirPlay and Google Cast**: play on a TV and control it from the Mac.
+- Media keys, Control Centre and AirPods work; the Mac stays awake while a film plays.
 
-**Sound**
-- Audio profiles per output: speakers, headphones, AirPods and an HDMI receiver each get their own
-  channel limit, LFE fold-down for 2.1, dialogue lift, night mode and loudness target. Receivers
-  and AirPods get the original sound untouched.
+### Sound
+- **A profile per output**, switched as you plug things in: Mac speakers, headphones, AirPods, 2.1
+  speakers, an HDMI receiver. Channel limit, bass fold-down, dialogue lift, night mode and a loudness
+  target; receivers and AirPods get the original sound untouched.
+- **Volume to 400 %** into a limiter, so a quiet film can be loud without clipping.
+- Audio delay, per-title tracks remembered on the server.
 
-**Subtitles**
-- Styling, timing offset, sidecar files, Plex's own search, and Find Subtitles from several free
-  sources at once.
-- Generate subtitles from the dialogue on the Mac (Apple's on-device speech recognition), translate
-  them on the Mac, and match any subtitle's timing to the speech.
+### Subtitles
+- Text and picture subtitles (SRT, ASS, PGS, VobSub) at the right size and place; size, background
+  and timing in the player; sidecar files.
+- **Find Subtitles** searches Plex and several free sources at once.
+- **Made on the Mac:** generate subtitles from the dialogue, translate them, and match any
+  subtitle's timing to the speech. Nothing leaves the Mac.
 
-**Library**
-- A local index of the whole server, so browsing, search and sorting are instant.
-- Home shelves you arrange: Plex rows, collections, playlists and smart shelves with a rule
-  builder; a different Home per library.
-- Quick Open (⌘K), a search panel that never leaves the page, folder browsing for personal media,
-  an artwork picker, and an option to show posters without the badges servers add.
-- Plex Home profiles with PINs and avatars; new-episode notifications.
+### Library
+- **A local index** of the whole server: browsing, sorting, filters and search answer at once.
+- **A sidebar that knows what you're watching:** Continue rows with progress, each library's
+  Unwatched, In Progress, Recently Added and Collections with counts, your pins, downloads and the
+  server.
+- **Home, arranged by you:** Plex rows, collections, playlists, your watchlist and smart shelves with
+  a rule builder; a different Home per library; All, Films or Shows with one click.
+- **Your Plex watchlist**, including titles that aren't on your server.
+- Posters, wide, list, folders and shelves, with density and sort remembered per library; collection
+  pages; a page for every film, show and season with cast, extras and related titles.
+- **Quick Open** (⌘K), a search panel that never leaves the page, recent searches, and **Surprise Me**.
+- Mark watched or unwatched, take titles out of Continue Watching, and play from the start, from any
+  card's menu or the Item menu.
+- Artwork picker, and an option to show posters without the badges servers add.
+- **Spotlight** finds your films and shows; **Shortcuts and Siri** can resume, open or surprise you.
 
-**On the go**
-- Downloads for offline viewing, with "keep the next N episodes downloaded" per show; progress
-  syncs back when you're online.
+### Profiles, downloads, upkeep
+- Plex Home profiles with PINs and avatars, each with its own shelves, pins, queue and progress;
+  more than one server; new-episode notifications.
+- **Downloads** for offline viewing with subtitles and artwork, "keep the next N episodes" per show;
+  progress syncs back when you're online.
+- **Remote control** from Plex Web (off by default).
+- **A diagnostics report** you can save: crashes, hangs and the playback log without names, titles,
+  addresses or tokens. Nothing is sent.
+- **Updates itself** (Sparkle, EdDSA-signed), in the background and never in the middle of a film.
 
-**Updates**
-- Mezzanine updates itself (Sparkle, EdDSA-signed): new versions download in the background and
-  install when you quit, never in the middle of a film.
+### Keyboard
+Every player key can be changed in Settings ▸ Shortcuts, and every action is in a menu. ⌘/ shows them
+all; some to start with:
+
+| In the player | | Anywhere | |
+|---|---|---|---|
+| Space, K | Play, pause | ⌘K | Quick Open |
+| ← → | 10 seconds | ⌘F | Search |
+| S | Skip intro or credits | ⌘↩ | Play the focused title |
+| N, ⇧N | Next, previous episode | W, ⇧W | Watched, watchlist |
+| W | What did they say? | ⇧⌘R | Surprise Me |
+| T | Go to a time | ⌥⌘A | Activity |
+| Q | Queue | ⌃⌘W | Watchlist |
+| ⌥S | Sleep timer | ⌘E | Edit shelves |
+| ⌥M | Mini player | ⌘/ | All shortcuts |
+
+VoiceOver, Full Keyboard Access, Reduce Motion, Increase Contrast and Text Size are supported.
 
 ## Screenshots
 
 | | |
 |---|---|
-| <img src="docs/screenshots/show.jpg" alt="A show's page with seasons and episodes"> | <img src="docs/screenshots/movie.jpg" alt="A film's page"> |
-| <img src="docs/screenshots/player.jpg" alt="The player"> | <img src="docs/screenshots/player-options.jpg" alt="Audio, subtitles and sound options in the player"> |
-| <img src="docs/screenshots/library.jpg" alt="A library grid"> | <img src="docs/screenshots/search.jpg" alt="The search panel"> |
+| <img src="docs/screenshots/show.jpg" alt="A show's page with seasons and episodes"><br>A show | <img src="docs/screenshots/movie.jpg" alt="A film's page"><br>A film |
+| <img src="docs/screenshots/player.jpg" alt="The player, with the time the film ends"><br>The player | <img src="docs/screenshots/player-options.jpg" alt="Audio, subtitles, sound, speed, picture, quality, queue and sleep timer in the player"><br>Options |
+| <img src="docs/screenshots/queue.jpg" alt="The queue in the player"><br>The queue | <img src="docs/screenshots/sleep.jpg" alt="The sleep timer"><br>Sleep timer |
+| <img src="docs/screenshots/unwatched.jpg" alt="A library's unwatched films"><br>Unwatched films | <img src="docs/screenshots/collections.jpg" alt="A library's collections"><br>Collections |
+| <img src="docs/screenshots/watchlist.jpg" alt="The Plex watchlist"><br>Watchlist | <img src="docs/screenshots/search.jpg" alt="The search panel"><br>Search |
 
 ## Install
 
@@ -93,9 +135,10 @@ credits markers need Plex Pass on the server.
 
 ## Privacy
 
-Mezzanine has no analytics and no account of its own. It talks to plex.tv (sign-in and server
-discovery), your Plex servers, the subtitle sites you turn on, and GitHub (update checks). Your
-Plex token stays in the Keychain. Speech recognition and translation run on the Mac. Playback is
+Mezzanine has no analytics and no account of its own. It talks to plex.tv (sign-in, server
+discovery and your watchlist), your Plex servers, the subtitle sites you turn on, and GitHub (update
+checks). Your Plex token stays in the Keychain. Speech recognition, translation and the Spotlight
+index stay on the Mac, and diagnostics reports are only ever saved to a file you choose. Playback is
 reported to your server the way every Plex app does, so resume points and watch history stay in
 sync.
 
@@ -122,7 +165,7 @@ must not write watch history.
 | `MezzanineKit/` | Swift package: the Plex client, local index (GRDB), subtitles, on-device speech, Google Cast, and `MezzaninePlayback`, the only code that touches the playback engine |
 | `docs/ARCHITECTURE.md` | How it fits together |
 | `DESIGN.md` | The design system ("Bias Light") and every screen's rules |
-| `docs/ROADMAP.md` | What's next: watchlist, requests (Seerr), upcoming episodes (Sonarr/Radarr), server subtitles (Bazarr), stats (Tautulli), all optional; Plex alone stays a complete app |
+| `docs/ROADMAP.md` | What's next: requests (Seerr), upcoming episodes (Sonarr/Radarr), server subtitles (Bazarr), stats (Tautulli), all optional; Plex alone stays a complete app |
 
 ## Contributing
 
