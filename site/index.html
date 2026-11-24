@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mezzanine, a Mac app for Plex</title>
+<meta name="description" content="A native Mac app for Plex. It plays your original files on the Mac, skips what you want skipped and has a key for everything. Free and open source.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0e0f11">
+<link rel="canonical" href="{{base}}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Mezzanine, a Mac app for Plex">
+<meta property="og:description" content="An evening with your Plex library. Original files, played on the Mac. Free and open source.">
+<meta property="og:url" content="{{base}}">
+<meta property="og:image" content="{{base}}img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="img/icon-64.png" sizes="64x64" type="image/png">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<link rel="preload" href="fonts/big-shoulders-800.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="site.css">
+<script src="site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#find">Skip to the evening</a>
+
+<header class="bar">
+  <a class="brand" href="./"><img src="img/icon-64.png" width="28" height="28" alt="">Mezzanine</a>
+  <nav aria-label="Main">
+    <a href="#everything">Features</a>
+    <a href="#keys">Keys</a>
+    <a href="#install">Install</a>
+    <a href="changelog.html">Changelog</a>
+    <a href="https://github.com/ahamedzoha/mezzanine">GitHub</a>
+    {{sponsor}}
+  </nav>
+</header>
+
+<main>
+<section class="opening" style="--light: 204 112 82; --light2: 92 66 58" aria-labelledby="title">
+  <p class="clock" aria-hidden="true">21:00</p>
+  <div class="words">
+    <h1 id="title">An evening with your Plex library.</h1>
+    <p class="lede">Mezzanine is a Mac app for Plex. It plays your original files on the Mac itself, gets out of the way of a binge, and has a key for everything.</p>
+    <p class="actions">
+      <a class="primary" href="{{download}}">Download for Mac</a>
+      <a class="secondary" href="https://github.com/ahamedzoha/mezzanine">Source on GitHub</a>
+    </p>
+    <p class="caption ruled">{{version}} · {{size}} · macOS 26 · Apple silicon · free and open source</p>
+  </div>
+  <figure class="window">
+    <picture>
+      <source type="image/webp" srcset="img/home-1200.webp 1200w, img/home-2400.webp 2400w" sizes="(min-width: 75rem) 72rem, 94vw">
+      <img src="img/home.jpg" width="1280" height="800" fetchpriority="high" alt="Mezzanine's Home. A sidebar lists what's being watched, the libraries with counts, and downloads. The page shows Sintel with a Resume button, then a Continue Watching shelf.">
+    </picture>
+  </figure>
+</section>
+
+<div class="evening" id="evening">
+
+<section class="scene" id="find" data-from="21:02" data-to="21:08" style="--light: 150 88 68; --dim: .55" aria-labelledby="find-h">
+  <p class="clock"><time datetime="21:02">21:02</time></p>
+  <div class="body">
+    <h2 id="find-h">Find something</h2>
+    <p>The sidebar keeps your place: what you’re watching, with minutes left, then each library’s unwatched, in progress and recently added titles with counts. Home is yours to arrange from Plex’s rows, collections, playlists, your watchlist and smart shelves with rules of their own.</p>
+    <p><kbd>⌘K</kbd> opens anything by name. It answers at once, because the whole library is indexed on the Mac. Can’t decide? <kbd>⇧⌘R</kbd> opens something you haven’t seen.</p>
+    <div class="pair">
+      <figure>
+        <picture>
+          <source type="image/webp" srcset="img/unwatched-1200.webp 1200w, img/unwatched-2400.webp 2400w" sizes="(min-width: 75rem) 40rem, 92vw">
+          <img class="framed" src="img/unwatched.jpg" width="1280" height="800" loading="lazy" alt="A library's unwatched films as a wall of posters.">
+        </picture>
+        <figcaption>Ten you haven’t seen</figcaption>
+      </figure>
+      <figure class="close">
+        <picture>
+          <source type="image/webp" srcset="img/quickopen-620.webp 620w, img/quickopen-1240.webp 1240w" sizes="(min-width: 75rem) 24rem, 92vw">
+          <img class="cut" src="img/quickopen.jpg" width="1280" height="972" loading="lazy" alt="Quick Open with the letter s typed, listing Singularity, Spring, Sintel and Sprite Fright.">
+        </picture>
+        <figcaption>One letter in</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="scene wide" id="play" data-from="21:08" data-to="21:10" style="--light: 219 160 110; --dim: .5" aria-labelledby="play-h">
+  <p class="clock"><time datetime="21:08">21:08</time></p>
+  <div class="body">
+    <h2 id="play-h">Press play</h2>
+    <div class="columns">
+      <p>The original file comes straight from your server and is decoded on the Mac: H.264, HEVC, AV1 and the older formats, HDR10 and Dolby Vision, stereo to Atmos. If a file won’t open, Plex repackages it, and only then converts it.</p>
+      <p>The sound fits what’s plugged in. The Mac’s speakers, headphones, AirPods, 2.1 speakers and a receiver each have a profile, with dialogue lift, night mode and a volume that goes to 400 % without clipping.</p>
+    </div>
+  </div>
+  <figure class="bleed">
+    <picture>
+      <source type="image/webp" srcset="img/player-1200.webp 1200w, img/player-2400.webp 2400w" sizes="100vw">
+      <img src="img/player.jpg" width="1280" height="676" loading="lazy" alt="The player showing Sintel. Its title is at the top left, the time left and “Ends 21:22” at the bottom right.">
+    </picture>
+    <figcaption>Sintel, 14 min 48 s. The player says when it ends, so you don’t do the sum.</figcaption>
+  </figure>
+</section>
+
+<section class="scene" id="what" data-from="21:10" data-to="21:13" style="--light: 128 58 30; --dim: .5" aria-labelledby="what-h">
+  <p class="clock"><time datetime="21:10">21:10</time></p>
+  <div class="body">
+    <h2 id="what-h">What did they say?</h2>
+    <p>Press <button type="button" class="key" id="w" hidden>W</button><kbd class="nojs">W</kbd>. Mezzanine goes back ten seconds with subtitles on, then turns them off again.</p>
+    <figure class="say" id="say">
+      <picture class="now">
+        <source type="image/webp" srcset="img/before-1200.webp 1200w, img/before-2400.webp 2400w" sizes="(min-width: 75rem) 62rem, 92vw">
+        <img class="framed" src="img/before.jpg" width="1280" height="676" loading="lazy" alt="Sintel: the old shaman speaks. No subtitles.">
+      </picture>
+      <picture class="back">
+        <source type="image/webp" srcset="img/subtitle-1200.webp 1200w, img/subtitle-2400.webp 2400w" sizes="(min-width: 75rem) 62rem, 92vw">
+        <img class="framed" src="img/subtitle.jpg" width="1280" height="676" loading="lazy" alt="Ten seconds earlier, with the subtitle: What brings you to the land of the gatekeepers?">
+      </picture>
+      <p class="sr" aria-live="polite" id="said"></p>
+    </figure>
+    <p>No subtitles in the file? Search Plex and several free sources at once, or have the Mac listen: it can write subtitles from the dialogue, translate them, and match a file’s timing to the speech. The listening and translating stay on the Mac.</p>
+  </div>
+</section>
+
+<section class="scene" id="browse" data-from="21:13" data-to="21:20" style="--light: 150 88 68; --dim: .36" aria-labelledby="browse-h">
+  <p class="clock"><time datetime="21:13">21:13</time></p>
+  <div class="body">
+    <h2 id="browse-h">Look something up, keep watching</h2>
+    <p><kbd>⌥M</kbd> puts the film in the corner while you browse. Picture in Picture takes it to any app. AirPlay or Google Cast takes it to the TV, with the Mac as the remote.</p>
+    <figure>
+      <picture>
+        <source type="image/webp" srcset="img/mini-1200.webp 1200w, img/mini-2400.webp 2400w" sizes="(min-width: 75rem) 62rem, 92vw">
+        <img class="framed" src="img/mini.jpg" width="1280" height="800" loading="lazy" alt="Home with the film still playing in a small player at the bottom right.">
+      </picture>
+    </figure>
+  </div>
+</section>
+
+<section class="scene" id="next" data-from="21:20" data-to="22:40" style="--light: 150 128 106; --dim: .26" aria-labelledby="next-h">
+  <p class="clock"><time datetime="21:20">21:20</time></p>
+  <div class="body">
+    <h2 id="next-h">Skip the credits, stay on the sofa</h2>
+    <p><kbd>S</kbd> skips intros and credits, or a rule per show does it for you. Up Next counts down with the next one already warmed up, and asks if you’re still there.</p>
+    <figure>
+      <picture>
+        <source type="image/webp" srcset="img/credits-1200.webp 1200w, img/credits-2400.webp 2400w" sizes="(min-width: 75rem) 62rem, 92vw">
+        <img class="framed" src="img/credits.jpg" width="1280" height="498" loading="lazy" alt="The film shrinks to the left; Up Next shows Sprite Fright with Play Now and Hide, starting in six seconds.">
+      </picture>
+    </figure>
+    <div class="pair flip">
+      <figure class="close">
+        <picture>
+          <source type="image/webp" srcset="img/queue-420.webp 420w, img/queue-840.webp 840w" sizes="(min-width: 75rem) 24rem, 92vw">
+          <img class="cut" src="img/queue.jpg" width="840" height="570" loading="lazy" alt="The queue: Sprite Fright, Spring, Caminandes.">
+        </picture>
+      </figure>
+      <p>Line up the rest of the night with Play Next and Add to Queue, or shuffle a show, a collection or a whole playlist. <kbd>Q</kbd> shows what’s coming.</p>
+    </div>
+  </div>
+</section>
+
+<section class="scene last" id="sleep" data-from="22:40" data-to="23:02" style="--light: 96 52 44; --dim: .14" aria-labelledby="sleep-h">
+  <p class="clock"><time datetime="22:40">22:40</time></p>
+  <div class="body">
+    <h2 id="sleep-h">Stop after this one</h2>
+    <div class="pair">
+      <p><kbd>⌥S</kbd> sets a sleep timer for 15 to 90 minutes, or the end of the episode or film. The sound fades out, playback pauses and the Mac can sleep. Your place is kept on your server, so any Plex app picks it up.</p>
+      <figure class="close">
+        <picture>
+          <source type="image/webp" srcset="img/sleep-420.webp 420w, img/sleep-840.webp 840w" sizes="(min-width: 75rem) 24rem, 92vw">
+          <img class="cut" src="img/sleep.jpg" width="840" height="860" loading="lazy" alt="The sleep timer: off, end of film, or 15 to 90 minutes.">
+        </picture>
+      </figure>
+    </div>
+  </div>
+</section>
+</div>
+
+<section class="plain" id="everything" aria-labelledby="everything-h">
+  <h2 id="everything-h">Everything else</h2>
+  <dl class="list">
+    <div><dt>Watching</dt><dd>Chapters, scrub previews, Go to Time, frame steps, speed from 0.5× to 2×, full-size snapshots. Fit, Fill or Zoom, remembered per title. Media keys, Control Center and AirPods.</dd></div>
+    <div><dt>Subtitles</dt><dd>Text and picture subtitles (SRT, ASS, PGS, VobSub) at the right size and place, with your size, background and timing. Sidecar files.</dd></div>
+    <div><dt>Library</dt><dd>Posters, wide, list, folders or shelves, remembered per library. Collection pages, pins, filters, recent searches. Pick artwork, or hide the badges your server draws on posters.</dd></div>
+    <div><dt>Watchlist</dt><dd>Your Plex watchlist in the sidebar and as a shelf, including titles that aren’t on your server.</dd></div>
+    <div><dt>Profiles</dt><dd>Plex Home profiles with PINs, each with its own shelves, pins and queue. More than one server.</dd></div>
+    <div><dt>Downloads</dt><dd>Offline copies with subtitles and artwork, and “keep the next few episodes” per show. Progress syncs back when you’re online.</dd></div>
+    <div><dt>The Mac</dt><dd>Spotlight finds your films and shows. Shortcuts and Siri can resume, open or surprise you. New-episode notifications.</dd></div>
+    <div><dt>For everyone</dt><dd>VoiceOver, Full Keyboard Access, Reduce Motion, Increase Contrast and Text Size.</dd></div>
+    <div><dt>Looking after itself</dt><dd>Updates install quietly, never in the middle of a film. A diagnostics report you can save has no names, titles, addresses or tokens, and is never sent.</dd></div>
+  </dl>
+</section>
+
+<section class="plain" id="keys" aria-labelledby="keys-h">
+  <h2 id="keys-h">A key for everything</h2>
+  <p>Every player key can be changed, and every action is in a menu too. <kbd>⌘/</kbd> lists them all.</p>
+  <div class="keys">
+    <table>
+      <caption>In the player</caption>
+      <tbody>
+        <tr><th scope="row"><kbd>Space</kbd></th><td>Play, pause</td></tr>
+        <tr><th scope="row"><kbd>←</kbd> <kbd>→</kbd></th><td>Ten seconds</td></tr>
+        <tr><th scope="row"><kbd>S</kbd></th><td>Skip intro or credits</td></tr>
+        <tr><th scope="row"><kbd>N</kbd></th><td>Next episode</td></tr>
+        <tr><th scope="row"><kbd>W</kbd></th><td>What did they say?</td></tr>
+        <tr><th scope="row"><kbd>T</kbd></th><td>Go to a time</td></tr>
+        <tr><th scope="row"><kbd>Q</kbd></th><td>Queue</td></tr>
+        <tr><th scope="row"><kbd>D</kbd></th><td>Dialogue lift</td></tr>
+        <tr><th scope="row"><kbd>⌥S</kbd></th><td>Sleep timer</td></tr>
+        <tr><th scope="row"><kbd>⌥M</kbd></th><td>Mini player</td></tr>
+      </tbody>
+    </table>
+    <table>
+      <caption>Anywhere</caption>
+      <tbody>
+        <tr><th scope="row"><kbd>⌘K</kbd></th><td>Quick Open</td></tr>
+        <tr><th scope="row"><kbd>⌘F</kbd></th><td>Search</td></tr>
+        <tr><th scope="row"><kbd>⌘↩</kbd></th><td>Play the focused title</td></tr>
+        <tr><th scope="row"><kbd>W</kbd></th><td>Watched or unwatched</td></tr>
+        <tr><th scope="row"><kbd>⇧W</kbd></th><td>Watchlist</td></tr>
+        <tr><th scope="row"><kbd>⇧⌘R</kbd></th><td>Surprise Me</td></tr>
+        <tr><th scope="row"><kbd>⌘E</kbd></th><td>Arrange Home</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="plain" id="install" aria-labelledby="install-h">
+  <h2 id="install-h">Install</h2>
+  <ol class="steps">
+    <li><a href="{{download}}">Download Mezzanine {{version}}</a> ({{size}}), open the disk image and drag Mezzanine into Applications.</li>
+    <li>Open it. macOS refuses the first time, because Mezzanine is signed but not notarized by Apple.</li>
+    <li>In System Settings, go to Privacy &amp; Security, scroll to Security and click <b>Open Anyway</b>. You do this once; updates install without it.</li>
+    <li>Sign in to Plex and pick your server.</li>
+  </ol>
+  <p>You need a Mac with Apple silicon, macOS 26, and a Plex Media Server you can sign in to.</p>
+</section>
+
+<section class="plain" id="questions" aria-labelledby="questions-h">
+  <h2 id="questions-h">Questions</h2>
+  <dl class="list two">
+    <div><dt>What does it cost?</dt><dd>Nothing. It’s open source under the MIT license.</dd></div>
+    <div><dt>Do I need Plex Pass?</dt><dd>Not for Mezzanine. Intro and credits markers are made by the server, and that does need Plex Pass.</dd></div>
+    <div><dt>Will it work with a friend’s server?</dt><dd>Yes. Any server your Plex account can see, at home or away.</dd></div>
+    <div><dt>What does it send?</dt><dd>There are no analytics and no account of its own. It talks to plex.tv, your servers, the subtitle sites you turn on, and GitHub for updates. Your Plex token stays in the Keychain. Playback is reported to your server the way every Plex app does it.</dd></div>
+    <div><dt>Intel Macs, iPhone, Apple TV?</dt><dd>No. It’s a Mac app; AirPlay and Google Cast reach the TV.</dd></div>
+    <div><dt>Something’s wrong</dt><dd><a href="https://github.com/ahamedzoha/mezzanine/issues">Open an issue</a>. Help ▸ Save Diagnostics Report… writes a file you can read before you attach it.</dd></div>
+  </dl>
+</section>
+{{sponsor_block}}
+</main>
+
+<footer>
+  <div class="close-row">
+    <p class="goodnight">Good night.</p>
+    <p><a class="secondary" href="{{download}}">Download Mezzanine {{version}}</a></p>
+  </div>
+  <details>
+    <summary>Film credits</summary>
+    <p>The pictures show Mezzanine playing open films by Blender and friends. Posters are made from the films’ own pictures; titles are set in type. Progress, names and the library are invented. Pictures that show Caminandes: Gran Dillama are available under CC BY-SA 3.0.</p>
+    <ul>
+{{credits}}
+    </ul>
+    <p>Headline type: Big Shoulders Display, <a href="fonts/OFL.txt">SIL Open Font License</a>.</p>
+  </details>
+  <p>Mezzanine is an independent project, not affiliated with or endorsed by Plex, Inc. Plex is a trademark of Plex, Inc. This page sets no cookies and loads nothing from anyone else.</p>
+  <p><a href="https://github.com/ahamedzoha/mezzanine">GitHub</a> · <a href="changelog.html">Changelog</a> · <a href="https://github.com/ahamedzoha/mezzanine/blob/main/LICENSE">MIT license</a></p>
+</footer>
+</body>
+</html>

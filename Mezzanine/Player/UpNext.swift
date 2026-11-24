@@ -15,7 +15,8 @@ struct UpNextCard: View {
         VStack(alignment: .leading, spacing: Theme.Space.m) {
             Text("Up Next").font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary)
                 .accessibilityAddTraits(.isHeader)
-            RemoteImage(url: session.backdropURL(next.thumb, pixelWidth: 760), pixelWidth: 760)
+            // A film's thumb is its poster, which this wide card would crop through the title.
+            RemoteImage(url: session.backdropURL(next.kind == .movie ? next.art ?? next.thumb : next.thumb, pixelWidth: 760), pixelWidth: 760)
                 .frame(width: 380, height: 214)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.still, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {

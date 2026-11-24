@@ -1,0 +1,508 @@
+{
+  "_": "The demo library for pictures: Blender's open films, their licences and an invented viewer's progress. See fetch.py, art.swift, server.py.",
+  "state": {
+    "continue": [
+      [
+        "sintel",
+        251
+      ],
+      [
+        "caminandes-2",
+        41
+      ],
+      [
+        "sprite-fright",
+        190
+      ],
+      [
+        "tears-of-steel",
+        402
+      ],
+      [
+        "spring",
+        170
+      ],
+      [
+        "cosmos-laundromat",
+        95
+      ]
+    ],
+    "watched": [
+      "big-buck-bunny",
+      "coffee-run",
+      "elephants-dream"
+    ],
+    "watchlist": [
+      "charge",
+      "spring",
+      "singularity",
+      "wing-it",
+      "hero"
+    ],
+    "new": [
+      "singularity",
+      "wing-it",
+      "charge",
+      "sprite-fright",
+      "hero"
+    ],
+    "collections": [
+      [
+        "1",
+        "Hand-drawn and painted",
+        [
+          "hero",
+          "wing-it",
+          "coffee-run"
+        ]
+      ],
+      [
+        "1",
+        "Machines",
+        [
+          "tears-of-steel",
+          "elephants-dream",
+          "charge",
+          "singularity"
+        ]
+      ],
+      [
+        "1",
+        "Into the woods",
+        [
+          "sprite-fright",
+          "spring",
+          "big-buck-bunny"
+        ]
+      ],
+      [
+        "1",
+        "First open films",
+        [
+          "elephants-dream",
+          "big-buck-bunny",
+          "sintel",
+          "tears-of-steel"
+        ]
+      ]
+    ]
+  },
+  "titles": [
+    {
+      "id": "sintel",
+      "type": "movie",
+      "title": "Sintel",
+      "year": 2010,
+      "director": "Colin Levy",
+      "cast": [
+        [
+          "Halina Reijn",
+          "Sintel"
+        ],
+        [
+          "Thom Hoffman",
+          "Shaman"
+        ]
+      ],
+      "studio": "Blender Foundation",
+      "genres": [
+        "Fantasy",
+        "Adventure",
+        "Animation"
+      ],
+      "duration": 888,
+      "credits": 728,
+      "intro": null,
+      "summary": "A wanderer crosses mountains, deserts and ruins to find the young dragon she once nursed back to health, and learns how long she has been looking.",
+      "source": {
+        "page": "https://studio.blender.org/projects/sintel/",
+        "by": "Blender Foundation, durian.blender.org",
+        "licence": "CC BY 3.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/c0/91/c091f1c8d6aacd18e0285989b69587d3.png",
+      "film": "https://download.blender.org/durian/movies/Sintel.2010.1080p.mkv",
+      "focus": 0.78
+    },
+    {
+      "id": "sprite-fright",
+      "type": "movie",
+      "title": "Sprite Fright",
+      "year": 2021,
+      "director": "Matthew Luhn",
+      "cast": [],
+      "studio": "Blender Studio",
+      "genres": [
+        "Comedy",
+        "Horror",
+        "Animation"
+      ],
+      "duration": 630,
+      "credits": 545,
+      "intro": [
+        42,
+        62
+      ],
+      "summary": "Rowdy teenagers on a trip through an isolated forest find peaceful mushroom creatures that turn out to be an unexpected force of nature.",
+      "source": {
+        "page": "https://studio.blender.org/projects/sprite-fright/",
+        "by": "Blender Studio",
+        "licence": "CC BY 4.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/ff/3d/ff3d8a8048e767cbc92d6489404924b2.jpg",
+      "focus": 0.58
+    },
+    {
+      "id": "spring",
+      "type": "movie",
+      "title": "Spring",
+      "year": 2019,
+      "director": "Andy Goralczyk",
+      "cast": [],
+      "studio": "Blender Studio",
+      "genres": [
+        "Fantasy",
+        "Animation"
+      ],
+      "duration": 464,
+      "credits": 400,
+      "intro": null,
+      "summary": "A shepherd girl and her dog face ancient spirits to keep the cycle of life going.",
+      "source": {
+        "page": "https://studio.blender.org/projects/spring/",
+        "by": "Andy Goralczyk / Blender Foundation",
+        "licence": "CC BY 4.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/e5/0f/e50f13c31a485f3a05d4983f1b4ab7ee.png",
+      "focus": 0.62
+    },
+    {
+      "id": "cosmos-laundromat",
+      "type": "movie",
+      "title": "Cosmos Laundromat",
+      "year": 2015,
+      "director": "Mathieu Auvray",
+      "cast": [],
+      "studio": "Blender Institute",
+      "genres": [
+        "Comedy",
+        "Science Fiction",
+        "Animation"
+      ],
+      "duration": 731,
+      "credits": 640,
+      "intro": null,
+      "summary": "On a desolate island a sheep at the end of his rope meets a salesman who offers him any life he likes.",
+      "source": {
+        "page": "https://studio.blender.org/projects/cosmos-laundromat/",
+        "by": "Blender Foundation, gooseberry.blender.org",
+        "licence": "CC BY 4.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/b4/02/b4026f8bc93f6dce9c66ceb5d142063b.jpg",
+      "focus": 0.8
+    },
+    {
+      "id": "tears-of-steel",
+      "type": "movie",
+      "title": "Tears of Steel",
+      "year": 2012,
+      "director": "Ian Hubert",
+      "cast": [
+        [
+          "Derek de Lint",
+          "Old Thom"
+        ],
+        [
+          "Sergio Hasselbaink",
+          "Barley"
+        ],
+        [
+          "Rogier Schippers",
+          "Captain"
+        ],
+        [
+          "Vanja Rukavina",
+          "Thom"
+        ],
+        [
+          "Denise Rebergen",
+          "Celia"
+        ]
+      ],
+      "studio": "Blender Foundation",
+      "genres": [
+        "Science Fiction",
+        "Action"
+      ],
+      "duration": 734,
+      "credits": 585,
+      "intro": null,
+      "summary": "In a domed Amsterdam, a crew of warriors and scientists restage a moment from the past to stop the machines that came out of it.",
+      "source": {
+        "page": "https://studio.blender.org/projects/tears-of-steel/",
+        "by": "Blender Foundation, mango.blender.org",
+        "licence": "CC BY 3.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/ff/67/ff6786ca1342e226ffb64ddbf6a31e52.png",
+      "focus": 0.61
+    },
+    {
+      "id": "big-buck-bunny",
+      "type": "movie",
+      "title": "Big Buck Bunny",
+      "year": 2008,
+      "director": "Sacha Goedegebure",
+      "cast": [],
+      "studio": "Blender Foundation",
+      "genres": [
+        "Comedy",
+        "Animation"
+      ],
+      "duration": 635,
+      "credits": 490,
+      "intro": null,
+      "summary": "A gentle rabbit has had enough of three rodents and plans a thorough answer.",
+      "source": {
+        "page": "https://studio.blender.org/projects/big-buck-bunny/",
+        "by": "Blender Foundation, bigbuckbunny.org",
+        "licence": "CC BY 3.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/85/26/8526e0d9b7829daaf03a650174bebd15.png",
+      "focus": 0.76
+    },
+    {
+      "id": "charge",
+      "type": "movie",
+      "title": "Charge",
+      "year": 2022,
+      "director": "Hjalti Hjálmarsson",
+      "cast": [],
+      "studio": "Blender Studio",
+      "genres": [
+        "Action",
+        "Science Fiction",
+        "Animation"
+      ],
+      "duration": 263,
+      "credits": 235,
+      "intro": null,
+      "summary": "In an energy-scarce future an old man breaks into a battery factory and meets its guard.",
+      "source": {
+        "page": "https://studio.blender.org/projects/charge/",
+        "by": "Blender Studio",
+        "licence": "CC BY 4.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/f6/76/f67601c6f69b2d7f65a5e5d97e73c4d7.png",
+      "focus": 0.74
+    },
+    {
+      "id": "wing-it",
+      "type": "movie",
+      "title": "Wing It!",
+      "year": 2023,
+      "director": "Rik Schutte",
+      "cast": [],
+      "studio": "Blender Studio",
+      "genres": [
+        "Comedy",
+        "Animation"
+      ],
+      "duration": 238,
+      "credits": 205,
+      "intro": null,
+      "summary": "A careful engineer and an eager pilot take a home-made rocket a good deal further than its checklist allows.",
+      "source": {
+        "page": "https://studio.blender.org/projects/wing-it/",
+        "by": "Blender Studio",
+        "licence": "CC BY 4.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/1c/60/1c60961bd2b161e546343de8022b05c9.jpg",
+      "focus": 0.55
+    },
+    {
+      "id": "coffee-run",
+      "type": "movie",
+      "title": "Coffee Run",
+      "year": 2020,
+      "director": "Hjalti Hjálmarsson",
+      "cast": [],
+      "studio": "Blender Studio",
+      "genres": [
+        "Comedy",
+        "Romance",
+        "Animation"
+      ],
+      "duration": 185,
+      "credits": 160,
+      "intro": null,
+      "summary": "Fuelled by caffeine, a young woman runs through the ups and downs of a relationship.",
+      "source": {
+        "page": "https://studio.blender.org/projects/coffee-run/",
+        "by": "Blender Foundation",
+        "licence": "CC BY 4.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/7a/43/7a43fa6b0bc44e62f1cbb21473800e07.png",
+      "focus": 0.68
+    },
+    {
+      "id": "hero",
+      "type": "movie",
+      "title": "HERO",
+      "year": 2018,
+      "director": "Daniel Martínez Lara",
+      "cast": [],
+      "studio": "Blender Institute",
+      "genres": [
+        "Action",
+        "Animation"
+      ],
+      "duration": 237,
+      "credits": 195,
+      "intro": null,
+      "summary": "A drawn showcase of a hero's fight, made to push Blender's Grease Pencil.",
+      "source": {
+        "page": "https://studio.blender.org/projects/hero/",
+        "by": "Blender Foundation",
+        "licence": "CC BY 4.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/2e/cb/2ecb2976719298685517e7a559f7f770.png",
+      "focus": 0.57
+    },
+    {
+      "id": "singularity",
+      "type": "movie",
+      "title": "Singularity",
+      "year": 2025,
+      "director": null,
+      "cast": [],
+      "studio": "Blender Studio",
+      "genres": [
+        "Science Fiction",
+        "Animation"
+      ],
+      "duration": 391,
+      "credits": 350,
+      "intro": null,
+      "summary": "An open film by Blender Studio.",
+      "source": {
+        "page": "https://studio.blender.org/projects/singularity/",
+        "by": "Blender Studio",
+        "licence": "CC BY 4.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/77/d2/77d22fd704cf7ee46e009032d2d906a6.webp",
+      "focus": 0.74
+    },
+    {
+      "id": "elephants-dream",
+      "type": "movie",
+      "title": "Elephants Dream",
+      "year": 2006,
+      "director": "Bassam Kurdali",
+      "cast": [
+        [
+          "Tygo Gernandt",
+          "Proog"
+        ],
+        [
+          "Cas Jansen",
+          "Emo"
+        ]
+      ],
+      "studio": "Orange Open Movie Project",
+      "genres": [
+        "Science Fiction",
+        "Animation"
+      ],
+      "duration": 658,
+      "credits": 560,
+      "intro": null,
+      "summary": "Two men explore a vast, strange machine; only one of them believes in it.",
+      "source": {
+        "page": "https://studio.blender.org/projects/elephants-dream/",
+        "by": "Orange Open Movie Project Team, orange.blender.org",
+        "licence": "CC BY 2.5"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/8b/d7/8bd7d4c5b572890a86299ff40813a201.png",
+      "focus": 0.64
+    },
+    {
+      "id": "glass-half",
+      "type": "movie",
+      "title": "Glass Half",
+      "year": 2015,
+      "director": "Beorn Leonard",
+      "cast": [],
+      "studio": "Blender Institute",
+      "genres": [
+        "Comedy",
+        "Animation"
+      ],
+      "duration": 191,
+      "credits": 170,
+      "intro": null,
+      "summary": "Two amateur art critics meet in a gallery and argue about what art is.",
+      "source": {
+        "page": "https://studio.blender.org/projects/glass-half/",
+        "by": "Blender Foundation",
+        "licence": "CC BY 4.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/55/fe/55fe87e01cb1c1404fd0ca3dbce4f536.png",
+      "focus": 0.66
+    },
+    {
+      "id": "caminandes",
+      "type": "show",
+      "title": "Caminandes",
+      "year": 2013,
+      "director": "Pablo Vazquez",
+      "cast": [],
+      "studio": "Blender Foundation",
+      "genres": [
+        "Comedy",
+        "Animation"
+      ],
+      "summary": "Koro the llama takes on a road, a fence and a winter in Patagonia.",
+      "source": null,
+      "picture": null,
+      "artOf": "caminandes-3",
+      "focus": 0.64
+    },
+    {
+      "id": "caminandes-2",
+      "type": "episode",
+      "show": "caminandes",
+      "index": 2,
+      "title": "Gran Dillama",
+      "year": 2013,
+      "duration": 146,
+      "credits": 125,
+      "intro": null,
+      "summary": "An electric fence stands between Koro and a fine-looking bush.",
+      "source": {
+        "page": "https://studio.blender.org/projects/caminandes-2/",
+        "by": "Pablo Vazquez, Beorn Leonard, Francesco Siddi / Blender Foundation",
+        "licence": "CC BY-SA 3.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/57/82/578225d0072b436d065474797d4f6517.png",
+      "date": "2013-11-22"
+    },
+    {
+      "id": "caminandes-3",
+      "type": "episode",
+      "show": "caminandes",
+      "index": 3,
+      "title": "Llamigos",
+      "year": 2016,
+      "duration": 150,
+      "credits": 132,
+      "intro": null,
+      "summary": "In the snow, Koro and Oti the penguin want the same berries.",
+      "source": {
+        "page": "https://studio.blender.org/projects/caminandes-3/",
+        "by": "Blender Foundation",
+        "licence": "CC BY 3.0"
+      },
+      "picture": "https://studio.blender.org/files/public/header/project/2f/89/2f897cfe4d6092c3ce77566de98019e1.jpg",
+      "date": "2016-01-30"
+    }
+  ]
+}

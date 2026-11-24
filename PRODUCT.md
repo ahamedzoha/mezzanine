@@ -77,7 +77,7 @@ Confirmed for v1:
   the server), OpenSubtitles.com directly, upload back to Plex; on-device translation and
   generated subtitles (M12).
 - Trakt sync, Plex Home switching, offline downloads.
-- Constraints: macOS 26 only; private distribution first (Sparkle after v1); app sandbox;
+- Constraints: macOS 26 only; public, signed but not notarized (Sparkle updates); app sandbox;
   token never in URLs or logs; testing never writes play history.
 
 ## Brand Commitments

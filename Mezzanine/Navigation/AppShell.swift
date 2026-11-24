@@ -233,6 +233,8 @@ struct AppShell: View {
     private func launchHooks() async {
         // -QueueSeed "58528,57206" queues titles; -SpotlightClear YES takes a test's titles out again.
         if let keys = UserDefaults.standard.string(forKey: "QueueSeed"), let client = session.client {
+            // After the profile's own queue has loaded, which would replace these.
+            try? await Task.sleep(for: .seconds(1))
             playback.queue.change { $0.clear() }
             for key in keys.split(separator: ",") {
                 if let item = try? await client.metadata(String(key)) { playback.queue.change { $0.add([QueueStore.entry(item)]) } }

@@ -358,12 +358,21 @@ struct PlayerStage: View {
         }
     }
 
+    /// -ClockAt 21:08 (Debug): the time "Ends" counts from, so a picture's clock can be chosen.
+    private static func clockNow(_ now: Date) -> Date {
+        #if DEBUG
+        if let parts = UserDefaults.standard.string(forKey: "ClockAt")?.split(separator: ":").compactMap({ Int($0) }), parts.count == 2,
+           let date = Calendar.current.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: now) { return date }
+        #endif
+        return now
+    }
+
     /// "−44:02 · Ends 23:42", and the sleep timer while one is set.
     private var remainingLine: some View {
         // The clock moves on while the film is paused.
         TimelineView(.periodic(from: .now, by: 15)) { context in
             let left = clock(max(0, player.duration - player.currentTime))
-            let end = TimeEntry.end(current: player.currentTime, duration: player.duration, rate: player.rate, now: context.date)
+            let end = TimeEntry.end(current: player.currentTime, duration: player.duration, rate: player.rate, now: Self.clockNow(context.date))
                 .map { $0.formatted(date: .omitted, time: .shortened) }
             let timer = playback.sleep.isOn ? playback.sleep.label(for: item) : nil
             HStack(spacing: Theme.Space.m) {

@@ -1,0 +1,6 @@
+{
+  "base": "https://ahamedzoha.github.io/mezzanine/",
+  "sponsors": false,
+  "sponsorURL": "https://github.com/sponsors/ahamedzoha",
+  "sponsorBlock": "<section class=\"scene quiet-scene\" id=\"sponsor\"><div class=\"body\"><h2>Keep the lamp on</h2><p>Mezzanine is free and made by one person. If it makes your evenings better, you can <a href=\"{url}\">sponsor it on GitHub</a>.</p></div></section>"
+}

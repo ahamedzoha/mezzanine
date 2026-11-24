@@ -5,6 +5,11 @@ public struct ResolvedConnection: Sendable, Equatable {
     public let connection: PlexConnection
     public let latency: Duration
     public var baseURL: URL { connection.url! }
+
+    public init(connection: PlexConnection, latency: Duration) {
+        self.connection = connection
+        self.latency = latency
+    }
 }
 
 /// Probes one address. The default probe asks the server for `/identity`

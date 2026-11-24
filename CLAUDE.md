@@ -36,8 +36,15 @@ Scripts/release.sh 0.3.0 --local          # same, built and published from this 
   resets its history. The same DMG becomes a GitHub Release on this repo (`Scripts/github-release.sh`),
   the page people download from. Installed copies download it and install on quit.
 - `CI` (`.github/workflows/ci.yml`) builds unsigned and runs the kit tests on every push and PR
-  (free on a public repo). README screenshots: `Scripts/screenshots/all.sh` (window-only
-  captures of the Debug app with `-PublicNames YES`, then framed; look at every one before a commit).
+  (free on a public repo). Pictures for the README and the website come from the
+  demo library (`Scripts/demo`: Blender's open films on 127.0.0.1, `-DemoServer http://127.0.0.1:32499`,
+  no Plex server, plex.tv or Keychain): once `Scripts/demo/fetch.py` (asks nothing; ~1.2 GB from Blender,
+  ask the owner first) and `swift Scripts/demo/art.swift`, then `Scripts/screenshots/all.sh` and
+  `Scripts/screenshots/site.sh`. No studio artwork in public pictures; look at every one; keep
+  `docs/screenshots/CREDITS.md` and `Scripts/demo/library.json` (the site's credits) in step.
+- Website: `site/`, built by `Scripts/site.py` (`--offline` for previews) into `build.noindex/site`,
+  published by `.github/workflows/pages.yml` on `site/**` pushes and after each Release. Donations:
+  `site/config.json` `sponsors` stays false until the owner's GitHub Sponsors page is approved.
 - The Release workflow runs on tags and "Run workflow"; `--local` builds on the Mac instead.
 - Build number = `git rev-list --count HEAD` (local installs too), so releases always compare newer.
 - Secrets (private repo): `MAC_CERT_P12`/`MAC_CERT_PASSWORD` (the Apple Development identity,
@@ -81,7 +88,7 @@ Build output goes to `build.noindex/` (Spotlight skips it).
 `-PlayerOptionsOpen YES` `-PlayerOptionsPage search|subtitles|audio|picture|sleep|queue` `-SleepTimerSeconds 30` (a timed choice ends that soon) `-DiagnosticsReport YES` (writes the report into the container after 15 s) `-FindSubtitlesChoose YES` (picks the first non-Plex result; local only) `-PlayerFullScreen YES` `-PlayerKeyScript "i,c,shift+right,!snapshot"`
 (`~3` waits 3 s, `!fs` toggles full screen directly) `-SelectBehindAfter 14` (switches the page under the player)
 (real key events through the router; menus ignore keys while the app is in the background, so
-⌘ items use `!action`) `-ScrubHoverAt 0.6` `-SnapshotNoClipboard YES`; detail:
+⌘ items use `!action`) `-ScrubHoverAt 0.6` `-SnapshotNoClipboard YES` `-ClockAt 21:08` (what "Ends" counts from); detail:
 `-MezzanineOpen <ratingKey>` `-DetailSection cast`; windows: `-MezzanineOpenWindow shortcuts|settings`
 with `-settingsTab shortcuts`. Debug builds are `com.mezzanine.mac.debug` (own container,
 defaults and Keychain item), so test runs never change the installed app's settings or sign-in; delivery: `-PlayerQuality remux|convert|8000` `-ForceDirectFail YES`

@@ -9,6 +9,8 @@
   Direct play, a binge flow that stays out of the way, and a keyboard for everything.
 </p>
 
+<p align="center"><a href="https://ahamedzoha.github.io/mezzanine/"><b>ahamedzoha.github.io/mezzanine</b></a></p>
+
 <p align="center">
   <a href="https://github.com/ahamedzoha/mezzanine/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/ahamedzoha/mezzanine?color=a08cff&label=release"></a>
   <a href="https://github.com/ahamedzoha/mezzanine/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ahamedzoha/mezzanine/actions/workflows/ci.yml/badge.svg"></a>
@@ -115,11 +117,13 @@ VoiceOver, Full Keyboard Access, Reduce Motion, Increase Contrast and Text Size 
 
 | | |
 |---|---|
-| <img src="docs/screenshots/show.jpg" alt="A show's page with seasons and episodes"><br>A show | <img src="docs/screenshots/movie.jpg" alt="A film's page"><br>A film |
+| <img src="docs/screenshots/show.jpg" alt="A show's page with its episodes"><br>A show | <img src="docs/screenshots/movie.jpg" alt="A film's page"><br>A film |
 | <img src="docs/screenshots/player.jpg" alt="The player, with the time the film ends"><br>The player | <img src="docs/screenshots/player-options.jpg" alt="Audio, subtitles, sound, speed, picture, quality, queue and sleep timer in the player"><br>Options |
-| <img src="docs/screenshots/queue.jpg" alt="The queue in the player"><br>The queue | <img src="docs/screenshots/sleep.jpg" alt="The sleep timer"><br>Sleep timer |
-| <img src="docs/screenshots/unwatched.jpg" alt="A library's unwatched films"><br>Unwatched films | <img src="docs/screenshots/collections.jpg" alt="A library's collections"><br>Collections |
+| <img src="docs/screenshots/credits.jpg" alt="Up Next over the credits"><br>Up Next | <img src="docs/screenshots/queue.jpg" alt="The queue in the player"><br>The queue |
+| <img src="docs/screenshots/sleep.jpg" alt="The sleep timer"><br>Sleep timer | <img src="docs/screenshots/unwatched.jpg" alt="A library's unwatched films"><br>Unwatched films |
 | <img src="docs/screenshots/watchlist.jpg" alt="The Plex watchlist"><br>Watchlist | <img src="docs/screenshots/search.jpg" alt="The search panel"><br>Search |
+
+Pictures: open films by Blender ([credits](docs/screenshots/CREDITS.md)).
 
 ## Install
 
@@ -163,6 +167,7 @@ must not write watch history.
 |---|---|
 | `Mezzanine/` | The app (SwiftUI, main-actor by default) |
 | `MezzanineKit/` | Swift package: the Plex client, local index (GRDB), subtitles, on-device speech, Google Cast, and `MezzaninePlayback`, the only code that touches the playback engine |
+| `site/` | The website (GitHub Pages; built by `Scripts/site.py`) |
 | `docs/ARCHITECTURE.md` | How it fits together |
 | `DESIGN.md` | The design system ("Bias Light") and every screen's rules |
 | `docs/ROADMAP.md` | What's next: requests (Seerr), upcoming episodes (Sonarr/Radarr), server subtitles (Bazarr), stats (Tautulli), all optional; Plex alone stays a complete app |

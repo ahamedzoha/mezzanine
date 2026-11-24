@@ -8,13 +8,15 @@ public struct PlexDiscover: Sendable {
 
     let identity: PlexIdentity
     let token: String
+    let base: URL
     let session: URLSession
     /// Tells two accounts apart without giving the token away.
     public var account: Int { token.hashValue }
 
-    public init(identity: PlexIdentity, token: String, session: URLSession = Transport.makeAPISession()) {
+    public init(identity: PlexIdentity, token: String, base: URL = PlexDiscover.baseURL, session: URLSession = Transport.makeAPISession()) {
         self.identity = identity
         self.token = token
+        self.base = base
         self.session = session
     }
 
@@ -61,7 +63,7 @@ public struct PlexDiscover: Sendable {
     }
 
     private func request(_ method: String, _ path: String, query: [URLQueryItem]) -> URLRequest {
-        var components = URLComponents(url: Self.baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: base.appending(path: path), resolvingAgainstBaseURL: false)!
         components.queryItems = query
         var request = URLRequest(url: components.url!)
         request.httpMethod = method

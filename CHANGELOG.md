@@ -3,6 +3,10 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 1.0.2 — unreleased
+
+- Up Next shows a film's backdrop instead of its poster cut through the title.
+
 ## 1.0.1 — 2026-11-24
 
 - Other programs on your Mac can no longer attach to Mezzanine and read its memory.

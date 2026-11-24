@@ -57,7 +57,12 @@ final class SessionStore {
     var activeToken: String? { keychain.read(Self.profileKey) ?? token }
 
     /// Plex's own service for the profile in use (its watchlist).
-    var discover: PlexDiscover? { activeToken.map { PlexDiscover(identity: identity, token: $0) } }
+    var discover: PlexDiscover? {
+        #if DEBUG
+        if let demo = Self.demoServer { return PlexDiscover(identity: identity, token: "demo", base: demo) }
+        #endif
+        return activeToken.map { PlexDiscover(identity: identity, token: $0) }
+    }
 
     /// One identifier per install. plex.tv ties the token and the Authorized
     /// Devices entry to it; Plex ties playback sessions to it.
@@ -73,6 +78,7 @@ final class SessionStore {
 
     func restore() async {
         #if DEBUG
+        if let demo = Self.demoServer { await connectDemo(demo); return }
         // Dev seeding (Scripts/dev-run.sh): a fresh Debug build signs in with the dev token
         // from .mezzanine-live.env instead of the browser flow. The env var only exists when
         // the binary is launched from that script.
@@ -209,10 +215,40 @@ final class SessionStore {
         AppLog.session.notice("connected, \(self.routeWords, privacy: .public)")
     }
 
+    #if DEBUG
+    /// -DemoServer http://127.0.0.1:32499: the open-film library in Scripts/demo, for pictures anyone
+    /// may see. plex.tv is never asked, the Keychain isn't read, and only this Mac's own addresses count.
+    static let demoServer: URL? = UserDefaults.standard.string(forKey: "DemoServer").flatMap(URL.init(string:))
+        .flatMap { $0.scheme == "http" && ["127.0.0.1", "localhost"].contains($0.host()) ? $0 : nil }
+
+    private func connectDemo(_ url: URL) async {
+        phase = .connecting
+        struct Identity: Decodable { struct Box: Decodable { let machineIdentifier: String }; let MediaContainer: Box }
+        guard let (data, _) = try? await URLSession.shared.data(from: url.appending(path: "identity")),
+              let machine = try? JSONDecoder().decode(Identity.self, from: data).MediaContainer.machineIdentifier,
+              let newAccount = try? JSONDecoder().decode(PlexAccount.self, from: Data(#"{"id":1,"uuid":"demo","title":"Sam"}"#.utf8)) else {
+            phase = .failed("The demo server isn't running.")
+            return
+        }
+        let here = PlexConnection(protocolName: "http", address: "127.0.0.1", port: url.port ?? 80, uri: url.absoluteString, local: true, relay: false)
+        let server = PlexServerResource(name: "Living Room", clientIdentifier: machine, accessToken: "demo", connections: [here])
+        account = newAccount
+        servers = [server]
+        currentServer = server
+        connection = ResolvedConnection(connection: here, latency: .milliseconds(1))
+        client = PlexServerClient(baseURL: url, token: "demo", machineIdentifier: machine, identity: identity)
+        await images.setToken("demo", host: url.host(), serverID: machine)
+        phase = .ready
+    }
+    #endif
+
     // MARK: Plex Home
 
     /// Loads the Home's members (account token; only the owner can list them).
     func loadHomeUsers() async {
+        #if DEBUG
+        if Self.demoServer != nil { return }
+        #endif
         guard let token else { return }
         homeUsers = (try? await tv.homeUsers(token: token)) ?? []
         Task { await loadAvatars() }

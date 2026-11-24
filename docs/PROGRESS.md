@@ -18,8 +18,20 @@ Open, waiting on the owner:
 - Cast's Connecting/Cancel and failure panels haven't been seen on the TV (only on the Mac).
 - Whether the logo still goes missing in full screen (see the grey-band entry).
 
-Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
-a GitHub Pages website that looks professional and asks for donations.
+Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is built (2026-11-24);
+donations wait for GitHub Sponsors.
+
+## 2026-11-24 — Website and demo library
+
+- Built, not published yet: `site/` for ahamedzoha.github.io/mezzanine ("One evening", Persuade, Bias Light): one page told by the
+  clock, a changelog and a 404; no JavaScript needed, no cookies, nothing from third parties.
+- The owner's user Pages repo had an expired custom domain, which every project page redirected to;
+  removed.
+- `Scripts/demo`: a stand-in server for pictures (Blender's open films). Wikimedia Commons refused
+  automated downloads (429), so files come from download.blender.org and studio.blender.org.
+- All public pictures were replaced: no studio artwork, no real server behind them.
+- App: Up Next shows a film's backdrop instead of cropping its poster (next release).
+- Waiting on the owner: GitHub Sponsors enrolment, then `sponsors: true` and `.github/FUNDING.yml`.
 
 ## 2026-11-24 — 1.0.1: no get-task-allow in Release
 
