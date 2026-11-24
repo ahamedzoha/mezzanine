@@ -67,11 +67,11 @@ extension LibraryIndex {
             case .years(let a, let b):
                 clauses.append("item.year BETWEEN ? AND ?"); args += [min(a, b), max(a, b)]
             case .watch(.unwatched):
-                clauses.append("((item.kind IN ('show','season') AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0)) OR (item.kind NOT IN ('show','season') AND item.viewCount = 0))")
+                clauses.append(WatchSQL.unwatched)
             case .watch(.inProgress):
-                clauses.append("(item.viewOffset > 0 OR (item.kind = 'show' AND COALESCE(item.viewedLeafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0)))")
+                clauses.append(WatchSQL.inProgress)
             case .watch(.watched):
-                clauses.append("((item.kind IN ('show','season') AND COALESCE(item.leafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) >= item.leafCount) OR (item.kind NOT IN ('show','season') AND item.viewCount > 0 AND item.viewOffset = 0))")
+                clauses.append(WatchSQL.watched)
             case .addedWithin(let days):
                 clauses.append("item.addedAt >= ?"); args.append(now.timeIntervalSince1970 - Double(days) * 86_400)
             case .minRating(let r):

@@ -66,6 +66,60 @@ import Testing
         #expect(try index.count(section: "2", kinds: ["movie"]) == 0)
     }
 
+    /// A query's count is always the number of rows its page shows.
+    @Test func countFollowsEveryFilter() throws {
+        let index = try LibraryIndex()
+        let movies = try entries("movies-page")
+        try index.upsert(movies, section: "1")
+        try index.updateProgress(ratingKey: movies[0].0.ratingKey, viewOffset: 60_000, viewCount: nil)
+        var queries = [LibraryQuery(section: "1", kinds: ["movie"])]
+        func add(_ change: (inout LibraryQuery) -> Void) {
+            var q = LibraryQuery(section: "1", kinds: ["movie"])
+            change(&q)
+            queries.append(q)
+        }
+        add { $0.unwatchedOnly = true }
+        add { $0.inProgressOnly = true }
+        add { $0.watchedOnly = true }
+        add { $0.hdrOnly = true }
+        add { $0.minAudioChannels = 6 }
+        add { $0.genre = movies.first?.0.genres.first?.tag }
+        add { $0.decade = movies.first?.0.year.map { $0 / 10 * 10 } }
+        add { $0.text = movies.first?.0.title; $0.unwatchedOnly = true }
+        for q in queries { #expect(try index.count(q) == index.items(q).count) }
+        #expect(try index.count(queries[2]) >= 1)
+    }
+
+    /// A show is in progress when some, not all, of its episodes are watched.
+    @Test func showsInProgress() throws {
+        let index = try LibraryIndex()
+        func show(_ key: String, viewed: Int, of total: Int) throws -> (PlexMetadata, Data) {
+            let json = Data(#"{"ratingKey":"\#(key)","type":"show","title":"Show \#(key)","leafCount":\#(total),"viewedLeafCount":\#(viewed)}"#.utf8)
+            return (try JSONDecoder().decode(PlexMetadata.self, from: json), json)
+        }
+        try index.upsert([show("a", viewed: 0, of: 10), show("b", viewed: 4, of: 10), show("c", viewed: 10, of: 10)], section: "2")
+        var q = LibraryQuery(section: "2", kinds: ["show"])
+        q.inProgressOnly = true
+        #expect(try index.items(q).map(\.ratingKey) == ["b"])
+        #expect(try index.count(q) == 1)
+        q.inProgressOnly = false
+        q.unwatchedOnly = true
+        #expect(try Set(index.items(q).map(\.ratingKey)) == ["a", "b"])
+    }
+
+    @Test func randomPicksWithinSectionKindAndWatchState() throws {
+        let index = try LibraryIndex()
+        let movies = try entries("movies-page")
+        try index.upsert(movies, section: "1")
+        #expect(try index.random(sections: ["1"], kinds: ["movie"], unwatchedOnly: false) != nil)
+        for _ in 0..<20 {
+            if let pick = try index.random(sections: ["1"], kinds: ["movie"]) { #expect(pick.viewCount == 0) }
+        }
+        #expect(try index.random(sections: ["1"], kinds: ["show"], unwatchedOnly: false) == nil)
+        #expect(try index.random(sections: ["9"], kinds: ["movie"], unwatchedOnly: false) == nil)
+        #expect(try index.random(sections: [], kinds: ["movie"]) == nil)
+    }
+
     @Test func pruneSectionsDropsLibrariesTheServerLost() throws {
         let index = try LibraryIndex()
         let movies = try entries("movies-page")

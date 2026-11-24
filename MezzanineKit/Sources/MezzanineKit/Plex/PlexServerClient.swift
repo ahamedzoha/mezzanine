@@ -307,6 +307,11 @@ public actor PlexServerClient {
         ])
     }
 
+    /// Takes a title out of Continue Watching (its resume point and watch state stay).
+    public func removeFromContinueWatching(ratingKey: String) async throws {
+        try await write("PUT", "/actions/removeFromContinueWatching", query: [URLQueryItem(name: "ratingKey", value: ratingKey)])
+    }
+
     // MARK: Artwork
 
     /// The poster an agent chose, before any overlay tool (Kometa) replaced it

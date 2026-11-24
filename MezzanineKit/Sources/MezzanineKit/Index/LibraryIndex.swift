@@ -110,6 +110,14 @@ public struct LibraryQuery: Sendable, Equatable, Hashable {
     }
 }
 
+/// Watch state as SQL over `item`: shows and seasons by their episodes' counts, the rest by
+/// their own. Library filters, smart shelves and sidebar counts share these.
+enum WatchSQL {
+    static let unwatched = "((item.kind IN ('show','season') AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0)) OR (item.kind NOT IN ('show','season') AND item.viewCount = 0))"
+    static let inProgress = "(item.viewOffset > 0 OR (item.kind IN ('show','season') AND COALESCE(item.viewedLeafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0)))"
+    static let watched = "((item.kind IN ('show','season') AND COALESCE(item.leafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) >= item.leafCount) OR (item.kind NOT IN ('show','season') AND item.viewCount > 0 AND item.viewOffset = 0))"
+}
+
 /// The local mirror of one server's libraries for one Plex user.
 public final class LibraryIndex: Sendable {
     let pool: DatabasePool
@@ -271,36 +279,60 @@ public final class LibraryIndex: Sendable {
     // MARK: Reads
 
     public func items(_ q: LibraryQuery) throws -> [IndexedItem] {
-        try pool.read { db in
-            var sql = "SELECT item.* FROM item"
-            var args: [any DatabaseValueConvertible] = []
-            var clauses: [String] = ["item.section = ?"]
-            args.append(q.section)
-            if let text = q.text?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
-               let pattern = FTS5Pattern(matchingAllPrefixesIn: text) {
-                sql += " JOIN item_ft ON item_ft.rowid = item.rowid AND item_ft MATCH ?"
-                args.append(pattern.rawPattern)
-            }
-            if !q.kinds.isEmpty {
-                clauses.append("item.kind IN (\(q.kinds.map { _ in "?" }.joined(separator: ",")))")
-                args += q.kinds
-            }
-            if q.unwatchedOnly {
-                clauses.append("((item.kind IN ('show','season') AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0)) OR (item.kind NOT IN ('show','season') AND item.viewCount = 0))")
-            }
-            if q.inProgressOnly { clauses.append("item.viewOffset > 0") }
-            if q.watchedOnly {
-                clauses.append("((item.kind IN ('show','season') AND COALESCE(item.leafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) >= item.leafCount) OR (item.kind NOT IN ('show','season') AND item.viewCount > 0 AND item.viewOffset = 0))")
-            }
-            if let genre = q.genre { clauses.append("item.genres LIKE ?"); args.append("%|\(genre)|%") }
-            if let decade = q.decade { clauses.append("item.year BETWEEN ? AND ?"); args += [decade, decade + 9] }
-            if let res = q.resolution { clauses.append("item.resolution = ?"); args.append(res) }
-            if q.hdrOnly { clauses.append("item.isHDR = 1") }
-            if let ch = q.minAudioChannels { clauses.append("item.audioChannels >= ?"); args.append(ch) }
-            sql += " WHERE " + clauses.joined(separator: " AND ")
-            sql += " ORDER BY " + Self.order(q.sort)
-            return try IndexedItem.fetchAll(db, sql: sql, arguments: StatementArguments(args))
+        let (from, args) = Self.from(q)
+        return try pool.read { db in
+            try IndexedItem.fetchAll(db, sql: "SELECT item.* \(from) ORDER BY \(Self.order(q.sort))", arguments: StatementArguments(args))
         }
+    }
+
+    /// How many titles `items` would return. Counted in SQLite: loading and sorting the rows
+    /// spills to disk.
+    public func count(_ q: LibraryQuery) throws -> Int {
+        let (from, args) = Self.from(q)
+        return try pool.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) \(from)", arguments: StatementArguments(args)) ?? 0
+        }
+    }
+
+    /// A random title of these sections and kinds (Surprise Me); nil when none match.
+    public func random(sections: [String], kinds: [String], unwatchedOnly: Bool = true) throws -> IndexedItem? {
+        guard !sections.isEmpty, !kinds.isEmpty else { return nil }
+        func marks(_ list: [String]) -> String { list.map { _ in "?" }.joined(separator: ",") }
+        var clauses = ["item.section IN (\(marks(sections)))", "item.kind IN (\(marks(kinds)))"]
+        if unwatchedOnly { clauses.append(WatchSQL.unwatched) }
+        // The key alone is shuffled; the row (with its JSON) is read for the one chosen.
+        return try pool.read { db in
+            try IndexedItem.fetchOne(db, sql: """
+                SELECT * FROM item WHERE ratingKey =
+                    (SELECT ratingKey FROM item WHERE \(clauses.joined(separator: " AND ")) ORDER BY RANDOM() LIMIT 1)
+                """, arguments: StatementArguments(sections + kinds))
+        }
+    }
+
+    /// "FROM item … WHERE …" for a query, shared by the rows and their count.
+    private static func from(_ q: LibraryQuery) -> (String, [any DatabaseValueConvertible]) {
+        var sql = "FROM item"
+        var args: [any DatabaseValueConvertible] = []
+        var clauses: [String] = ["item.section = ?"]
+        if let text = q.text?.trimmingCharacters(in: .whitespaces), !text.isEmpty,
+           let pattern = FTS5Pattern(matchingAllPrefixesIn: text) {
+            sql += " JOIN item_ft ON item_ft.rowid = item.rowid AND item_ft MATCH ?"
+            args.append(pattern.rawPattern)
+        }
+        args.append(q.section)
+        if !q.kinds.isEmpty {
+            clauses.append("item.kind IN (\(q.kinds.map { _ in "?" }.joined(separator: ",")))")
+            args += q.kinds
+        }
+        if q.unwatchedOnly { clauses.append(WatchSQL.unwatched) }
+        if q.inProgressOnly { clauses.append(WatchSQL.inProgress) }
+        if q.watchedOnly { clauses.append(WatchSQL.watched) }
+        if let genre = q.genre { clauses.append("item.genres LIKE ?"); args.append("%|\(genre)|%") }
+        if let decade = q.decade { clauses.append("item.year BETWEEN ? AND ?"); args += [decade, decade + 9] }
+        if let res = q.resolution { clauses.append("item.resolution = ?"); args.append(res) }
+        if q.hdrOnly { clauses.append("item.isHDR = 1") }
+        if let ch = q.minAudioChannels { clauses.append("item.audioChannels >= ?"); args.append(ch) }
+        return (sql + " WHERE " + clauses.joined(separator: " AND "), args)
     }
 
     /// Whole-library search across every section (titles, people, collections, summaries).
@@ -376,13 +408,9 @@ public final class LibraryIndex: Sendable {
         try pool.read { db in try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM item WHERE section = ?", arguments: [section]) ?? 0 }
     }
 
-    /// Counted in SQLite: loading and sorting the rows spills to disk on every sync.
     public func count(section: String, kinds: [String]) throws -> Int {
         guard !kinds.isEmpty else { return 0 }
-        return try pool.read { db in
-            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM item WHERE section = ? AND kind IN (\(kinds.map { _ in "?" }.joined(separator: ",")))",
-                             arguments: StatementArguments([section] + kinds)) ?? 0
-        }
+        return try count(LibraryQuery(section: section, kinds: kinds))
     }
 
     static func order(_ sort: LibraryQuery.Sort) -> String {
