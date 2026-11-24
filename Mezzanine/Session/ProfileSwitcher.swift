@@ -61,11 +61,11 @@ struct SidebarProfileButton: View {
             ProfileMenuItems(session: session, commands: commands)
         } label: {
             HStack(spacing: Theme.Space.s) {
-                RemoteImage(url: URL(string: current?.thumb ?? session.account?.thumb ?? ""), pixelWidth: 64, placeholder: Theme.raised)
+                RemoteImage(url: SessionStore.usesPublicNames ? nil : URL(string: current?.thumb ?? session.account?.thumb ?? ""), pixelWidth: 64, placeholder: Theme.raisedHover)
                     .frame(width: 26, height: 26)
                     .clipShape(Circle())
                     .accessibilityHidden(true)
-                Text(current?.title ?? session.account?.displayName ?? "Profile")
+                Text(session.shownProfileName(current?.title ?? session.account?.displayName ?? "Profile"))
                     .font(Theme.Typeface.cardTitle)
                     .foregroundStyle(Theme.ink)
                     .lineLimit(1)

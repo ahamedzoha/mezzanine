@@ -144,7 +144,7 @@ private struct ActivityPanel: View {
     }
 
     private var serverLine: String {
-        guard let server = session.currentServer else { return "Not connected" }
-        return "\(server.name) · \(session.routeWords)"
+        guard let name = session.shownServerName else { return "Not connected" }
+        return "\(name) · \(session.routeWords)"
     }
 }

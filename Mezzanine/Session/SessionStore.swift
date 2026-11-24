@@ -284,6 +284,21 @@ final class SessionStore {
         await images.setToken(server.accessToken ?? token, host: won.baseURL.host(), serverID: server.clientIdentifier)
     }
 
+    // MARK: Names on screen
+
+    /// -PublicNames YES: invented server and profile names, for screenshots anyone may see.
+    static var usesPublicNames: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "PublicNames")
+        #else
+        false
+        #endif
+    }
+
+    var shownServerName: String? { currentServer.map { Self.usesPublicNames ? "Living Room" : $0.name } }
+
+    func shownProfileName(_ name: String) -> String { Self.usesPublicNames ? "Sam" : name }
+
     // MARK: Artwork URLs
 
     /// A poster at the pixel width it's drawn at (2:3), resized by the server.

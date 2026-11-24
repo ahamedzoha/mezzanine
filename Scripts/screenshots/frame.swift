@@ -1,30 +1,16 @@
-// Frames a 1440×900 window capture for the README: rounded corners, an optional blurred
-// rectangle (the profile row in the sidebar), and a graphite backdrop with a soft lilac glow and
-// a shadow (Bias Light). Usage: swift frame.swift in.png out.jpg [blur]
+// Frames a window capture for the README: rounded corners, a graphite backdrop with a soft lilac
+// glow and a shadow (Bias Light), 2000 px wide. Usage: swift frame.swift in.png out.jpg
+// Captures use invented server and profile names (-PublicNames YES), so nothing needs blurring.
 import AppKit
-import CoreImage
 
 let args = CommandLine.arguments
 let input = URL(fileURLWithPath: args[1]), output = URL(fileURLWithPath: args[2])
-let blurProfile = args.count > 3 && args[3] == "blur"
-
-guard let source = CIImage(contentsOf: input) else { fatalError("can't read \(input.path)") }
-let w = source.extent.width, h = source.extent.height
-var window = source
-
-// The profile row (avatar + name) at the bottom of the sidebar, in window points (top-left origin).
-if blurProfile {
-    let row = CGRect(x: 10, y: h - 892, width: 200, height: 52)   // CI's origin is bottom-left
-    let blurred = source.clampedToExtent()
-        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 9])
-        .cropped(to: row)
-    window = blurred.composited(over: source)
-}
-
-let ctxCI = CIContext()
-guard let windowCG = ctxCI.createCGImage(window, from: source.extent) else { fatalError() }
+guard let rep0 = NSBitmapImageRep(data: try Data(contentsOf: input)), let windowCG = rep0.cgImage else { fatalError("can't read \(input.path)") }
 
 let pad: CGFloat = 70
+// The window at a size that makes the whole picture 2000 px wide.
+let w: CGFloat = 2000 - pad * 2
+let h = (w * CGFloat(windowCG.height) / CGFloat(windowCG.width)).rounded()
 let canvas = CGSize(width: w + pad * 2, height: h + pad * 2)
 let space = CGColorSpace(name: CGColorSpace.sRGB)!
 let ctx = CGContext(data: nil, width: Int(canvas.width), height: Int(canvas.height), bitsPerComponent: 8,
@@ -41,7 +27,7 @@ let centre = CGPoint(x: canvas.width * 0.3, y: canvas.height * 0.7)
 ctx.drawRadialGradient(glow, startCenter: centre, startRadius: 0, endCenter: centre, endRadius: canvas.width * 0.6, options: [])
 
 let frame = CGRect(x: pad, y: pad, width: w, height: h)
-let shape = CGPath(roundedRect: frame, cornerWidth: 16, cornerHeight: 16, transform: nil)
+let shape = CGPath(roundedRect: frame, cornerWidth: 20, cornerHeight: 20, transform: nil)
 // Shadow under the window.
 ctx.saveGState()
 ctx.setShadow(offset: CGSize(width: 0, height: -18), blur: 50, color: color(0x000000, 0.65))
@@ -50,10 +36,11 @@ ctx.restoreGState()
 // The window, clipped to its rounded corners (drops the desktop in the corners).
 ctx.saveGState()
 ctx.addPath(shape); ctx.clip()
+ctx.interpolationQuality = .high
 ctx.draw(windowCG, in: frame)
 ctx.restoreGState()
 // A hairline edge, as macOS draws on dark windows.
-ctx.addPath(CGPath(roundedRect: frame.insetBy(dx: 0.5, dy: 0.5), cornerWidth: 16, cornerHeight: 16, transform: nil))
+ctx.addPath(CGPath(roundedRect: frame.insetBy(dx: 0.5, dy: 0.5), cornerWidth: 20, cornerHeight: 20, transform: nil))
 ctx.setStrokeColor(color(0xFFFFFF, 0.10)); ctx.setLineWidth(1); ctx.strokePath()
 
 let rep = NSBitmapImageRep(cgImage: ctx.makeImage()!)

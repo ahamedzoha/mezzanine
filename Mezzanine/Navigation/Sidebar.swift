@@ -278,7 +278,7 @@ struct Sidebar: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if !isOffline, let server = session.currentServer { ServerLine(name: server.name) }
+            if !isOffline, let name = session.shownServerName { ServerLine(name: name) }
             if session.homeUsers.count > 1 { SidebarProfileButton() }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
