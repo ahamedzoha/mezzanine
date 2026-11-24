@@ -38,11 +38,9 @@ struct ShellToolbar: ToolbarContent {
     let canSurprise: Bool
 
     var body: some ToolbarContent {
-        ToolbarItem {
-            if shown { SurpriseButton().disabled(!canSurprise) }
-        }
-        ToolbarItem {
-            if shown { ActivityButton() }
+        if shown {
+            ToolbarItem { SurpriseButton().disabled(!canSurprise) }
+            ToolbarItem { ActivityButton() }
         }
     }
 }

@@ -147,6 +147,7 @@ struct AppShell: View {
             detailColumn
         }
         .onChange(of: commands.surpriseRequests) { _, _ in surprise() }
+        .onChange(of: canSurprise, initial: true) { _, can in commands.canSurprise = can }
         .sheet(item: $commands.artworkRequest) { request in
             ArtworkPicker(request: request)
         }
@@ -340,7 +341,7 @@ struct AppShell: View {
     /// Opens a random unwatched title: from the library on screen, else by Home's switch.
     private func surprise() {
         var section: String?
-        var kinds = (HomeKind(rawValue: UserDefaults.standard.string(forKey: "homeKind") ?? "") ?? .all).kinds
+        var kinds = commands.homeKind.kinds
         switch commands.selection {
         case .library(let key), .slice(let key, _): section = key; kinds = ["movie", "show"]
         case .home: break

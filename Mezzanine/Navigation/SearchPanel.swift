@@ -27,14 +27,14 @@ struct SearchPanel: View {
     @State private var lastPointer: CGPoint?
 
     enum Hit: Hashable {
-        case title(PlexMetadata.ID), person(String), episode(PlexMetadata.ID), seeAll, recent(String)
+        case title(PlexMetadata.ID), person(String), episode(PlexMetadata.ID), seeAll, recent(String), clearRecents
     }
 
     private var query: String { commands.query.trimmingCharacters(in: .whitespaces) }
 
     /// Every row in reading order, for the arrow keys.
     private var hits: [Hit] {
-        if query.isEmpty { return commands.recentSearches.map { .recent($0) } }
+        if query.isEmpty { return commands.recentSearches.map { .recent($0) } + [.clearRecents] }
         return titles.map { .title($0.id) } + people.map { .person($0.id) } + episodes.map { .episode($0.id) } + [.seeAll]
     }
 
@@ -118,11 +118,16 @@ struct SearchPanel: View {
     private var recentsFooter: some View {
         HStack {
             Spacer()
-            Button("Clear") { commands.clearRecentSearches() }
-                .buttonStyle(.plain)
-                .font(Theme.Typeface.cardMeta.weight(.semibold))
-                .foregroundStyle(Theme.inkSecondary)
-                .help("Clear recent searches")
+            row(.clearRecents) { selected in
+                Text("Clear")
+                    .font(Theme.Typeface.cardMeta.weight(.semibold))
+                    .foregroundStyle(selected ? Theme.lilac : Theme.ink)
+                    .padding(.horizontal, Theme.Space.m)
+                    .frame(minHeight: 28)
+                    .background(RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous)
+                        .fill(selected ? Theme.raisedHover : .clear))
+            } open: { commands.clearRecentSearches() }
+                .accessibilityLabel("Clear recent searches")
         }
         .padding(.horizontal, Theme.Space.m)
         .padding(.vertical, Theme.Space.s)
@@ -371,6 +376,7 @@ struct SearchPanel: View {
         case .episode(let id): if let item = episodes.first(where: { $0.id == id }) { open(item, play: play) }
         case .person(let id): if let person = people.first(where: { $0.id == id }) { narrow(to: person) }
         case .seeAll: seeAll()
+        case .clearRecents: commands.clearRecentSearches()
         case .recent(let text): commands.query = text; selection = nil
         }
     }

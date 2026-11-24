@@ -21,7 +21,6 @@ struct HomeView: View {
     @Environment(TitleActions.self) private var titleActions
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model = HomeModel()
-    @AppStorage("homeKind") private var kindRaw = HomeKind.all.rawValue
     @State private var showsDetails = false
     @State private var heroFrame: CGRect = .zero
     /// True when the last focus change came from the keyboard (only then do we scroll).
@@ -125,10 +124,11 @@ struct HomeView: View {
         .toolbar {
             if isMain {
                 ToolbarItem {
-                    Picker("Show", selection: $kindRaw) {
-                        ForEach(HomeKind.allCases, id: \.rawValue) { Text($0.label).tag($0.rawValue) }
+                    Picker("Show on Home", selection: Binding(get: { commands.homeKind }, set: { commands.homeKind = $0 })) {
+                        ForEach(HomeKind.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
+                    .accessibilityLabel("Show on Home")
                     .help("Show everything, only films or only shows")
                     .disabled(editing)
                 }
@@ -136,7 +136,7 @@ struct HomeView: View {
             }
         }
         .modifier(MainTitle(isMain: isMain, editing: editing, facts: library.homeFacts))
-        .onChange(of: kindRaw, initial: true) { _, raw in if isMain { model.kind = HomeKind(rawValue: raw) ?? .all; updateRoom() } }
+        .onChange(of: commands.homeKind, initial: true) { _, kind in if isMain { model.kind = kind; updateRoom() } }
     }
 
     /// Edit Shelves / Done. Done is the screen's primary action while editing.

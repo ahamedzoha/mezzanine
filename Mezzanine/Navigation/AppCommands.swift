@@ -12,7 +12,14 @@ final class AppCommandCenter {
     var sections: [PlexLibrarySection] = []
     var selection: SidebarItem? = AppCommandCenter.restoredSelection {
         didSet {
-            if selection != oldValue { query = ""; path = [] }
+            if selection != oldValue {
+                query = ""
+                path = []
+                // The page that had a title in hand is going; the next one reports its own.
+                focusedItem = nil
+                detailFocusedItem = nil
+                hasFocusedTitle = false
+            }
             UserDefaults.standard.set(selection?.storageKey, forKey: "lastSidebarItem")
         }
     }
@@ -48,7 +55,11 @@ final class AppCommandCenter {
         setRecents(Array(([q] + recentSearches.filter { $0.localizedCaseInsensitiveCompare(q) != .orderedSame }).prefix(8)))
     }
 
-    func clearRecentSearches() { setRecents([]); recentsShown = false }
+    func clearRecentSearches() {
+        setRecents([])
+        recentsShown = false
+        AccessibilityNotification.Announcement("Recent searches cleared").post()
+    }
 
     private func setRecents(_ list: [String]) {
         guard let recentsKey else { return }
@@ -68,7 +79,11 @@ final class AppCommandCenter {
     var detailsShown = false
     /// Detail pages pushed over the current section.
     var path: [DetailRoute] = [] {
-        didSet { recordForward(from: oldValue) }
+        didSet {
+            recordForward(from: oldValue)
+            // Its button is rebuilt with the page's toolbar.
+            if path != oldValue { isActivityShown = false }
+        }
     }
     /// Pages left by Back (⌘[ or the toolbar), most recent last, for Forward (⌘]).
     private(set) var forwardStack: [DetailRoute] = []
@@ -95,9 +110,18 @@ final class AppCommandCenter {
     var focusedItem: PlexMetadata?
     var detailFocusedItem: PlexMetadata?
     /// What the Item menu acts on.
-    var actionItem: PlexMetadata? {
-        if case .title = selection { return detailFocusedItem }
-        return path.isEmpty ? focusedItem : detailFocusedItem
+    var actionItem: PlexMetadata? { isTitlePage ? detailFocusedItem : focusedItem }
+    /// A title's page (or a pushed collection) is on top, pushed or opened from Continue.
+    var isTitlePage: Bool {
+        if case .title = selection { return true }
+        return !path.isEmpty
+    }
+    /// The index can answer Surprise Me.
+    var canSurprise = false
+
+    /// The main Home's All / Films / Shows switch.
+    var homeKind = HomeKind(rawValue: UserDefaults.standard.string(forKey: "homeKind") ?? "") ?? .all {
+        didSet { UserDefaults.standard.set(homeKind.rawValue, forKey: "homeKind") }
     }
     var isLibraryVisible: Bool {
         guard query.isEmpty else { return false }
@@ -398,6 +422,12 @@ struct MezzanineCommands: Commands {
             Button(center.detailsShown ? "Hide Details" : "Show Details") { center.toggleDetails() }
                 .keyboardShortcut("i", modifiers: .command)
                 .disabled(!center.isHomeVisible || center.isBlocked || center.isEditingShelves)
+            Picker("Show on Home", selection: Binding(get: { center.homeKind }, set: { center.homeKind = $0 })) {
+                ForEach(HomeKind.allCases, id: \.self) { Text($0.label).tag($0) }
+            }
+            .disabled(!center.isHomeVisible || center.isBlocked || center.isEditingShelves)
+            Button("Clear Recent Searches") { center.clearRecentSearches() }
+                .disabled(center.recentSearches.isEmpty)
             Button(center.isActivityShown ? "Hide Activity" : "Show Activity") { center.isActivityShown.toggle() }
                 .keyboardShortcut("a", modifiers: [.command, .option])
                 .disabled(!center.isSignedIn || center.isBlocked)
@@ -443,7 +473,7 @@ struct MezzanineCommands: Commands {
                 .disabled(!center.isSignedIn || center.isPlayerOpen)
             Button("Surprise Me") { center.surprise() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(!center.isSignedIn || center.isBlocked || center.isEditingShelves)
+                .disabled(!center.isSignedIn || !center.canSurprise || center.isBlocked)
             Button("Downloads") { center.go(to: .downloads) }
                 .keyboardShortcut("l", modifiers: [.command, .option])
                 .disabled(center.isPlayerOpen)
@@ -457,7 +487,7 @@ struct MezzanineCommands: Commands {
             if let item = center.actionItem, center.isSignedIn {
                 Section(Format.displayTitle(item)) {
                     TitleMenuItems(item: item, actions: actions, library: library, commands: center,
-                                   offersOpen: center.path.isEmpty)
+                                   offersOpen: !center.isTitlePage)
                 }
                 .disabled(center.isBlocked || center.isEditingShelves)
             } else {

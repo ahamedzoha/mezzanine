@@ -18,7 +18,7 @@ struct DetailView: View {
     var contentFocus: FocusState<Bool>.Binding
     /// The window's root page (a Continue row in the sidebar), not one pushed over another.
     var rootPage = false
-    private var isRoot: Bool { rootPage && commands.path.isEmpty }
+    private var isTop: Bool { rootPage ? commands.path.isEmpty : commands.path.last == route }
 
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
@@ -102,7 +102,7 @@ struct DetailView: View {
             return .handled
         }
         .onChange(of: commands.playFocusedRequests) { _, _ in
-            if commands.path.last == route || isRoot { _ = playPrimary() }
+            if isTop { _ = playPrimary() }
         }
         .onMoveCommand(perform: move)
         .navigationTitle(item.map(Format.displayTitle) ?? "")
@@ -115,7 +115,9 @@ struct DetailView: View {
             commands.currentDetailItem = item.flatMap { [.movie, .show, .season].contains($0.kind) ? $0 : nil }
         }
         // The Item menu acts on the episode in hand, else the title.
-        .onChange(of: itemInHand, initial: true) { _, inHand in commands.detailFocusedItem = inHand }
+        .onChange(of: itemInHand, initial: true) { _, inHand in if isTop { commands.detailFocusedItem = inHand } }
+        // Back on top after a pushed page closed over it.
+        .onChange(of: isTop) { _, top in if top { commands.detailFocusedItem = itemInHand } }
         .onDisappear { if commands.detailFocusedItem?.ratingKey == itemInHand?.ratingKey { commands.detailFocusedItem = nil } }
         .onDisappear { if commands.currentDetailItem?.ratingKey == item?.ratingKey { commands.currentDetailItem = nil } }
         .onChange(of: library.revision) { _, _ in Task { await refreshEpisodes() } }

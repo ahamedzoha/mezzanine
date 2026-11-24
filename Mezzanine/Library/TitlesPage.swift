@@ -87,14 +87,9 @@ struct TitlesPage: View {
             return .handled
         }
         .onChange(of: filter) { _, _ in focused = nil }
-        .onChange(of: focusedItem, initial: true) { _, item in
-            if route == nil {
-                commands.hasFocusedTitle = item != nil
-                commands.focusedItem = item
-            } else {
-                commands.detailFocusedItem = item
-            }
-        }
+        .onChange(of: focusedItem, initial: true) { _, _ in report() }
+        // Back on top after a pushed page closed over it.
+        .onChange(of: isTop) { _, top in if top { report() } }
         .onDisappear { if route != nil, commands.detailFocusedItem?.ratingKey == focusedItem?.ratingKey { commands.detailFocusedItem = nil } }
         .onChange(of: commands.playFocusedRequests) { _, _ in if isTop, let item = focusedItem { start(item, from: nil) } }
         .navigationTitle(title)
@@ -141,6 +136,16 @@ struct TitlesPage: View {
     /// A collection has nothing to play by itself: it opens.
     private func start(_ item: PlexMetadata, from frame: CGRect?) {
         if item.kind == .collection { commands.open(item) } else { Task { await playback.play(item, from: frame) } }
+    }
+
+    /// The title in hand, for the Item menu and Play.
+    private func report() {
+        if route == nil {
+            commands.hasFocusedTitle = focusedItem != nil
+            commands.focusedItem = focusedItem
+        } else if isTop {
+            commands.detailFocusedItem = focusedItem
+        }
     }
 
     private func setFocus(_ index: Int, byKeyboard: Bool) {

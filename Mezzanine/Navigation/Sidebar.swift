@@ -105,7 +105,8 @@ struct Sidebar: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         .onKeyPress(.rightArrow) {
-            if case .library(let key) = commands.selection, !isOpen(key) { setOpen(key, true) } else { enterContent() }
+            // A library with nothing inside it doesn't open: → goes straight to the content.
+            if case .library(let key) = commands.selection, !isOpen(key), hasSlices(key) { setOpen(key, true) } else { enterContent() }
             return .handled
         }
         .onKeyPress(.leftArrow) {
@@ -120,14 +121,34 @@ struct Sidebar: View {
 
     // MARK: Rows
 
+    private static func tag(_ item: PlexMetadata) -> SidebarItem { .title(TitleActions.showKey(item) ?? item.ratingKey) }
+
+    /// The first few titles in progress, one per page they open, and the selected one if it has
+    /// slipped further down (its row shouldn't vanish while its page is open).
+    private var watching: [PlexMetadata] {
+        var seen = Set<SidebarItem>()
+        let unique = library.continueItems.filter { seen.insert(Self.tag($0)).inserted }
+        var rows = Array(unique.prefix(Self.continueLimit))
+        if let selected = unique.first(where: { Self.tag($0) == commands.selection }), !rows.contains(where: { $0.ratingKey == selected.ratingKey }) {
+            rows.append(selected)
+        }
+        return rows
+    }
+
+    private func slices(_ section: PlexLibrarySection) -> [LibrarySlice] {
+        LibrarySlice.allCases.filter { offers($0, section, library.sliceCounts[section.key]) }
+    }
+
+    private func hasSlices(_ key: String) -> Bool {
+        commands.sections.first { $0.key == key }.map { !slices($0).isEmpty } ?? false
+    }
+
     @ViewBuilder private var rows: some View {
         Label("Home", systemImage: "house").tag(SidebarItem.home)
-        let watching = Array(library.continueItems.prefix(Self.continueLimit))
         if !watching.isEmpty {
             Section("Continue", isExpanded: $continueOpen) {
                 ForEach(watching) { item in
-                    ContinueRow(item: item)
-                        .tag(SidebarItem.title(TitleActions.showKey(item) ?? item.ratingKey))
+                    ContinueRow(item: item).tag(Self.tag(item))
                 }
             }
         }
@@ -145,7 +166,16 @@ struct Sidebar: View {
                         .badge(library.pinCounts[pin.id] ?? 0)
                         .tag(SidebarItem.pinned(pin.id))
                         .help(pin.title)
-                        .contextMenu { Button("Unpin from Sidebar") { unpin(pin.id) } }
+                        .contextMenu {
+                            Button("Open") { commands.go(to: .pinned(pin.id)) }
+                            Divider()
+                            Button("Move Up") { movePin(pin.id, -1) }.disabled(pins.pins.first?.id == pin.id)
+                            Button("Move Down") { movePin(pin.id, 1) }.disabled(pins.pins.last?.id == pin.id)
+                            Divider()
+                            Button("Unpin from Sidebar") { unpin(pin.id) }
+                        }
+                        .accessibilityAction(named: "Move Up") { movePin(pin.id, -1) }
+                        .accessibilityAction(named: "Move Down") { movePin(pin.id, 1) }
                 }
                 .onMove { pins.move(from: $0, to: $1) }
             }
@@ -155,7 +185,7 @@ struct Sidebar: View {
 
     @ViewBuilder private func libraryRows(_ section: PlexLibrarySection) -> some View {
         let counts = library.sliceCounts[section.key]
-        let slices = LibrarySlice.allCases.filter { offers($0, section, counts) }
+        let slices = slices(section)
         let title = Label(section.title, systemImage: icon(section))
             .badge(counts?.total ?? 0)
             .tag(SidebarItem.library(section.key))
@@ -254,6 +284,11 @@ struct Sidebar: View {
         if !open, case .slice(key, _) = commands.selection { commands.selection = .library(key) }
     }
 
+    private func movePin(_ id: String, _ delta: Int) {
+        guard let i = pins.pins.firstIndex(where: { $0.id == id }), pins.pins.indices.contains(i + delta) else { return }
+        pins.move(from: IndexSet(integer: i), to: delta > 0 ? i + 2 : i - 1)
+    }
+
     private func unpin(_ id: String) {
         if commands.selection == .pinned(id) { commands.selection = .home }
         pins.remove(id)
@@ -282,11 +317,13 @@ private struct ContinueRow: View {
     @Environment(AppCommandCenter.self) private var commands
     @Environment(TitleActions.self) private var actions
     @State private var hovering = false
+    /// Follows Text Size with the words beside it.
+    @ScaledMetric(relativeTo: .body) private var posterWidth: CGFloat = 28
 
     var body: some View {
         HStack(spacing: Theme.Space.s) {
             RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: 72), pixelWidth: 72)
-                .frame(width: 28, height: 42)
+                .frame(width: posterWidth, height: posterWidth * 1.5)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.badge, style: .continuous))
                 .overlay {
                     if hovering {
