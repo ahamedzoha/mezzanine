@@ -12,6 +12,7 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
     case cycleAudio, cycleSubtitles, subtitleOptions, findSubtitles, subtitlesEarlier, subtitlesLater
     case generateSubtitles, translateSubtitles, matchSubtitleTiming
     case fullScreen, pictureInPicture, options, stats, pictureMode, miniPlayer
+    case whatDidTheySay, goToTime, sleepTimer
 
     var id: String { rawValue }
 
@@ -51,6 +52,9 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .stats: "Playback info"
         case .pictureMode: "Picture: fit, fill or zoom"
         case .miniPlayer: "Mini player (keep browsing)"
+        case .whatDidTheySay: "What did they say? (back with subtitles)"
+        case .goToTime: "Go to a time"
+        case .sleepTimer: "Sleep timer"
         }
     }
 
@@ -91,6 +95,9 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .stats: "Playback Info"
         case .pictureMode: "Next Picture Size"
         case .miniPlayer: "Mini Player"
+        case .whatDidTheySay: "What Did They Say?"
+        case .goToTime: "Go to Time…"
+        case .sleepTimer: "Sleep Timer…"
         }
     }
 
@@ -102,11 +109,11 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
     var group: Group {
         switch self {
         case .playPause, .back10, .forward10, .back60, .forward60, .previousChapter, .nextChapter,
-             .previousFrame, .nextFrame, .slower, .faster: .playback
+             .previousFrame, .nextFrame, .slower, .faster, .goToTime, .sleepTimer: .playback
         case .skipMarker, .nextEpisode, .previousEpisode: .episodes
         case .volumeUp, .volumeDown, .mute, .dialogueBoost, .nightMode: .sound
         case .cycleAudio, .cycleSubtitles, .subtitleOptions, .findSubtitles, .subtitlesEarlier, .subtitlesLater,
-             .generateSubtitles, .translateSubtitles, .matchSubtitleTiming: .subtitles
+             .generateSubtitles, .translateSubtitles, .matchSubtitleTiming, .whatDidTheySay: .subtitles
         case .fullScreen, .pictureInPicture, .options, .stats, .pictureMode, .miniPlayer: .view
         }
     }
@@ -147,6 +154,9 @@ enum PlayerKey: String, CaseIterable, Identifiable, Codable {
         case .stats: [.char("i")]
         case .pictureMode: [.char("z")]
         case .miniPlayer: [.char("m", option: true)]
+        case .whatDidTheySay: [.char("w")]
+        case .goToTime: [.char("t")]
+        case .sleepTimer: [.char("s", option: true)]
         }
     }
 }

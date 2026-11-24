@@ -22,7 +22,7 @@ struct PlayerOptions: View {
     @Environment(DownloadStore.self) private var downloads
     @Environment(\.openSettings) private var openSettings
 
-    enum Page { case root, audio, subtitles, search, sound, speed, quality, picture }
+    enum Page { case root, audio, subtitles, search, sound, speed, quality, picture, sleep }
 
     private var player: MezzaninePlayer { playback.player }
     private var onDevice: OnDeviceSubtitles { playback.onDevice }
@@ -38,6 +38,7 @@ struct PlayerOptions: View {
             case .speed: speed
             case .quality: quality
             case .picture: picturePage
+            case .sleep: sleepPage
             }
         }
         .padding(Theme.Space.s)
@@ -70,6 +71,7 @@ struct PlayerOptions: View {
             row("Speed", value: speedLabel(player.rate)) { page = .speed }
             row("Picture", value: playback.pictureMode.label) { page = .picture }
             row("Quality", value: playback.mode.label) { page = .quality }
+            if !playback.cast.isCasting { row("Sleep timer", value: playback.sleep.label(for: item)) { page = .sleep } }
         }
     }
 
@@ -327,6 +329,24 @@ struct PlayerOptions: View {
             ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
                 choice(speedLabel(rate), detail: nil, selected: abs(player.rate - rate) < 0.01) { player.setRate(rate) }
             }
+        }
+    }
+
+    private var sleepPage: some View {
+        Group {
+            header("Sleep timer")
+            ForEach([SleepTimer.Choice.off, .endOfTitle] + SleepTimer.minuteChoices.map { .minutes($0) }, id: \.self) { choice in
+                choiceRow(choice)
+            }
+            note("The sound fades out, then playback pauses and the Mac can sleep.")
+        }
+    }
+
+    private func choiceRow(_ choice: SleepTimer.Choice) -> some View {
+        let selected = playback.sleep.timer.choice == choice
+        let left: String? = if selected, case .minutes = choice { playback.sleep.label(for: item) + " left" } else { nil }
+        return self.choice(SleepWords.label(choice, episode: item.kind == .episode), detail: left, selected: selected) {
+            playback.sleep.set(choice)
         }
     }
 

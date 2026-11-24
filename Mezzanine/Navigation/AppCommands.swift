@@ -151,13 +151,16 @@ final class AppCommandCenter {
     var isFolderBrowserVisible = false
 
     /// A Playback menu item or key: a rebindable player key, or one of the fixed ones.
-    enum PlayerAction: Equatable { case key(PlayerKey), speed(Double), jump(Int), picture(String), cast(String?), snapshot, close }
+    enum PlayerAction: Equatable { case key(PlayerKey), speed(Double), jump(Int), picture(String), cast(String?), sleep(SleepTimer.Choice), snapshot, close }
     // Player state the Playback menu enables and checks items from.
     var hasActiveMarker = false
     var hasNextEpisode = false
     var hasPreviousEpisode = false
     var canPictureInPicture = false
     var playbackRate: Double = 1
+    /// The sleep timer's choice, and whether an episode is playing (its end, or a film's).
+    var sleepChoice: SleepTimer.Choice = .off
+    var playsEpisode = false
     /// The picture mode in force (Fit, Fill, Zoom), for the menu's checkmarks.
     var pictureMode = "fit"
     var isMuted = false
@@ -517,6 +520,7 @@ struct MezzanineCommands: Commands {
                             .keyboardShortcut(playerKeys ? KeyboardShortcut(KeyEquivalent(Character(String(d))), modifiers: []) : nil)
                     }
                 }
+                item(.goToTime, disabled: center.hasMiniPlayer)
                 item(.previousFrame)
                 item(.nextFrame)
                 Menu("Speed") {
@@ -538,6 +542,7 @@ struct MezzanineCommands: Commands {
                     item(.cycleSubtitles)
                     item(.subtitleOptions)
                     item(.findSubtitles)
+                    item(.whatDidTheySay)
                     Divider()
                     // Actions that start and stop name what they'll do; Translate is a setting.
                     item(.generateSubtitles, title: center.generatingSubtitles ? "Stop Generating Subtitles" : nil)
@@ -557,6 +562,15 @@ struct MezzanineCommands: Commands {
                     toggle(.nightMode, isOn: sound.current.profile.nightMode)
                 }
                 Divider()
+                Menu("Sleep Timer") {
+                    ForEach([SleepTimer.Choice.off, .endOfTitle] + SleepTimer.minuteChoices.map { .minutes($0) }, id: \.self) { choice in
+                        Toggle(SleepWords.label(choice, episode: center.playsEpisode),
+                               isOn: Binding(get: { center.sleepChoice == choice }, set: { _ in center.player(.sleep(choice)) }))
+                    }
+                    Divider()
+                    item(.sleepTimer)
+                }
+                .disabled(center.castingTo != nil)
                 Menu("Play On") {
                     Toggle("This Mac", isOn: Binding(get: { center.castingTo == nil }, set: { on in if on { center.player(.cast(nil)) } }))
                     ForEach(center.castTargets, id: \.id) { target in

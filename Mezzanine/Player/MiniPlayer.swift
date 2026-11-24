@@ -158,12 +158,15 @@ struct MiniPlayerTile: View {
             default: expand()
             }
         case .speed(let rate): player.setRate(rate)
+        case .sleep(let choice): playback.sleep.set(choice)
         case .jump, .picture, .cast, .snapshot: expand()
         }
     }
 
     /// The episode ended in the corner: the next one follows if Up Next autoplay is on.
     private func finished() {
+        // The sleep timer ends here: nothing follows.
+        if playback.sleep.titleEnded() { playback.close(); return }
         if playback.nextEpisode != nil, playback.binge.upNextCountdown > 0 {
             Task { await playback.playNext(autoplayed: true) }
         } else {

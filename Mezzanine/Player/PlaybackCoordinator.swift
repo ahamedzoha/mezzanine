@@ -100,6 +100,10 @@ final class PlaybackCoordinator {
     let onDevice: OnDeviceSubtitles
     /// Google Cast to a TV.
     let cast = CastController()
+    /// Stops playback after a while, or at the end of the title.
+    let sleep = SleepControl()
+    /// What did they say?: subtitles on until the moment it was asked.
+    private(set) var catchUp: CatchUp?
 
     /// Sends the film to a Cast device from where it is; the Mac pauses.
     func startCasting(to device: CastDevice) async {
@@ -140,6 +144,7 @@ final class PlaybackCoordinator {
         self.player = player
         self.session = session
         onDevice = OnDeviceSubtitles(player: player)
+        sleep.attach(self)
         onDevice.selectTrack = { [weak self] id in self?.selectSubtitle(trackID: id) }
         cast.onStopped = { [weak self] at in
             guard let self, self.item != nil else { return }
@@ -197,6 +202,7 @@ final class PlaybackCoordinator {
         #endif
         requestGeneration += 1
         let generation = requestGeneration
+        catchUp = nil
         // Offline: a downloaded film or episode still plays, from its saved details.
         guard let client = session.client else {
             await playOffline(item, from: origin)
@@ -422,7 +428,44 @@ final class PlaybackCoordinator {
         remember(partID: part.id, audio: stream.id, subtitle: nil)
     }
 
+    enum CatchUpOutcome { case showing, backOnly, noSubtitles }
+
+    /// Goes back ten seconds with subtitles on, then off again past where it was asked. The choice
+    /// isn't remembered or sent to Plex. With subtitles already on, it only goes back.
+    func whatDidTheySay(preferred: [String]) -> CatchUpOutcome {
+        let showing = player.selectedSubtitleID != nil || onDevice.showsGenerated
+        let spoken = player.audioTracks.first { $0.id == player.selectedAudioID }?.language
+        let tracks = player.subtitleTracks.map {
+            CatchUp.Track(id: $0.id, language: $0.language, isForced: $0.isForced, isHearingImpaired: $0.isHearingImpaired,
+                          isCommentary: $0.isCommentary)
+        }
+        guard !showing, let track = CatchUp.track(from: tracks, spoken: spoken, preferred: preferred) else {
+            Task { await player.seek(by: -CatchUp.step) }
+            return showing ? .backOnly : .noSubtitles
+        }
+        let ask = CatchUp(at: player.currentTime, trackID: track.id)
+        catchUp = ask
+        Task {
+            await player.goBack(CatchUp.step, withSubtitle: track.id)
+            while catchUp == ask {
+                try? await Task.sleep(for: .milliseconds(200))
+                guard catchUp == ask, player.status == .playing, ask.isOver(at: player.currentTime) else { continue }
+                endCatchUp()
+            }
+        }
+        return .showing
+    }
+
+    /// Subtitles off again, unless someone chose another track meanwhile.
+    private func endCatchUp() {
+        guard let ask = catchUp else { return }
+        catchUp = nil
+        if player.selectedSubtitleID == ask.trackID { player.selectSubtitle(id: nil) }
+    }
+
     func selectSubtitle(trackID: Int?) {
+        // A choice of its own: nothing turns it off again.
+        catchUp = nil
         onDevice.hideGenerated()
         onDevice.trackChanged()
         player.selectSubtitle(id: trackID)
@@ -478,6 +521,8 @@ final class PlaybackCoordinator {
 
     func close() {
         requestGeneration += 1
+        catchUp = nil
+        sleep.playerClosed()
         isMini = false
         // Closing the player while casting stops the TV too.
         if cast.isCasting { Task { await cast.stop(resume: false) } }

@@ -117,6 +117,8 @@ struct AppShell: View {
         // Plex apps can control Mezzanine only while signed in to a server.
         .onChange(of: session.client == nil) { _, _ in Task { await remote.apply() } }
         .onChange(of: library.index == nil) { _, missing in if !missing { notifier.openPending() } }
+        .onChange(of: playback.sleep.timer.choice, initial: true) { _, choice in commands.sleepChoice = choice }
+        .onChange(of: playback.item?.kind, initial: true) { _, kind in commands.playsEpisode = kind == .episode }
         .onChange(of: playback.isMini, initial: true) { _, mini in commands.hasMiniPlayer = mini }
     }
 

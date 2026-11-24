@@ -48,6 +48,12 @@ public final class MezzaninePlayer {
         didSet { applyVolumeAndShaping() }
     }
 
+    /// The sleep timer's fade, 1 to 0, over whatever the volume is. The player's own volume only,
+    /// so it never rebuilds the session.
+    public var fade = 1.0 {
+        didSet { if fade != oldValue { applyPlayerVolume() } }
+    }
+
     /// Fill the view, cropping the picture's edges, instead of fitting it whole.
     public var fillsView = false {
         didSet { if fillsView != oldValue { engine.videoGravity = fillsView ? .resizeAspectFill : .resizeAspect } }
@@ -272,6 +278,19 @@ public final class MezzaninePlayer {
         if let id { engine.selectSubtitleTrack(index: id) } else { engine.clearSubtitle() }
     }
 
+    /// Goes back with a subtitle track on (What did they say?). Neither the switch nor the seek
+    /// rebuilds the session. The software route reads a track's lines from where it was chosen,
+    /// so there it's chosen again once the seek has landed, or the earlier lines never come.
+    public func goBack(_ seconds: Double, withSubtitle id: Int) async {
+        selectSubtitle(id: id)
+        await seek(by: -seconds)
+        guard engine.videoRoute == .software else { return }
+        try? await Task.sleep(for: .milliseconds(500))
+        guard selectedSubtitleID == id else { return }
+        selectSubtitle(id: nil)
+        selectSubtitle(id: id)
+    }
+
     // MARK: Speech audio (on-device subtitles)
 
     /// The playing audio for speech recognition: mono 48 kHz from the centre (dialogue)
@@ -345,7 +364,7 @@ public final class MezzaninePlayer {
     /// be shaped (AVPlayer owns its audio) has none built in.
     private func applyPlayerVolume() {
         let builtIn = engine.audioShapingState == .applied ? playingBoostDB : 0
-        engine.volume = isMuted ? 0 : Float(volume.playerVolume(builtInBoostDB: builtIn))
+        engine.volume = isMuted ? 0 : Float(volume.playerVolume(builtInBoostDB: builtIn) * min(1, max(0, fade)))
     }
 
     // MARK: Engine → Mezzanine

@@ -24,6 +24,7 @@ struct PlayerStage: View {
     @Environment(SoundSettings.self) private var sound
     @Environment(SessionStore.self) private var session
     @Environment(DownloadStore.self) private var downloads
+    @Environment(SubtitleSourceSettings.self) private var subtitleSources
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var opened = false
     @State private var chromeVisible = true
@@ -40,6 +41,7 @@ struct PlayerStage: View {
     @State private var postPlaySelection = 0
     @State private var pendingToggle: Task<Void, Never>?
     @State private var optionsPage: PlayerOptions.Page = .root
+    @State private var goingToTime = false
     @AppStorage("playerStatsVisible") private var statsVisible = false
     @AppStorage("subtitleOffset") private var subtitleOffset: Double = 0
     @FocusState private var focused: Bool
@@ -73,6 +75,19 @@ struct PlayerStage: View {
                     .padding(.bottom, 112)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97, anchor: .bottomTrailing)))
+            }
+            if goingToTime {
+                GoToTimeField(duration: player.duration, go: { t in
+                    setGoToTime(false)
+                    Task { await player.seek(to: t, exact: true) }
+                    showToast(Format.clock(t))
+                }, close: { setGoToTime(false) })
+                    .padding(.bottom, 112)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .transition(.opacity)
+            }
+            if let seconds = playback.sleep.stopping, !upNextShown {
+                StoppingSoonCard(seconds: seconds) { playback.sleep.keepWatching() }.transition(.opacity)
             }
             if let flash { FlashGlyph(symbol: flash).transition(.opacity) }
             if let message = failure {
@@ -123,6 +138,7 @@ struct PlayerStage: View {
             case "subtitles": optionsPage = .subtitles; optionsOpen = true
             case "audio": optionsPage = .audio; optionsOpen = true
             case "picture": optionsPage = .picture; optionsOpen = true
+            case "sleep": optionsPage = .sleep; optionsOpen = true
             default: break
             }
             // -PlayerKeyScript "i,c,g,shift+c": posts real key events through the app's event
@@ -191,6 +207,12 @@ struct PlayerStage: View {
             default: break
             }
         }
+        // Stopped by the sleep timer: Up Next must not go on counting.
+        .onChange(of: playback.sleep.stops) { _, _ in
+            if case .counting = upNext { withAnimation(Theme.Motion.quick) { upNext = .stillWatching } }
+            showToast("Sleep timer: paused")
+        }
+        .animation(reduceMotion ? nil : Theme.Motion.quick, value: playback.sleep.stopping != nil)
         .onChange(of: player.status) { _, status in
             playback.reporter?.statusChanged()
             if status == .ended { handleEnded() }
@@ -238,6 +260,7 @@ struct PlayerStage: View {
         // Click toggles play; a double click (two toggles) leaves play as it was and goes full screen.
         .simultaneousGesture(TapGesture().onEnded {
             if optionsOpen { withAnimation(Theme.Motion.quick) { optionsOpen = false }; return }
+            if goingToTime { setGoToTime(false); return }
             // Wait out the double-click interval so a double click doesn't pause and resume.
             pendingToggle?.cancel()
             pendingToggle = Task {
@@ -308,7 +331,7 @@ struct PlayerStage: View {
                     }
                     Text(clock(player.currentTime))
                     Spacer()
-                    Text("−" + clock(max(0, player.duration - player.currentTime)))
+                    remainingLine
                 }
                 .font(Theme.Typeface.cardMeta)
                 .foregroundStyle(Theme.inkSecondary)
@@ -321,6 +344,25 @@ struct PlayerStage: View {
                 }
                 // A new title gets a fresh bar: hover previews are cached per position.
                 .id(item.ratingKey)
+                }
+            }
+        }
+    }
+
+    /// "−44:02 · Ends 23:42", and the sleep timer while one is set.
+    private var remainingLine: some View {
+        // The clock moves on while the film is paused.
+        TimelineView(.periodic(from: .now, by: 15)) { context in
+            HStack(spacing: Theme.Space.s) {
+                if playback.sleep.isOn {
+                    Label(playback.sleep.label(for: item), systemImage: "moon.zzz")
+                        .help(PlayerShortcuts.shared.help("Sleep timer", .sleepTimer))
+                        .accessibilityLabel("Sleep timer: \(playback.sleep.label(for: item))")
+                    Text("·").accessibilityHidden(true)
+                }
+                Text("−" + clock(max(0, player.duration - player.currentTime)))
+                if let end = TimeEntry.end(current: player.currentTime, duration: player.duration, rate: player.rate, now: context.date) {
+                    Text("· Ends \(end.formatted(date: .omitted, time: .shortened))")
                 }
             }
         }
@@ -462,7 +504,8 @@ struct PlayerStage: View {
             return
         }
         guard upNext == .hidden, let trigger = upNextTrigger, t >= trigger,
-              playback.nextEpisode != nil, playback.binge.upNextCountdown > 0, player.status == .playing else { return }
+              playback.nextEpisode != nil, playback.binge.upNextCountdown > 0, player.status == .playing,
+              !playback.sleep.timer.stopsAtEnd else { return }
         playback.prewarmNext()
         startCountdown()
     }
@@ -515,7 +558,12 @@ struct PlayerStage: View {
 
     private func handleEnded() {
         // A film's suggestions stay up at the end until you choose (or close).
-        if upNext == .postPlay { return }
+        if upNext == .postPlay { _ = playback.sleep.titleEnded(); return }
+        // The sleep timer ends here: the next episode waits to be asked for.
+        if playback.sleep.titleEnded() {
+            if playback.nextEpisode != nil { withAnimation { upNext = .stillWatching } } else { _ = perform(.close) }
+            return
+        }
         if playback.nextEpisode != nil, upNext != .dismissed, playback.binge.upNextCountdown > 0 {
             if playback.shouldAskStillWatching { withAnimation { upNext = .stillWatching } }
             else { Task { await playback.playNext(autoplayed: true) } }
@@ -529,6 +577,7 @@ struct PlayerStage: View {
         upNextTrigger = nil
         autoSkipped = []
         optionsOpen = false
+        goingToTime = false
         showChrome()
     }
 
@@ -574,6 +623,8 @@ struct PlayerStage: View {
             if optionsPage != .root { optionsPage = optionsPage == .search ? .subtitles : .root } else { setOptions(open: false) }
             return
         }
+        if goingToTime { setGoToTime(false); return }
+        if playback.sleep.stopping != nil, !upNextShown { playback.sleep.keepWatching(); return }
         if upNextShown { dismissUpNext(); return }
         if let window = NSApp.keyWindow, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil); return }
         _ = perform(.close)
@@ -582,6 +633,7 @@ struct PlayerStage: View {
     /// Return: Try Again on a failure, Up Next plays now, Still Watching resumes, else skip.
     private func returnKey() {
         if failure != nil { Task { await playback.retry() }; return }
+        if playback.sleep.stopping != nil, !upNextShown { playback.sleep.keepWatching(); return }
         switch upNext {
         case .counting, .stillWatching: Task { await playback.playNext(autoplayed: false) }
         case .postPlay:
@@ -589,6 +641,14 @@ struct PlayerStage: View {
             if list.indices.contains(postPlaySelection) { Task { await playback.playSuggestion(list[postPlaySelection]) } }
         default: _ = perform(.key(.skipMarker))
         }
+    }
+
+    private func setGoToTime(_ open: Bool) {
+        withAnimation(Theme.Motion.quick) {
+            if open { optionsOpen = false }
+            goingToTime = open
+        }
+        if !open { focused = true }
     }
 
     private func setOptions(open: Bool, page: PlayerOptions.Page = .root) {
@@ -619,6 +679,9 @@ struct PlayerStage: View {
             guard player.duration > 0 else { return .ignored }
             Task { await player.seek(to: player.duration * Double(digit) / 10) }
             showToast(digit == 0 ? "Start" : "\(digit * 10) %")
+        case .sleep(let choice):
+            playback.sleep.set(choice)
+            showToast(choice == .off ? "Sleep timer off" : "Sleep timer: \(playback.sleep.label(for: item))")
         case .snapshot: takeSnapshot()
         case .close: close()
         }
@@ -704,6 +767,16 @@ struct PlayerStage: View {
         case .miniPlayer:
             setOptions(open: false)
             playback.shrink()
+        case .whatDidTheySay:
+            switch playback.whatDidTheySay(preferred: subtitleSources.languages) {
+            case .showing: showToast("Back 10 s with subtitles")
+            case .backOnly: flashGlyph("gobackward.10")
+            case .noSubtitles: showToast("No subtitles · \(PlayerShortcuts.shared.display(.generateSubtitles)) makes them from speech")
+            }
+        case .goToTime:
+            guard player.duration > 0, !upNextShown else { return .ignored }
+            setGoToTime(!goingToTime)
+        case .sleepTimer: setOptions(open: !(optionsOpen && optionsPage == .sleep), page: .sleep)
         case .pictureMode:
             withAnimation(Theme.Motion.object(reduceMotion)) { playback.pictureMode = playback.pictureMode.next }
             showToast("Picture: " + playback.pictureMode.label)
