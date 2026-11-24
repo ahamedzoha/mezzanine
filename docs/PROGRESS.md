@@ -33,8 +33,14 @@ Plan for 0.4 to 0.6: `~/.claude/plans/immutable-crunching-aho-of-578ae7c0-c3a6-4
 - Differs from the plan: the sidebar asks `/hubs/continueWatching/items` itself rather than sharing
   Home's hub; both lay the same stops and removals over Plex's answer.
 - Found on the way: In Progress never matched shows; ⌘Return on a title page played the page under it.
-- Not yet: on-screen checks of 0.3.4 and 0.4 (the owner was watching). Remove from Continue
-  Watching has never been sent to the server: try it once on a title the owner names.
+- Checked on screen (Debug, owner's OK): Home, slices, collections, the activity popover, the
+  sidebar's arrow keys (a printed selection after each key), 900 × 600, full screen in and out
+  (muted). Fixed from it: rows showed through the server line, a slice whose library was closed
+  had no row, a Play disc on collections, a doubled Unwatched chip, clipped popover text. The Debug
+  index dropped Courses on connect (0.3.4); no duplicate-geometry faults logged.
+- Not checked: the pointer (Continue's Play disc, pin drag), VoiceOver, larger text, Increase
+  Contrast, offline, volume above 100 % by ear, the version in Plex's dashboard. Remove from
+  Continue Watching has never been sent to the server: try it once on a title the owner names.
 
 ## 2026-11-24 — Fixes from field diagnostics (for 0.3.4)
 
@@ -53,7 +59,7 @@ Found by reading the Mac's reports and the unified log (AetherEngine logs there 
 - A library removed from Plex stayed in the index (924 Courses titles in search and smart shelves).
   Connecting now drops sections missing from a successful, non-empty list.
 - Plex was told version 0.1.0; `PlexIdentity` now reads the app's own.
-- Not yet checked in the running app: the owner was watching a film. The duplicate
+- Checked later in the Debug app, except the volume by ear and the version at the server. The duplicate
   `matchedGeometryEffect` source in Continue Watching is fixed in 0.4.
 
 ## 2026-11-16 — Screen dimmed during playback (0.3.2)

@@ -21,4 +21,4 @@ sleep 1.2
 screencapture -x $out/$name-1.png $out/$name-2.png $out/$name-3.png 2>/dev/null
 osascript -e 'tell application id "com.mezzanine.mac.debug" to quit' >/dev/null 2>&1
 sleep 2
-tr -d '\r' < $out/$name.log | grep -E "SEARCHPANEL|QUICKOPEN|FOLDERS|DETAIL|MINI|PERF home|AUTOPLAY|error|Fatal" | head -12
+tr -d '\r' < $out/$name.log | grep -E "SEARCHPANEL|QUICKOPEN|FOLDERS|DETAIL|MINI|PERF home|SIDEBAR|AUTOPLAY|error|Fatal" | head -24

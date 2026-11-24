@@ -116,7 +116,8 @@ struct LibraryView: View {
 
     private var titles: some View {
         VStack(spacing: 0) {
-            if filters.isActive {
+            // A slice's own filter is its title; chips show what was added to it.
+            if filters.isActive && filters != slice?.filters {
                 FilterChips(filters: $filters).padding(.horizontal, Theme.Space.gutter).padding(.top, Theme.Space.m)
             }
             GeometryReader { geo in
@@ -738,7 +739,8 @@ struct GridPoster: View {
                     }
                     .overlay(alignment: .topTrailing) { WatchedMark(item: item) }
                     .overlay(alignment: .bottomTrailing) {
-                        if lifted { PlayDisc { actions.play(item, frame) }.padding(10).transition(.opacity) }
+                        // A collection opens; there's nothing to play by itself.
+                        if lifted, item.kind != .collection { PlayDisc { actions.play(item, frame) }.padding(10).transition(.opacity) }
                     }
             }
             .aspectRatio(2 / 3, contentMode: .fit)

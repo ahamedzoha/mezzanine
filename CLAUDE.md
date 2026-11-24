@@ -88,7 +88,8 @@ defaults and Keychain item), so test runs never change the installed app's setti
 (each starts a real transcode on the server: keep runs short, let the player close itself
 (`-MezzanineAutoClose`) so the session stops, and check `Scripts/plex.sh pms /transcode/sessions`).
 
-Sidebar and top bar: `-SidebarSelect "slice:unwatched:1"` (a `SidebarItem` storage key), `-ActivityOpen YES`.
+Sidebar and top bar: `-SidebarSelect "slice:unwatched:1"` (a `SidebarItem` storage key), `-ActivityOpen YES`, `-WindowSize 900x600`,
+`-SidebarKeyScript "down,right,down"` (prints `SIDEBAR` with the selection after each key).
 `TitleActions` writes (watched marks, Continue Watching removal) print `ACTION …` and send nothing under `-MezzanineNoActivity YES`.
 
 Shelves: `-HomeSeedShelves YES` (smart shelf, collection, hidden row), `-HomeEditing YES`,

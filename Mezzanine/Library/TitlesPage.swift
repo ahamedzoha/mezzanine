@@ -5,6 +5,8 @@ import MezzanineKit
 /// The same grid, keys and Item menu as a library.
 struct TitlesPage: View {
     let title: String
+    /// Before the count in the subtitle.
+    var place: String? = nil
     /// Counted in the subtitle: ("title", "titles").
     var noun = ("title", "titles")
     /// Changes when the titles should be read again.
@@ -93,7 +95,7 @@ struct TitlesPage: View {
         .onDisappear { if route != nil, commands.detailFocusedItem?.ratingKey == focusedItem?.ratingKey { commands.detailFocusedItem = nil } }
         .onChange(of: commands.playFocusedRequests) { _, _ in if isTop, let item = focusedItem { start(item, from: nil) } }
         .navigationTitle(title)
-        .navigationSubtitle(loaded ? "\(items.count.formatted()) \(items.count == 1 ? noun.0 : noun.1)" : "")
+        .navigationSubtitle([place, loaded ? "\(items.count.formatted()) \(items.count == 1 ? noun.0 : noun.1)" : nil].compactMap { $0 }.joined(separator: " · "))
         .toolbar {
             if let pin {
                 ToolbarItem(placement: .primaryAction) {
@@ -179,7 +181,7 @@ struct CollectionsView: View {
     @Environment(SessionStore.self) private var session
 
     var body: some View {
-        TitlesPage(title: "\(section.title) Collections", noun: ("collection", "collections"), reloadKey: "collections|\(section.key)",
+        TitlesPage(title: "Collections", place: section.title, noun: ("collection", "collections"), reloadKey: "collections|\(section.key)",
                    filterable: true, contentFocus: contentFocus) {
             guard let client = session.client else { throw CancellationError() }
             // Kometa's folder-style parents hold no titles of their own.

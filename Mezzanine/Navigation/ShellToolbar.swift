@@ -88,7 +88,10 @@ private struct ActivityPanel: View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Theme.Space.m, verticalSpacing: Theme.Space.m) {
             GridRow {
                 Text("Library").font(Theme.Typeface.cardTitle)
-                TimelineView(.everyMinute) { _ in Text(libraryLine).foregroundStyle(Theme.inkSecondary).lineLimit(3) }
+                TimelineView(.everyMinute) { _ in
+                    Text(libraryLine).foregroundStyle(Theme.inkSecondary).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Button("Sync Now") { Task { await library.syncAll() } }
                     .disabled(library.isSyncing || library.index == nil)
             }
@@ -105,7 +108,7 @@ private struct ActivityPanel: View {
         }
         .font(Theme.Typeface.cardMeta)
         .padding(Theme.Space.l)
-        .frame(minWidth: 340, maxWidth: 440, alignment: .leading)
+        .frame(width: 400, alignment: .leading)
     }
 
     private var libraryLine: String {

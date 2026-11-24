@@ -196,6 +196,22 @@ struct AppShell: View {
             try? await Task.sleep(for: .seconds(4))
             commands.selection = item
         }
+        // -WindowSize 900x600: the window at that size (captures).
+        if let size = UserDefaults.standard.string(forKey: "WindowSize")?.split(separator: "x").compactMap({ Double($0) }), size.count == 2 {
+            NSApp.windows.first { $0.isVisible && $0.canBecomeMain }?.setFrame(CGRect(x: 200, y: 300, width: size[0], height: size[1]), display: true)
+        }
+        // -SidebarKeyScript "down,right,down": keys into the sidebar, printing the selection after each.
+        if let script = UserDefaults.standard.string(forKey: "SidebarKeyScript") {
+            try? await Task.sleep(for: .seconds(4))
+            commands.focusSidebar()
+            try? await Task.sleep(for: .milliseconds(600))
+            for token in script.split(separator: ",") {
+                DebugKeys.post(String(token))
+                try? await Task.sleep(for: .milliseconds(500))
+                print("SIDEBAR \(token) -> \(commands.selection.map { "\($0)" } ?? "none") sidebarFocus=\(sidebarFocused) item=\(commands.actionItem?.title ?? "-")")
+            }
+            fflush(stdout)
+        }
         if UserDefaults.standard.bool(forKey: "ActivityOpen") {
             try? await Task.sleep(for: .seconds(3))
             commands.isActivityShown = true

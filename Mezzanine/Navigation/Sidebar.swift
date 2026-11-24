@@ -103,7 +103,13 @@ struct Sidebar: View {
         List(selection: $commands.selection) {
             if isOffline { offline } else { rows }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        // A bar, not an inset: rows scroll under it without showing through the words.
+        .safeAreaBar(edge: .bottom, spacing: 0) { footer }
+        .scrollEdgeEffectStyle(.hard, for: .bottom)
+        // A slice reached some other way (restored at launch): its library opens to show it.
+        .onChange(of: commands.selection, initial: true) { _, item in
+            if case .slice(let key, _) = item { setOpen(key, true) }
+        }
         .onKeyPress(.rightArrow) {
             // A library with nothing inside it doesn't open: → goes straight to the content.
             if case .library(let key) = commands.selection, !isOpen(key), hasSlices(key) { setOpen(key, true) } else { enterContent() }
