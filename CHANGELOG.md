@@ -3,7 +3,7 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
-## 0.5.0 — unreleased
+## 0.5.0 — 2026-11-24
 
 - Sleep timer (⌥S, or Playback ▸ Sleep Timer): stop after 15 to 90 minutes, or at the end of the
   episode or film. The sound fades out first; Return keeps watching.

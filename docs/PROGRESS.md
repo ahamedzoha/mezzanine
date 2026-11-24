@@ -21,7 +21,7 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
-## 2026-11-24 — 0.5 under way: player comforts and diagnostics
+## 2026-11-24 — 0.5.0: player comforts and diagnostics
 
 - Spike: choosing a subtitle track, seeking and turning it off never rebuilds the session (native
   and software routes, silent test files). The software route reads a track's lines from where it
