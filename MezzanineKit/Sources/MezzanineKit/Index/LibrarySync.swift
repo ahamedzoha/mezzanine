@@ -62,7 +62,7 @@ public actor LibrarySync {
             }
             // Counts disagree: something was added or removed that the filters missed.
             let serverCount = try await client.count(section: section.key, type: type)
-            let local = try index.items(LibraryQuery(section: section.key, kinds: [kind])).count
+            let local = try index.count(section: section.key, kinds: [kind])
             if serverCount != local {
                 try await fullSync(section, types: types, progress: progress)
                 try index.recordSync(section: section.key, at: now, full: true)
@@ -71,6 +71,12 @@ public actor LibrarySync {
         }
         try index.recordSync(section: section.key, at: now, full: false)
         return changed
+    }
+
+    /// Drops libraries the server no longer lists (deleted, or no longer shared with this
+    /// user). `keys` must come from a successful answer. Returns true when any titles went.
+    public func dropMissingSections(listed keys: Set<String>) throws -> Bool {
+        try index.pruneSections(keeping: keys) > 0
     }
 
     private func fullSync(_ section: PlexLibrarySection, types: [(type: Int, kind: String)],

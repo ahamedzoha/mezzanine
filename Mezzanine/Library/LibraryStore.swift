@@ -67,11 +67,19 @@ final class LibraryStore {
         revision += 1
         timer?.cancel()
         timer = Task { [weak self] in
+            await self?.dropMissingSections()
             while !Task.isCancelled {
                 await self?.syncAll()
                 try? await Task.sleep(for: .seconds(600))
             }
         }
+    }
+
+    /// Titles of a library that's gone would otherwise stay in search and smart shelves.
+    private func dropMissingSections() async {
+        guard let sync, (try? await sync.dropMissingSections(listed: Set(sections.map(\.key)))) == true,
+              sync === self.sync else { return }
+        revision += 1
     }
 
     /// One sync at a time. A request while one runs makes it go round once more when it ends
@@ -174,7 +182,7 @@ final class LibraryStore {
     /// "275 films", "65 shows · 4,352 episodes", for a library by title.
     func summary(sectionTitle: String) -> String? {
         guard let index, let section = sections.first(where: { $0.title == sectionTitle }) else { return nil }
-        func n(_ kind: String) -> Int { (try? index.items(LibraryQuery(section: section.key, kinds: [kind])).count) ?? 0 }
+        func n(_ kind: String) -> Int { (try? index.count(section: section.key, kinds: [kind])) ?? 0 }
         let f = { (v: Int) in v.formatted(.number) }
         if section.kind == .show {
             let shows = n("show"), episodes = n("episode")

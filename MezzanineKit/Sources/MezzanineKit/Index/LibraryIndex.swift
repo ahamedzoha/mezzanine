@@ -221,6 +221,20 @@ public final class LibraryIndex: Sendable {
         }
     }
 
+    /// Removes every section not in `keys`, titles and sync state, and returns how many titles
+    /// went. An empty list removes nothing: it's more likely a bad answer than an empty server.
+    public func pruneSections(keeping keys: Set<String>) throws -> Int {
+        guard !keys.isEmpty else { return 0 }
+        return try pool.write { db in
+            let marks = keys.map { _ in "?" }.joined(separator: ",")
+            let arguments = StatementArguments(Array(keys))
+            try db.execute(sql: "DELETE FROM item WHERE section NOT IN (\(marks))", arguments: arguments)
+            let removed = db.changesCount
+            try db.execute(sql: "DELETE FROM sectionSync WHERE section NOT IN (\(marks))", arguments: arguments)
+            return removed
+        }
+    }
+
     public func setCleanPoster(_ path: String, for ratingKey: String) throws {
         try pool.write { db in
             try db.execute(sql: "UPDATE item SET cleanPosterPath = ? WHERE ratingKey = ?", arguments: [path, ratingKey])
@@ -360,6 +374,15 @@ public final class LibraryIndex: Sendable {
 
     public func count(section: String) throws -> Int {
         try pool.read { db in try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM item WHERE section = ?", arguments: [section]) ?? 0 }
+    }
+
+    /// Counted in SQLite: loading and sorting the rows spills to disk on every sync.
+    public func count(section: String, kinds: [String]) throws -> Int {
+        guard !kinds.isEmpty else { return 0 }
+        return try pool.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM item WHERE section = ? AND kind IN (\(kinds.map { _ in "?" }.joined(separator: ",")))",
+                             arguments: StatementArguments([section] + kinds)) ?? 0
+        }
     }
 
     static func order(_ sort: LibraryQuery.Sort) -> String {

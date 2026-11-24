@@ -55,6 +55,42 @@ import Testing
         #expect(try index.count(section: "1") == 1)
     }
 
+    @Test func countMatchesTheRowsLoaded() throws {
+        let index = try LibraryIndex()
+        try index.upsert(try entries("movies-page"), section: "1")
+        let rows = try index.items(LibraryQuery(section: "1", kinds: ["movie"])).count
+        #expect(rows > 0)
+        #expect(try index.count(section: "1", kinds: ["movie"]) == rows)
+        #expect(try index.count(section: "1", kinds: ["episode"]) == 0)
+        #expect(try index.count(section: "1", kinds: []) == 0)
+        #expect(try index.count(section: "2", kinds: ["movie"]) == 0)
+    }
+
+    @Test func pruneSectionsDropsLibrariesTheServerLost() throws {
+        let index = try LibraryIndex()
+        let movies = try entries("movies-page")
+        let (kept, lost) = (Array(movies.prefix(1)), Array(movies.dropFirst()))
+        try index.upsert(kept, section: "1")
+        try index.upsert(lost, section: "3")
+        try index.recordSync(section: "1", at: Date(), full: true)
+        try index.recordSync(section: "3", at: Date(), full: true)
+        let word = try #require(lost.first?.0.title.split(separator: " ").first.map(String.init))
+        #expect(try index.search(word).contains { $0.section == "3" })
+
+        // An empty list is a bad answer, not an empty server.
+        #expect(try index.pruneSections(keeping: []) == 0)
+        #expect(try index.count(section: "3") == lost.count)
+
+        #expect(try index.pruneSections(keeping: ["1", "6"]) == lost.count)
+        #expect(try index.count(section: "1") == kept.count)
+        #expect(try index.count(section: "3") == 0)
+        #expect(try !index.search(word).contains { $0.section == "3" })
+        // No sync state left, so a library that comes back is read in full.
+        #expect(try index.syncState(section: "3") == nil)
+        #expect(try index.syncState(section: "1") != nil)
+        #expect(try index.pruneSections(keeping: ["1", "6"]) == 0)
+    }
+
     @Test func upsertKeepsCleanPoster() throws {
         let index = try LibraryIndex()
         let movies = try entries("movies-page")
