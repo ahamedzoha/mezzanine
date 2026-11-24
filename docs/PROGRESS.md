@@ -1,6 +1,6 @@
 # Progress
 
-## Where things stand (2026-11-24: 1.0.0)
+## Where things stand (2026-11-24: 1.0.1)
 
 Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
 picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
@@ -21,7 +21,7 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
-## 2026-11-24 — No get-task-allow in Release (1.0.1, not released)
+## 2026-11-24 — 1.0.1: no get-task-allow in Release
 
 - Published builds carried `com.apple.security.get-task-allow`: Xcode adds it for Apple Development
   signing, so any process of the same user could attach and read memory, the Plex token included.
