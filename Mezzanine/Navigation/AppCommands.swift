@@ -545,7 +545,7 @@ struct MezzanineCommands: Commands {
                     item(.cycleSubtitles)
                     item(.subtitleOptions)
                     item(.findSubtitles)
-                    item(.whatDidTheySay)
+                    item(.whatDidTheySay, disabled: center.hasMiniPlayer)
                     Divider()
                     // Actions that start and stop name what they'll do; Translate is a setting.
                     item(.generateSubtitles, title: center.generatingSubtitles ? "Stop Generating Subtitles" : nil)

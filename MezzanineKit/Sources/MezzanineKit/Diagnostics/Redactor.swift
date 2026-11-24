@@ -16,14 +16,15 @@ public struct Redactor: Sendable {
 
     public func callAsFunction(_ text: String) -> String {
         var out = text
+        if !home.isEmpty { out = out.replacingOccurrences(of: home, with: "~") }
+        // Before names: a profile called "Plex" would break a host name up for the patterns.
+        for (pattern, replacement) in Self.patterns {
+            out = out.replacingOccurrences(of: pattern, with: replacement, options: [.regularExpression, .caseInsensitive])
+        }
         for name in names {
             // Whole words: a film called "Cars" must not eat into other words.
             out = out.replacingOccurrences(of: "(?<!\\w)\(NSRegularExpression.escapedPattern(for: name))(?!\\w)", with: "<name>",
                                            options: [.regularExpression, .caseInsensitive])
-        }
-        if !home.isEmpty { out = out.replacingOccurrences(of: home, with: "~") }
-        for (pattern, replacement) in Self.patterns {
-            out = out.replacingOccurrences(of: pattern, with: replacement, options: [.regularExpression, .caseInsensitive])
         }
         return out
     }

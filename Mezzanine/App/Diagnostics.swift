@@ -63,12 +63,20 @@ final class Diagnostics: NSObject, MXMetricManagerSubscriber {
         panel.message = "Names, titles, addresses and tokens are left out. Nothing is sent."
         panel.nameFieldStringValue = "Mezzanine Diagnostics \(Date().formatted(.iso8601.year().month().day())).txt"
         panel.allowedContentTypes = [.plainText]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // Not modal: a film (and its sleep timer) goes on behind it.
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            MainActor.assumeIsolated { self?.write(to: url) }
+        }
+    }
+
+    private func write(to url: URL) {
         Task {
             let text = await report()
             do {
                 try text.write(to: url, atomically: true, encoding: .utf8)
-                NSWorkspace.shared.activateFileViewerSelecting([url])
+                // Finder doesn't come forward over a film.
+                if playback?.isPresented != true { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             } catch {
                 let alert = NSAlert()
                 alert.messageText = "The report couldn’t be saved"

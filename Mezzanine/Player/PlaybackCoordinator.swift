@@ -447,6 +447,9 @@ final class PlaybackCoordinator {
         }
         let ask = CatchUp(at: player.currentTime, trackID: track.id)
         catchUp = ask
+        #if DEBUG
+        print("CATCHUP track \(track.id) at \(player.currentTime)")
+        #endif
         Task {
             await player.goBack(CatchUp.step, withSubtitle: track.id)
             while catchUp == ask {
@@ -463,6 +466,9 @@ final class PlaybackCoordinator {
         guard let ask = catchUp else { return }
         catchUp = nil
         if player.selectedSubtitleID == ask.trackID { player.selectSubtitle(id: nil) }
+        #if DEBUG
+        print("CATCHUP over at \(player.currentTime)")
+        #endif
     }
 
     func selectSubtitle(trackID: Int?) {

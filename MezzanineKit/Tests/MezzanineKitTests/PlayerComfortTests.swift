@@ -106,6 +106,11 @@ struct RedactorTests {
         #expect(out.contains(":32400"))
     }
 
+    @Test func aNameInsideAHostDoesNotSplitIt() {
+        let out = Redactor(names: ["plex", "direct"])("load https://10-0-0-7.abc123.plex.direct:32400/library/parts/1/2/file.mkv")
+        #expect(out == "load https://<host>:32400/library/parts/<file>")
+    }
+
     /// What a reader needs stays: times, versions, engine facts.
     @Test func keepsTheEvidence() {
         let text = "2026-11-24 10:19:44.438 [engine] startup 8/8 presenting (gen 4) makeup +11.6 dB seg-255 1011.58s version 26.6.2"

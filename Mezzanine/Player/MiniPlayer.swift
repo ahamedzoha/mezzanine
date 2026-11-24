@@ -61,6 +61,19 @@ struct MiniPlayerTile: View {
         }
         .frame(width: size.width, height: size.height)
         .overlay(alignment: .bottom) { progress }
+        .overlay {
+            // The sleep timer's last seconds: always shown, pointer or not.
+            if let seconds = playback.sleep.stopping {
+                VStack(spacing: Theme.Space.s) {
+                    Text("Stopping in \(seconds) s").font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink)
+                    Button("Keep Watching") { playback.sleep.keepWatching() }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .focusEffectDisabled(false)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.black.opacity(0.6))
+            }
+        }
         .overlay(Rectangle().strokeBorder(Theme.rule, lineWidth: 1))
         .shadow(color: .black.opacity(0.55), radius: 24, y: 12)
         .contentShape(Rectangle())
@@ -69,7 +82,8 @@ struct MiniPlayerTile: View {
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
         .modifier(TileAccessibility(title: Format.displayTitle(item), value: accessibilityValue,
                                     playing: player.status == .playing,
-                                    expand: expand, toggle: { player.togglePlayPause() }, close: { playback.close() }))
+                                    expand: expand, toggle: { player.togglePlayPause() }, close: { playback.close() },
+                                    keepWatching: playback.sleep.stopping == nil ? nil : { playback.sleep.keepWatching() }))
     }
 
     private var accessibilityValue: String {
@@ -184,6 +198,7 @@ private struct TileAccessibility: ViewModifier {
     let expand: () -> Void
     let toggle: () -> Void
     let close: () -> Void
+    let keepWatching: (() -> Void)?
 
     func body(content: Content) -> some View {
         content
@@ -194,5 +209,6 @@ private struct TileAccessibility: ViewModifier {
             .accessibilityAction(named: "Expand Player") { expand() }
             .accessibilityAction(named: playing ? "Pause" : "Play") { toggle() }
             .accessibilityAction(named: "Close Player") { close() }
+            .accessibilityActions { if let keepWatching { Button("Keep Watching", action: keepWatching) } }
     }
 }

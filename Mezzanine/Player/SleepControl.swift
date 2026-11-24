@@ -16,6 +16,8 @@ final class SleepControl {
 
     @ObservationIgnored private weak var playback: PlaybackCoordinator?
     @ObservationIgnored private var loop: Task<Void, Never>?
+    @ObservationIgnored private var ramp: Task<Void, Never>?
+    @ObservationIgnored private var isRamping = false
 
     func attach(_ playback: PlaybackCoordinator) { self.playback = playback }
 
@@ -42,7 +44,7 @@ final class SleepControl {
     /// The title reached its end. True when nothing may follow it; the timer is then done.
     func titleEnded() -> Bool {
         guard timer.stopsAtEnd else { return false }
-        finish()
+        finish(quietly: true)
         return true
     }
 
@@ -50,7 +52,10 @@ final class SleepControl {
     func playerClosed() {
         timer.set(.off)
         loop?.cancel()
-        endFade()
+        ramp?.cancel()
+        isRamping = false
+        stopping = nil
+        playback?.player.fade = 1
     }
 
     /// "23 min", "End of episode"; "Off".
@@ -84,46 +89,74 @@ final class SleepControl {
         guard let playback else { return }
         let player = playback.player
         let casting = playback.cast.isCasting
-        let playing = player.status == .playing && !casting
         let remaining = player.duration > 0 ? (player.duration - player.currentTime) / max(0.1, player.rate) : nil
         switch timer.phase(remaining: casting ? nil : remaining) {
         case .idle, .waiting:
             endFade()
         case .fading(let seconds, let level):
-            // Paused or on a TV there's no sound here to fade.
-            guard playing else { endFade(); return }
-            if stopping == nil {
-                AccessibilityNotification.Announcement("Sleep timer. Stopping in \(seconds) seconds. Return keeps watching.").post()
+            switch player.status {
+            case .playing where !casting: break
+            // Between two pictures: hold the level, or it would swell back for a moment.
+            case .seeking, .loading: return
+            default: endFade(); return
             }
+            if stopping == nil {
+                AccessibilityNotification.Announcement(playback.isMini
+                    ? "Sleep timer. Stopping in \(seconds) seconds. Keep Watching is on the mini player."
+                    : "Sleep timer. Stopping in \(seconds) seconds. Return keeps watching.").post()
+            }
+            #if DEBUG
+            if stopping != seconds { print("SLEEP stopping in \(seconds) fade \(String(format: "%.2f", level)) status \(player.status)") }
+            #endif
+            ramp?.cancel()
             stopping = seconds
             player.fade = level
         case .due:
-            if casting {
-                if playback.cast.isPlaying { playback.cast.togglePlay() }
-            } else if player.status == .playing || player.status == .seeking || player.status == .loading {
-                player.pause()
-            }
-            finish()
+            let stopsIt = [.playing, .seeking, .loading].contains(player.status) && !casting
+            if stopsIt { player.pause() }
+            // Already paused by hand: there's nothing to say.
+            finish(quietly: !stopsIt)
         }
     }
 
-    private func finish() {
+    private func finish(quietly: Bool) {
         timer.set(.off)
         loop?.cancel()
         stopping = nil
-        stops += 1
-        AppLog.playback.notice("sleep timer stopped playback")
-        AccessibilityNotification.Announcement("Sleep timer ended").post()
-        // The level comes back once the pause has landed, so nothing is heard of it.
-        Task {
-            try? await Task.sleep(for: .milliseconds(600))
-            if !isOn { playback?.player.fade = 1 }
+        if !quietly {
+            stops += 1
+            AccessibilityNotification.Announcement("Sleep timer. Playback paused.").post()
+        }
+        AppLog.playback.notice("sleep timer ended")
+        // The level comes back once the sound has stopped, so nothing is heard of it.
+        ramp?.cancel()
+        ramp = Task { [weak self] in
+            for _ in 0..<30 {
+                guard let player = self?.playback?.player, player.status == .playing else { break }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            guard !Task.isCancelled, let self, !self.isOn else { return }
+            self.playback?.player.fade = 1
+            #if DEBUG
+            if let player = self.playback?.player { print("SLEEP ended, fade \(player.fade) status \(player.status)") }
+            #endif
         }
     }
 
+    /// Back to the full level: over a second while it plays, at once otherwise.
     private func endFade() {
         if stopping != nil { stopping = nil }
-        if let player = playback?.player, player.fade != 1 { player.fade = 1 }
+        guard let player = playback?.player, player.fade < 1 else { return }
+        guard player.status == .playing else { ramp?.cancel(); player.fade = 1; return }
+        guard !isRamping else { return }
+        isRamping = true
+        ramp = Task { [weak self] in
+            defer { self?.isRamping = false }
+            while let player = self?.playback?.player, player.fade < 1, !Task.isCancelled {
+                player.fade = min(1, player.fade + 0.05)
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+        }
     }
 }
 
@@ -177,7 +210,8 @@ struct GoToTimeField: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(Theme.Space.m)
-        .frame(width: 260, alignment: .leading)
+        .frame(minWidth: 260, maxWidth: 340, alignment: .leading)
+        .fixedSize(horizontal: true, vertical: true)
         .background(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).fill(Theme.graphite.opacity(0.95)))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).strokeBorder(Theme.rule, lineWidth: 1))
         .onAppear { focused = true }

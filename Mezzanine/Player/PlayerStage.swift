@@ -84,7 +84,8 @@ struct PlayerStage: View {
                 }, close: { setGoToTime(false) })
                     .padding(.bottom, 112)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .transition(.opacity)
+                    // Gone at once: a fading field would go on taking keys.
+                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
             }
             if let seconds = playback.sleep.stopping, !upNextShown {
                 StoppingSoonCard(seconds: seconds) { playback.sleep.keepWatching() }.transition(.opacity)
@@ -132,6 +133,8 @@ struct PlayerStage: View {
             scheduleHide()
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "PlayerOptionsOpen") { optionsOpen = true }
+            // -SleepTimerSeconds 30 starts a timed sleep timer ending that soon.
+            if UserDefaults.standard.integer(forKey: "SleepTimerSeconds") > 0 { playback.sleep.set(.minutes(15)) }
             // -PlayerOptionsPage search|subtitles|audio: open the ⋯ panel on that page.
             switch UserDefaults.standard.string(forKey: "PlayerOptionsPage") {
             case "search": optionsPage = .search; optionsOpen = true
@@ -195,6 +198,11 @@ struct PlayerStage: View {
         }
         .onChange(of: playback.cast.isCasting, initial: true) { _, casting in
             commands.castingTo = casting ? playback.cast.device?.id : nil
+            // The TV plays on its own clock: the timer is for the Mac.
+            if casting, playback.sleep.isOn {
+                playback.sleep.set(.off)
+                showToast("Sleep timer off while casting")
+            }
         }
         .onChange(of: upNext) { _, state in
             switch state {
@@ -353,18 +361,21 @@ struct PlayerStage: View {
     private var remainingLine: some View {
         // The clock moves on while the film is paused.
         TimelineView(.periodic(from: .now, by: 15)) { context in
-            HStack(spacing: Theme.Space.s) {
-                if playback.sleep.isOn {
-                    Label(playback.sleep.label(for: item), systemImage: "moon.zzz")
+            let left = clock(max(0, player.duration - player.currentTime))
+            let end = TimeEntry.end(current: player.currentTime, duration: player.duration, rate: player.rate, now: context.date)
+                .map { $0.formatted(date: .omitted, time: .shortened) }
+            let timer = playback.sleep.isOn ? playback.sleep.label(for: item) : nil
+            HStack(spacing: Theme.Space.m) {
+                if let timer {
+                    Label(timer, systemImage: "moon.zzz")
                         .help(PlayerShortcuts.shared.help("Sleep timer", .sleepTimer))
-                        .accessibilityLabel("Sleep timer: \(playback.sleep.label(for: item))")
-                    Text("·").accessibilityHidden(true)
                 }
-                Text("−" + clock(max(0, player.duration - player.currentTime)))
-                if let end = TimeEntry.end(current: player.currentTime, duration: player.duration, rate: player.rate, now: context.date) {
-                    Text("· Ends \(end.formatted(date: .omitted, time: .shortened))")
-                }
+                Text(["−" + left, end.map { "Ends \($0)" }].compactMap { $0 }.joined(separator: " · "))
             }
+            .lineLimit(1)
+            .fixedSize()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(["\(left) left", end.map { "ends \($0)" }, timer.map { "sleep timer \($0)" }].compactMap { $0 }.joined(separator: ", "))
         }
     }
 
@@ -498,7 +509,7 @@ struct PlayerStage: View {
             upNextTrigger = BingePlanner.upNextTrigger(duration: player.duration, markers: item.markers) ?? .infinity
         }
         // Films: at the credits, suggestions instead of a countdown.
-        if item.kind == .movie, upNext == .hidden, playback.showsPostPlay, let trigger = upNextTrigger, t >= trigger,
+        if item.kind == .movie, upNext == .hidden, playback.showsPostPlay, !playback.sleep.timer.stopsAtEnd, let trigger = upNextTrigger, t >= trigger,
            player.status == .playing {
             showPostPlay()
             return
@@ -633,6 +644,8 @@ struct PlayerStage: View {
     /// Return: Try Again on a failure, Up Next plays now, Still Watching resumes, else skip.
     private func returnKey() {
         if failure != nil { Task { await playback.retry() }; return }
+        // Typed before the field took the keys.
+        if goingToTime { return }
         if playback.sleep.stopping != nil, !upNextShown { playback.sleep.keepWatching(); return }
         switch upNext {
         case .counting, .stillWatching: Task { await playback.playNext(autoplayed: false) }
@@ -648,11 +661,13 @@ struct PlayerStage: View {
             if open { optionsOpen = false }
             goingToTime = open
         }
-        if !open { focused = true }
+        // Once the field is gone, the player takes the keys back.
+        if !open { DispatchQueue.main.async { focused = true } }
     }
 
     private func setOptions(open: Bool, page: PlayerOptions.Page = .root) {
         withAnimation(Theme.Motion.quick) {
+            if open { goingToTime = false }
             optionsPage = page
             optionsOpen = open
         }

@@ -29,7 +29,18 @@ a GitHub Pages website that looks professional and asks for donations.
   seek. First line on screen: 0.54 s native, 0.64 s software.
 - Built: `SleepTimer`, `TimeEntry`, `CatchUp`, `Redactor` (kit, tested); `SleepControl`, `GoToTimeField`,
   `Diagnostics`, `AppLog` (app). The fade is the player's own volume (no shaping change).
-- Not yet: anything on screen or by ear; a MetricKit payload has never arrived; the HIG review.
+- HIG review applied: casting turns the timer off, Keep Watching on the mini player, no film
+  suggestions at a timed end, the fade holds through seeks and comes back over a second, the time
+  field gives the keys back, the save panel isn't modal.
+- Checked on screen (Debug, muted): the sleep page and card, fade to pause (the screen is let go and
+  the level returns), Return keeps watching, Go to Time (typed, past the end, Return, Esc, then
+  Space), Ends at, What did they say (on and off again), a real report (nothing identifying in it).
+- Not checked: the fade by ear, the mini player's card, end of episode, casting, the save panel,
+  VoiceOver; a MetricKit payload has never arrived.
+- Seen: first frames took 4 to 7 s in these runs (0.5 s the same morning). The Mac's route to the
+  server's LAN address went through a VPN interface (utun5); not looked into.
+- Seen: bitmap subtitles (VobSub) are drawn far too large (`SubtitleOverlay` scales each image to a
+  fifth of the picture's height and ignores its own position and size).
 
 ## 2026-11-24 — 0.4.0: sidebar, top bar, card actions
 

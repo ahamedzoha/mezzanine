@@ -438,6 +438,8 @@ final class PlayerKeyRouter {
         guard let handler, let eventWindow = event.window else { return false }
         let mods = event.modifierFlags
         if mods.contains(.command) || mods.contains(.control) { return false }
+        // A save panel answers its own Return and Esc.
+        if eventWindow is NSSavePanel { return false }
 
         // Typing (any window): the field gets every plain key, never a menu equivalent.
         if let text = eventWindow.firstResponder as? NSText {
