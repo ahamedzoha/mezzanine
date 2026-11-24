@@ -25,6 +25,7 @@ struct AppShell: View {
     @State private var keepAwake = KeepAwake()
     @Environment(HomeLayoutStore.self) private var layouts
     @Environment(DownloadStore.self) private var downloads
+    @Environment(TitleActions.self) private var titleActions
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
     @FocusState private var sidebarFocused: Bool
@@ -83,6 +84,13 @@ struct AppShell: View {
         // the new client too.
         .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(session.account?.uuid ?? "")|\(session.connection?.baseURL.absoluteString ?? "")") {
             await loadSections()
+        }
+        // Continue Watching for the sidebar, after every change to the library or a stop.
+        .task(id: "\(session.connection?.baseURL.absoluteString ?? "")|\(library.revision)") {
+            // Several changes arrive together (a sync, a stop): one request once they settle.
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            await library.loadContinue()
         }
         .onChange(of: isOffline, initial: true) { _, offline in
             guard offline else { return }
@@ -200,6 +208,8 @@ struct AppShell: View {
         } message: { _ in
             Text("The files go to the Trash. Nothing changes on the Plex server.")
         }
+        .modifier(TitleActionPrompts(actions: titleActions))
+        .onChange(of: titleActions.confirmation == nil) { _, closed in commands.isModalShown = !closed }
         .onChange(of: commands.downloadRemoval == nil) { _, closed in commands.isModalShown = !closed }
         .onChange(of: commands.artworkRequest == nil) { _, closed in commands.isModalShown = !closed }
         // Offline there's nothing to search: the field goes rather than sitting dead.
@@ -360,6 +370,29 @@ private struct PagePanels: ViewModifier {
             }
             .animation(Theme.Motion.quick, value: commands.isQuickOpenShown)
             .animation(Theme.Motion.quick, value: showsSearchPanel)
+    }
+}
+
+/// Asked once, app-wide: marking a whole show or season, and a change the server refused.
+private struct TitleActionPrompts: ViewModifier {
+    @Bindable var actions: TitleActions
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog(actions.confirmationTitle,
+                                isPresented: Binding(get: { actions.confirmation != nil }, set: { if !$0 { actions.confirmation = nil } }),
+                                titleVisibility: .visible) {
+                Button(actions.confirmationButton) {
+                    if let (item, watched) = actions.confirmation { Task { await actions.setWatched(item, watched) } }
+                    actions.confirmation = nil
+                }
+                Button("Cancel", role: .cancel) { actions.confirmation = nil }
+            } message: {
+                Text("This changes your watch history on the server, which Plex apps, Tautulli and Trakt all read.")
+            }
+            .alert("Couldn’t make that change", isPresented: Binding(get: { actions.error != nil }, set: { if !$0 { actions.error = nil } })) {
+                Button("OK", role: .cancel) { actions.error = nil }
+            } message: { Text(actions.error ?? "") }
     }
 }
 

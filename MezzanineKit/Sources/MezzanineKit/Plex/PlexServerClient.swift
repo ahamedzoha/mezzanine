@@ -146,6 +146,12 @@ public actor PlexServerClient {
         return c.hubs
     }
 
+    /// Continue Watching on its own (the sidebar), in Plex's order.
+    public func continueWatching(limit: Int = 12) async throws -> [PlexMetadata] {
+        let c: MetadataContainer = try await get("/hubs/continueWatching/items", offset: 0, limit: limit)
+        return c.metadata
+    }
+
     public func sectionHubs(_ section: String, count: Int = 20) async throws -> [PlexHub] {
         let c: HubContainer = try await get("/hubs/sections/\(section)", query: [URLQueryItem(name: "count", value: String(count))])
         return c.hubs
@@ -211,6 +217,32 @@ public actor PlexServerClient {
               let row = rows.first else { throw PlexError.decoding("no Metadata") }
         let json = try JSONSerialization.data(withJSONObject: row)
         return (try JSONDecoder().decode(PlexMetadata.self, from: json), json)
+    }
+
+    /// Titles by key, each with its own JSON (for refreshing their rows in the index).
+    public func rawMetadata(_ ratingKeys: [String]) async throws -> [(PlexMetadata, Data)] {
+        guard !ratingKeys.isEmpty else { return [] }
+        return try await rawRows("/library/metadata/\(ratingKeys.joined(separator: ","))")
+    }
+
+    /// Every episode of a show or season, each with its own JSON.
+    public func rawEpisodes(of item: PlexMetadata) async throws -> [(PlexMetadata, Data)] {
+        switch item.kind {
+        case .show: return try await rawRows("/library/metadata/\(item.ratingKey)/allLeaves")
+        case .season: return try await rawRows("/library/metadata/\(item.ratingKey)/children")
+        default: return []
+        }
+    }
+
+    private func rawRows(_ path: String) async throws -> [(PlexMetadata, Data)] {
+        let data = try await perform(makeRequest("GET", path, query: [URLQueryItem(name: "includeGuids", value: "1")]))
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let container = root["MediaContainer"] as? [String: Any] else { throw PlexError.decoding(path) }
+        let decoder = JSONDecoder()
+        return try (container["Metadata"] as? [[String: Any]] ?? []).compactMap { row in
+            let json = try JSONSerialization.data(withJSONObject: row)
+            return (try? decoder.decode(PlexMetadata.self, from: json)).map { ($0, json) }
+        }
     }
 
     public func rawItems(section: String, type: Int, offset: Int, limit: Int,

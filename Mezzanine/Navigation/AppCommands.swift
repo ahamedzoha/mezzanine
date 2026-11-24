@@ -70,6 +70,11 @@ final class AppCommandCenter {
     var isSearchFieldFocused = false
     /// The visible content has a focused title that Play would start.
     var hasFocusedTitle = false
+    /// That title, and the title or episode in hand on an open title page (the Item menu).
+    var focusedItem: PlexMetadata?
+    var detailFocusedItem: PlexMetadata?
+    /// What the Item menu acts on.
+    var actionItem: PlexMetadata? { path.isEmpty ? focusedItem : detailFocusedItem }
     var isLibraryVisible: Bool {
         if case .library = selection, query.isEmpty { return true }
         return false
@@ -191,7 +196,10 @@ final class AppCommandCenter {
 
     /// Opens a title's page. Episodes open their show; seasons open as themselves.
     func open(_ item: PlexMetadata) {
-        let key = item.kind == .episode ? (item.grandparentRatingKey ?? item.ratingKey) : item.ratingKey
+        open(ratingKey: item.kind == .episode ? (item.grandparentRatingKey ?? item.ratingKey) : item.ratingKey)
+    }
+
+    func open(ratingKey key: String) {
         guard path.last?.ratingKey != key else { return }
         path.append(DetailRoute(ratingKey: key))
         focusContent()
@@ -231,6 +239,8 @@ struct MezzanineCommands: Commands {
     let session: SessionStore
     let downloads: DownloadStore
     let updater: AppUpdater
+    let actions: TitleActions
+    let library: LibraryStore
 
     private var downloadTitle: String {
         switch center.currentDetailItem?.kind {
@@ -406,6 +416,17 @@ struct MezzanineCommands: Commands {
                 Button(section.title) { center.go(to: .library(section.key)) }
                     .keyboardShortcut(KeyEquivalent(Character(String(index + 2))), modifiers: .command)
                     .disabled(center.isPlayerOpen)
+            }
+        }
+        CommandMenu("Item") {
+            if let item = center.actionItem, center.isSignedIn {
+                Section(Format.displayTitle(item)) {
+                    TitleMenuItems(item: item, actions: actions, library: library, commands: center,
+                                   offersOpen: center.path.isEmpty)
+                }
+                .disabled(center.isBlocked || center.isEditingShelves)
+            } else {
+                Text("No Title Selected")
             }
         }
         CommandMenu("Playback") {

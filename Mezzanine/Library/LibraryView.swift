@@ -38,6 +38,7 @@ struct LibraryView: View {
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(AppCommandCenter.self) private var commands
     @Environment(LibraryStore.self) private var library
+    @Environment(TitleActions.self) private var titleActions
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var items: [PlexMetadata] = []
     @State private var loaded = false
@@ -145,7 +146,15 @@ struct LibraryView: View {
         .onKeyPress(.space) { playFocused() }
         .onKeyPress(.home) { jump(to: 0) }
         .onKeyPress(.end) { jump(to: items.count - 1) }
-        .onChange(of: focused, initial: true) { _, index in commands.hasFocusedTitle = index != nil }
+        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { _ in
+            guard let item = focusedItem else { return .ignored }
+            titleActions.toggleWatched(item)
+            return .handled
+        }
+        .onChange(of: focusedItem, initial: true) { _, item in
+            commands.hasFocusedTitle = item != nil
+            commands.focusedItem = item
+        }
         .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }
         .onChange(of: commands.densitySteps.count) { _, _ in
             withAnimation(Theme.Motion.object(reduceMotion)) {
@@ -153,6 +162,8 @@ struct LibraryView: View {
             }
         }
     }
+
+    private var focusedItem: PlexMetadata? { focused.flatMap { items.indices.contains($0) ? items[$0] : nil } }
 
     private var actions: CardActions {
         CardActions(focus: { setFocus($0, byKeyboard: false) },
@@ -651,6 +662,8 @@ private struct TitleRow: View {
 /// default action) plays.
 struct CardInteraction: ViewModifier {
     @Environment(AppCommandCenter.self) private var commands
+    @Environment(TitleActions.self) private var titleActions
+    @Environment(LibraryStore.self) private var library
     let item: PlexMetadata
     let frame: CGRect
     let isFocused: Bool
@@ -680,14 +693,10 @@ struct CardInteraction: ViewModifier {
             .accessibilityHint("Opens. Play with the Play action.")
             .accessibilityAction { onOpen() }
             .accessibilityAction(named: "Play") { onPlay(frame) }
+            .accessibilityAction(named: item.isWatched ? "Mark as unwatched" : "Mark as watched") { titleActions.toggleWatched(item) }
             .contextMenu {
-                Button("Play") { onPlay(frame) }
-                Button("Open") { onOpen() }
-                if item.kind != .episode {
-                    Divider()
-                    Button("Choose Poster…") { commands.artworkRequest = ArtworkRequest(item: item, kind: .poster) }
-                    Button("Choose Background…") { commands.artworkRequest = ArtworkRequest(item: item, kind: .background) }
-                }
+                TitleMenuItems(item: item, actions: titleActions, library: library, commands: commands, frame: frame,
+                               play: { onPlay(frame) })
             }
     }
 }

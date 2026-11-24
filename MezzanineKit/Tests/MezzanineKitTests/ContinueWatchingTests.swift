@@ -49,6 +49,21 @@ import Testing
         #expect(ContinueWatching.applying([old, short], to: plex, now: now).map(\.ratingKey) == ["10", "9"])
     }
 
+    /// Taken out by hand: gone at once, back if played again, and Plex decides after the window.
+    @Test func removedTitlesLeaveUntilPlayedAgain() throws {
+        let now = Date()
+        let f = try film("9", offset: 1_000_000)
+        let plex = [f, try film("10")]
+        let removed = ["9": now.addingTimeInterval(-5)]
+        #expect(ContinueWatching.applying([], removed: removed, to: plex, now: now).map(\.ratingKey) == ["10"])
+        let before = PlaybackStop(item: f, time: 2000, duration: 6000, at: now.addingTimeInterval(-30))
+        #expect(ContinueWatching.applying([before], removed: removed, to: plex, now: now).map(\.ratingKey) == ["10"])
+        let after = PlaybackStop(item: f, time: 2000, duration: 6000, at: now.addingTimeInterval(-1))
+        #expect(ContinueWatching.applying([after], removed: removed, to: plex, now: now).map(\.ratingKey) == ["9", "10"])
+        let old = ["9": now.addingTimeInterval(-ContinueWatching.window - 1)]
+        #expect(ContinueWatching.applying([], removed: old, to: plex, now: now).map(\.ratingKey) == ["9", "10"])
+    }
+
     @Test func hubNames() {
         #expect(ContinueWatching.isContinueHub("home.continue"))
         #expect(ContinueWatching.isContinueHub("tv.ondeck"))

@@ -79,6 +79,18 @@ public actor LibrarySync {
         try index.pruneSections(keeping: keys) > 0
     }
 
+    /// Reads one title again after its watch state changed: its own row, its show's (the watched
+    /// count), and a show's or season's episodes. The incremental sync misses unwatched marks.
+    public func refresh(_ item: PlexMetadata) async throws {
+        var keys = [item.ratingKey]
+        if let show = item.kind == .season ? item.parentRatingKey : item.grandparentRatingKey { keys.append(show) }
+        guard let section = try keys.lazy.compactMap({ try index.item($0)?.section }).first
+            ?? item.librarySectionID.map(String.init) else { return }
+        var rows = try await client.rawMetadata(keys)
+        rows += try await client.rawEpisodes(of: item)
+        try index.upsert(rows.filter { [.movie, .show, .episode].contains($0.0.kind) }, section: section)
+    }
+
     private func fullSync(_ section: PlexLibrarySection, types: [(type: Int, kind: String)],
                           progress: (@Sendable (Progress) -> Void)?) async throws {
         for (type, kind) in types {

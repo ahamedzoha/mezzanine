@@ -20,6 +20,7 @@ struct DetailView: View {
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(AppCommandCenter.self) private var commands
     @Environment(LibraryStore.self) private var library
+    @Environment(TitleActions.self) private var titleActions
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var item: PlexMetadata?
     @State private var seasons: [PlexMetadata] = []
@@ -32,9 +33,6 @@ struct DetailView: View {
     @State private var focusedEpisode: Int?
     @State private var error: String?
     @State private var heroFrame: CGRect = .zero
-    /// A show or season waiting for "Mark all as watched?" confirmation.
-    @State private var confirmWatched: PlexMetadata?
-    @State private var actionError: String?
     /// Which page section ↑/↓ last scrolled to (index into `sectionIDs`).
     @State private var section = 0
     private static let sectionLead: CGFloat = 24
@@ -48,7 +46,7 @@ struct DetailView: View {
                     VStack(alignment: .leading, spacing: Theme.Space.xl - Self.sectionLead) {
                         DetailHero(item: item, nextEpisode: nextEpisode, play: { play(nextEpisode ?? item, from: heroFrame) },
                                    playTrailer: trailer.map { t in { play(t, from: heroFrame) } },
-                                   toggleWatched: { requestToggleWatched(item) },
+                                   toggleWatched: { titleActions.toggleWatched(item) },
                                    playVersion: { i in Task { await playback.play(item, from: heroFrame, mediaIndex: i) } },
                                    chooseArtwork: { kind in commands.artworkRequest = ArtworkRequest(item: item, kind: kind) },
                                    season: season)
@@ -96,29 +94,21 @@ struct DetailView: View {
             // never the whole series on a stray key; the hero button covers that, with a confirmation.
             let focused = focusedEpisode.flatMap { episodes.indices.contains($0) ? episodes[$0] : nil }
             guard let target = focused ?? (episodes.isEmpty ? item : nextEpisode) else { return .ignored }
-            requestToggleWatched(target)
+            titleActions.toggleWatched(target)
             return .handled
         }
         .onMoveCommand(perform: move)
         .navigationTitle(item.map(Format.displayTitle) ?? "")
-        .confirmationDialog(confirmTitle, isPresented: Binding(get: { confirmWatched != nil }, set: { if !$0 { confirmWatched = nil } }),
-                            titleVisibility: .visible) {
-            Button(confirmWatched?.isWatched == true ? "Mark as Unwatched" : "Mark as Watched") {
-                if let target = confirmWatched { Task { await toggleWatched(target) } }
-                confirmWatched = nil
-            }
-            Button("Cancel", role: .cancel) { confirmWatched = nil }
-        } message: {
-            Text("This changes your watch history on the server, which Plex apps, Tautulli and Trakt all read.")
-        }
-        .alert("Couldn’t change watched state", isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
-            Button("OK", role: .cancel) { actionError = nil }
-        } message: { Text(actionError ?? "") }
+        // A mark made anywhere (this page, a card, the Item menu) shows here at once.
+        .onChange(of: titleActions.mark) { _, mark in if let mark { apply(mark) } }
         .task(id: route) { await load() }
         // View ▸ Choose Poster / Background act on this page's title.
         .onChange(of: item?.ratingKey, initial: true) { _, _ in
             commands.currentDetailItem = item.flatMap { [.movie, .show, .season].contains($0.kind) ? $0 : nil }
         }
+        // The Item menu acts on the episode in hand, else the title.
+        .onChange(of: itemInHand, initial: true) { _, inHand in commands.detailFocusedItem = inHand }
+        .onDisappear { if commands.detailFocusedItem?.ratingKey == itemInHand?.ratingKey { commands.detailFocusedItem = nil } }
         .onDisappear { if commands.currentDetailItem?.ratingKey == item?.ratingKey { commands.currentDetailItem = nil } }
         .onChange(of: library.revision) { _, _ in Task { await refreshEpisodes() } }
         .task(id: playTarget?.ratingKey) {
@@ -203,7 +193,7 @@ struct DetailView: View {
                     EpisodeRow(episode: episode, isFocused: focusedEpisode == i,
                                onFocus: { focusedEpisode = i; if let e = sectionIDs.firstIndex(of: "episodes") { section = e } },
                                onPlay: { frame in play(episode, from: frame) },
-                               onToggleWatched: { requestToggleWatched(episode) },
+                               onToggleWatched: { titleActions.toggleWatched(episode) },
                                onPlayVersion: { v in Task { await playback.play(episode, from: nil, mediaIndex: v) } })
                 }
             }
@@ -252,6 +242,10 @@ struct DetailView: View {
     }
 
     // MARK: Data
+
+    private var itemInHand: PlexMetadata? {
+        focusedEpisode.flatMap { episodes.indices.contains($0) ? episodes[$0] : nil } ?? item
+    }
 
     private var relatedHubs: [PlexHub] { related.filter { !$0.items.isEmpty } }
 
@@ -337,45 +331,41 @@ struct DetailView: View {
         episodesVersion += 1
     }
 
-    private var confirmTitle: String {
-        guard let t = confirmWatched else { return "" }
-        let n = t.leafCount ?? 0
-        let what = t.kind == .show ? "all \(n) episodes of \(t.title)" : "all \(n) episodes of \(t.title)"
-        return t.isWatched ? "Mark \(what) as unwatched?" : "Mark \(what) as watched?"
+    /// Shows a watched mark at once; the server's copy replaces it when it arrives.
+    private func apply(_ mark: TitleActions.Mark) {
+        let target = mark.item
+        guard let item, concerns(target) else { return }
+        switch mark.phase {
+        case .applied:
+            if let i = episodes.firstIndex(where: { $0.ratingKey == target.ratingKey }) {
+                episodes[i] = episodes[i].markedWatched(mark.watched)
+            } else if target.kind == .show || (target.kind == .season && target.ratingKey == season?.ratingKey) {
+                episodes = episodes.map { $0.markedWatched(mark.watched) }
+            }
+            episodesVersion += 1
+            if item.ratingKey == target.ratingKey, target.kind == .movie || target.kind == .episode {
+                self.item = item.markedWatched(mark.watched)
+            }
+        case .confirmed:
+            Task {
+                if let fresh = try? await session.client?.metadata(route.ratingKey), fresh.ratingKey == self.item?.ratingKey { self.item = fresh }
+                await refreshSeasons()
+                await refreshEpisodes()
+            }
+        case .failed:
+            Task {
+                if let fresh = try? await session.client?.metadata(route.ratingKey), fresh.ratingKey == self.item?.ratingKey { self.item = fresh }
+                await refreshEpisodes()
+            }
+        }
     }
 
-    /// Shows and seasons ask first (they change many episodes); single titles don't.
-    private func requestToggleWatched(_ target: PlexMetadata) {
-        if target.kind == .show || target.kind == .season { confirmWatched = target }
-        else { Task { await toggleWatched(target) } }
-    }
-
-    private func toggleWatched(_ target: PlexMetadata) async {
-        guard let client = session.client else { return }
-        let watched = !target.isWatched
-        // Show it at once; the server's copy replaces it when it arrives.
-        if let i = episodes.firstIndex(where: { $0.ratingKey == target.ratingKey }) {
-            episodes[i] = episodes[i].markedWatched(watched)
-        } else if target.kind == .show || (target.kind == .season && target.ratingKey == season?.ratingKey) {
-            episodes = episodes.map { $0.markedWatched(watched) }
-        }
-        episodesVersion += 1
-        if item?.ratingKey == target.ratingKey, target.kind == .movie || target.kind == .episode {
-            item = item?.markedWatched(watched)
-        }
-        AccessibilityNotification.Announcement(watched ? "Marked as watched" : "Marked as unwatched").post()
-        do {
-            if watched { try await client.scrobble(ratingKey: target.ratingKey) }
-            else { try await client.unscrobble(ratingKey: target.ratingKey) }
-            item = try await client.metadata(route.ratingKey)
-            await refreshSeasons()
-            await refreshEpisodes()
-            // Home, the library grids and smart shelves catch up in the background.
-            Task { await library.syncAll() }
-        } catch {
-            await refreshEpisodes()
-            actionError = (error as? PlexError)?.userMessage ?? "The server didn’t accept the change."
-        }
+    /// This page's title, or an episode or season of its show.
+    private func concerns(_ target: PlexMetadata) -> Bool {
+        guard let item else { return false }
+        return [target.ratingKey, target.parentRatingKey, target.grandparentRatingKey].contains(item.ratingKey)
+            || target.ratingKey == item.parentRatingKey
+            || episodes.contains { $0.ratingKey == target.ratingKey }
     }
 
     /// The season chips' ticks (each season's watched count) after a change.

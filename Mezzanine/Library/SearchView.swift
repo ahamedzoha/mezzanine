@@ -12,6 +12,7 @@ struct SearchView: View {
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(AppCommandCenter.self) private var commands
     @Environment(LibraryStore.self) private var library
+    @Environment(TitleActions.self) private var titleActions
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var results: [PlexMetadata] = []
     @State private var phase: Phase = .idle
@@ -49,7 +50,15 @@ struct SearchView: View {
             return .handled
         }
         .onKeyPress(.space) { playFocused() }
-        .onChange(of: focused, initial: true) { _, index in commands.hasFocusedTitle = index != nil }
+        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { _ in
+            guard let item = focusedItem, TitleActions.canMark(item) else { return .ignored }
+            titleActions.toggleWatched(item)
+            return .handled
+        }
+        .onChange(of: focusedItem, initial: true) { _, item in
+            commands.hasFocusedTitle = item != nil
+            commands.focusedItem = item
+        }
         .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }
         .navigationTitle("Search")
         .navigationSubtitle(results.isEmpty ? "" : (results.count == 1 ? "1 result" : "\(results.count) results"))
@@ -67,6 +76,8 @@ struct SearchView: View {
             }
         }
     }
+
+    private var focusedItem: PlexMetadata? { focused.flatMap { results.indices.contains($0) ? results[$0] : nil } }
 
     private func search() async {
         let q = query.trimmingCharacters(in: .whitespaces)

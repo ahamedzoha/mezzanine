@@ -34,11 +34,14 @@ public enum ContinueWatching {
         ["continue", "ondeck", "inprogress"].contains { identifier.lowercased().contains($0) }
     }
 
-    /// Plex's items with the recent stops (oldest first) applied; `now` for tests.
-    public static func applying(_ stops: [PlaybackStop], to items: [PlexMetadata], now: Date = Date()) -> [PlexMetadata] {
-        var out = items
+    /// Plex's items with the recent stops (oldest first) applied, less the titles taken out of
+    /// the row by hand (rating key → when), unless played again since; `now` for tests.
+    public static func applying(_ stops: [PlaybackStop], removed: [String: Date] = [:], to items: [PlexMetadata],
+                                now: Date = Date()) -> [PlexMetadata] {
+        var out = items.filter { item in removed[item.ratingKey].map { now.timeIntervalSince($0) > window } ?? true }
         for stop in stops.sorted(by: { $0.at < $1.at }) where now.timeIntervalSince(stop.at) <= window {
             let item = stop.item
+            if let gone = removed[item.ratingKey], gone >= stop.at { continue }
             if stop.finished {
                 out.removeAll { $0.ratingKey == item.ratingKey }
                 continue

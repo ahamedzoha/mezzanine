@@ -55,6 +55,8 @@ final class LibraryStore {
                 self.index = index
                 openedFor = key
                 cleanPosters = [:]
+                continueItems = []
+                removedFromContinue = [:]
                 overridesKey = "artworkOverrides.v1.\(key)"
                 artworkOverrides = (UserDefaults.standard.dictionary(forKey: overridesKey!) as? [String: [String: String]]) ?? [:]
             } catch {
@@ -191,6 +193,38 @@ final class LibraryStore {
         let films = n("movie")
         let noun = section.isPersonalMedia ? (films == 1 ? "video" : "videos") : (films == 1 ? "film" : "films")
         return "\(f(films)) \(noun)"
+    }
+
+    // MARK: Continue Watching
+
+    /// What's in progress, in Plex's order (the sidebar, and whether a title can be taken out).
+    private(set) var continueItems: [PlexMetadata] = []
+    /// Titles taken out of Continue Watching by hand, and when, until Plex has caught up.
+    private(set) var removedFromContinue: [String: Date] = [:]
+    @ObservationIgnored private var continueGeneration = 0
+
+    func isInContinue(_ ratingKey: String) -> Bool { continueItems.contains { $0.ratingKey == ratingKey } }
+
+    func setRemovedFromContinue(_ ratingKey: String, _ removed: Bool) {
+        removedFromContinue[ratingKey] = removed ? Date() : nil
+        if removed { continueItems.removeAll { $0.ratingKey == ratingKey } }
+        revision += 1
+    }
+
+    /// Reads the row again. A newer request's answer wins.
+    func loadContinue() async {
+        guard let client else { return }
+        continueGeneration += 1
+        let generation = continueGeneration
+        guard let items = try? await client.continueWatching() else { return }
+        guard generation == continueGeneration else { return }
+        continueItems = ContinueWatching.applying(recentStops, removed: removedFromContinue, to: items)
+    }
+
+    /// Reads one title again after its watch state changed, so every page shows the server's copy.
+    func refresh(_ item: PlexMetadata) async {
+        try? await sync?.refresh(item)
+        revision += 1
     }
 
     /// Playbacks that stopped in the last two minutes, for Home's Continue Watching while Plex

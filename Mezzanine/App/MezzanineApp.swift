@@ -30,6 +30,7 @@ struct MezzanineApp: App {
     @State private var remote = RemoteControl()
     @State private var layouts = HomeLayoutStore()
     @State private var downloads = DownloadStore()
+    @State private var titleActions = TitleActions()
     @State private var sound: SoundSettings
     @State private var subtitleSources = SubtitleSourceSettings()
     @State private var subtitleFinder = SubtitleFinder()
@@ -63,8 +64,10 @@ struct MezzanineApp: App {
                 .environment(notifier)
                 .environment(updater)
                 .environment(remote)
+                .environment(titleActions)
                 .task {
                     playback.downloads = downloads
+                    titleActions.start(session: session, library: library, playback: playback, commands: commands)
                     updater.isWatching = { [playback] in playback.item != nil }
                     notifier.start(library: library, session: session, commands: commands)
                     #if DEBUG
@@ -89,7 +92,8 @@ struct MezzanineApp: App {
         }
         .defaultSize(width: 1440, height: 900)
         .windowResizability(.contentMinSize)
-        .commands { MezzanineCommands(center: commands, sound: sound, session: session, downloads: downloads, updater: updater) }
+        .commands { MezzanineCommands(center: commands, sound: sound, session: session, downloads: downloads, updater: updater,
+                                        actions: titleActions, library: library) }
 
         Settings {
             SettingsView()

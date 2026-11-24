@@ -168,6 +168,8 @@ struct EpisodeRow: View {
     @Environment(AppCommandCenter.self) private var commands
     @Environment(DownloadStore.self) private var downloads
     @Environment(SessionStore.self) private var session
+    @Environment(TitleActions.self) private var titleActions
+    @Environment(LibraryStore.self) private var library
     @State private var hovering = false
     @State private var frame: CGRect = .zero
 
@@ -227,7 +229,8 @@ struct EpisodeRow: View {
         .accessibilityAction { onPlay(frame) }
         .accessibilityAction(named: episode.isWatched ? "Mark as unwatched" : "Mark as watched") { onToggleWatched() }
         .contextMenu {
-            Button("Play") { onPlay(frame) }
+            Button(episode.progress != nil ? "Resume" : "Play") { onPlay(frame) }
+            if episode.progress != nil { Button("Play from Start") { titleActions.playFromStart(episode, from: frame) } }
             if let onPlayVersion, episode.media.count > 1 {
                 Menu("Play Version") {
                     ForEach(Array(episode.media.enumerated()), id: \.offset) { i, media in
@@ -235,7 +238,14 @@ struct EpisodeRow: View {
                     }
                 }
             }
-            Button(episode.isWatched ? "Mark as Unwatched" : "Mark as Watched", action: onToggleWatched)
+            Divider()
+            if !episode.isWatched { Button("Mark as Watched") { titleActions.requestWatched(episode, true) } }
+            if episode.isWatched || TitleActions.isPartlyWatched(episode) {
+                Button("Mark as Unwatched") { titleActions.requestWatched(episode, false) }
+            }
+            if library.isInContinue(episode.ratingKey) {
+                Button("Remove from Continue Watching") { titleActions.removeFromContinue(episode) }
+            }
             Divider()
             if let record = downloads.record(episode.ratingKey) {
                 if record.isDone {
