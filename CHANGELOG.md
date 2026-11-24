@@ -3,6 +3,16 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 0.6.0 — unreleased
+
+- Play Next and Add to Queue on any film, episode or show; the queue plays before the next episode.
+  Q shows it in the player.
+- Shuffle and Shuffle Unwatched for shows, seasons, collections and playlists.
+- Your Plex watchlist: in the sidebar, as a Home shelf, and on title pages (⇧W). Titles that aren't
+  on your server say so.
+- Films and shows in Spotlight (Settings ▸ Library turns it off).
+- Shortcuts and Siri: Resume Watching, Play Next Episode, Open Title, Surprise Me.
+
 ## 0.5.0 — 2026-11-24
 
 - Sleep timer (⌥S, or Playback ▸ Sleep Timer): stop after 15 to 90 minutes, or at the end of the

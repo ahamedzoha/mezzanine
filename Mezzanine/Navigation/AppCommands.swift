@@ -268,6 +268,22 @@ final class AppCommandCenter {
         focusContent()
     }
 
+    /// A title chosen outside the app (Spotlight, Shortcuts), waiting for the library, or for a
+    /// film that owns the window to close.
+    var pendingTitle: String?
+
+    func openWhenReady(_ ratingKey: String) {
+        guard isSignedIn, !isPlayerOpen else { pendingTitle = ratingKey; return }
+        pendingTitle = nil
+        isQuickOpenShown = false
+        open(ratingKey: ratingKey)
+    }
+
+    func openPendingTitle() {
+        guard let key = pendingTitle else { return }
+        openWhenReady(key)
+    }
+
     func goBack() {
         guard !path.isEmpty else { return }
         path.removeLast()

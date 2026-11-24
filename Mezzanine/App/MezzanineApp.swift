@@ -34,6 +34,7 @@ struct MezzanineApp: App {
     @State private var pins = PinnedStore()
     @State private var diagnostics = Diagnostics()
     @State private var watchlist = WatchlistStore()
+    @State private var spotlight = SpotlightIndex()
     @State private var sound: SoundSettings
     @State private var subtitleSources = SubtitleSourceSettings()
     @State private var subtitleFinder = SubtitleFinder()
@@ -70,6 +71,7 @@ struct MezzanineApp: App {
                 .environment(titleActions)
                 .environment(pins)
                 .environment(watchlist)
+                .environment(spotlight)
                 .task {
                     playback.downloads = downloads
                     diagnostics.start(session: session, library: library, playback: playback, sound: sound)
@@ -84,6 +86,7 @@ struct MezzanineApp: App {
                         }
                     }
                     #endif
+                    IntentBridge.shared.start(session: session, library: library, playback: playback, commands: commands)
                     titleActions.start(session: session, library: library, playback: playback, commands: commands, pins: pins, watchlist: watchlist)
                     updater.isWatching = { [playback] in playback.item != nil }
                     notifier.start(library: library, session: session, commands: commands)
@@ -124,6 +127,7 @@ struct MezzanineApp: App {
                 .environment(notifier)
                 .environment(updater)
                 .environment(remote)
+                .environment(spotlight)
         }
 
         Window("Keyboard Shortcuts", id: "shortcuts") {

@@ -21,6 +21,19 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
+## 2026-11-24 — 0.6 under way: queue, watchlist, Spotlight, Shortcuts
+
+- Spike (GET only): `discover.provider.plex.tv/library/sections/watchlist/all` pages and answers
+  `plex://` guids that match the server's. The index keeps guids (migration v3, filled from the JSON
+  already stored: 150 ms on a copy of the owner's index; every film and show matched).
+- Built: `PlayQueue`, `PlexDiscover` (kit, tested); `QueueStore`, `WatchlistStore`, `SpotlightIndex`,
+  `AppShortcuts` (app). The queue is local, per server and profile. Spotlight holds one profile's
+  345 titles, rewritten only when something changed; Debug builds leave it alone.
+- Differs from the plan: the Watchlist shelf holds only titles on this server (the page has them
+  all); Spotlight has no posters.
+- Not yet: anything on screen, Spotlight and Siri for real, the HIG review. Watchlist add and remove
+  have never been sent: try each once on a title the owner names.
+
 ## 2026-11-24 — 0.5.0: player comforts and diagnostics
 
 - Spike: choosing a subtitle track, seeking and turning it off never rebuilds the session (native

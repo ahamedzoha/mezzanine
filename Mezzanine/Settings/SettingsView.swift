@@ -4,6 +4,7 @@ import MezzanineKit
 /// Settings (⌘,): Account, Playback (binge rules), Sound (per-device setups), Subtitles
 /// (Find Subtitles' languages and sources), Shortcuts (every player key, rebindable), Library.
 struct SettingsView: View {
+    @Environment(SpotlightIndex.self) private var spotlight
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
     @Environment(SoundSettings.self) private var sound
@@ -197,6 +198,10 @@ struct SettingsView: View {
                 @Bindable var library = library
                 Form {
                     Section {
+                        Toggle(isOn: Binding(get: { spotlight.enabled }, set: { spotlight.enabled = $0 })) {
+                            Text("Show titles in Spotlight")
+                            Text("Films and shows of the profile in use, searchable from macOS.")
+                        }
                         Toggle("Show original posters", isOn: $library.prefersCleanPosters)
                     } footer: {
                         Text("Uses each title’s original poster instead of the one your server shows, so badges added to posters on the server (like resolution or rating stickers) don’t appear here. Nothing on the server changes.")

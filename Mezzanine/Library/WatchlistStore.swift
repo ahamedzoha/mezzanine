@@ -40,7 +40,10 @@ final class WatchlistStore {
         } catch {
             guard generation == self.generation else { return }
             // A managed profile has none. Anything else keeps what was there.
-            if let plex = error as? PlexError, case .unauthorized = plex { set([], available: false) }
+            switch error as? PlexError {
+            case .unauthorized, .forbidden: set([], available: false)
+            default: break
+            }
         }
     }
 

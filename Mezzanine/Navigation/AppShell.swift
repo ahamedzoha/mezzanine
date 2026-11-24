@@ -1,3 +1,4 @@
+import CoreSpotlight
 import SwiftUI
 import MezzanineKit
 
@@ -22,6 +23,8 @@ struct AppShell: View {
     @Environment(TitleActions.self) private var titleActions
     @Environment(PinnedStore.self) private var pins
     @Environment(WatchlistStore.self) private var watchlist
+    @Environment(SpotlightIndex.self) private var spotlight
+    @State private var spotlightActivity: NSUserActivity?
     @State private var watchlistAccount: String?
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
@@ -72,6 +75,8 @@ struct AppShell: View {
         .preferredColorScheme(.dark)
         .onChange(of: session.phase, initial: true) { old, phase in
             commands.isSignedIn = phase == .ready
+            if phase == .ready { commands.openPendingTitle() }
+            if phase == .signedOut && old != .signedOut { spotlight.clear() }
             // Only a real sign-out starts onboarding over (every launch begins signed out
             // for a moment while the session restores).
             if phase == .signedOut && old != .signedOut { onboardingComplete = false }
@@ -102,6 +107,16 @@ struct AppShell: View {
             watchlistAccount = key
             await watchlist.load(discover: session.discover, index: library.index, changedAccount: changed)
         }
+        .task(id: "\(library.indexKey ?? "")|\(library.lastSyncedAt?.timeIntervalSince1970 ?? 0)|\(spotlight.enabled)") {
+            guard library.lastSyncedAt != nil else { return }
+            await spotlight.update(index: library.index, key: library.indexKey,
+                                   sections: commands.sections.filter { !$0.isPersonalMedia }.map(\.key))
+        }
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            spotlightActivity = activity
+            openSpotlightTitle()
+        }
+        .onChange(of: library.indexKey) { _, _ in openSpotlightTitle() }
         .onChange(of: watchlist.isAvailable, initial: true) { _, available in
             commands.hasWatchlist = available
             if !available, commands.selection == .watchlist, library.lastSyncedAt != nil { commands.selection = .home }
@@ -114,6 +129,7 @@ struct AppShell: View {
         .onChange(of: playback.ownsWindow, initial: true) { _, owns in
             commands.isPlayerOpen = owns
             if !owns { contentFocused = true }
+            commands.openPendingTitle()
             notifier.openPending()
         }
         .onChange(of: playback.item == nil) { _, closed in if closed { updater.playerClosed() } }
@@ -358,6 +374,13 @@ struct AppShell: View {
                 HomeView(contentFocus: $contentFocused)
             }
         }
+    }
+
+    /// A Spotlight result, once the library it belongs to is open.
+    private func openSpotlightTitle() {
+        guard let activity = spotlightActivity, let key = library.indexKey else { return }
+        spotlightActivity = nil
+        if let ratingKey = SpotlightIndex.ratingKey(from: activity, key: key) { commands.openWhenReady(ratingKey) }
     }
 
     /// A page restored from the last launch that's gone (or another server's): Home.
