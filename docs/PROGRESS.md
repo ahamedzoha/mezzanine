@@ -21,6 +21,26 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
+## 2026-11-24 — Fixes from field diagnostics (for 0.3.4)
+
+Found by reading the Mac's reports and the unified log (AetherEngine logs there in Release, subsystem
+`de.superuser404.AetherEngine`) after a few days' use. No crash report since 0.3.3.
+
+- Volume above 100 %: the boost sits in the engine's shaping, and each change rebuilds the session.
+  The owner's 110, 120, 130 % and back rebuilt it six times; the film advanced 2 s in 8.5 s. Boost is
+  now built in steps of √2 in gain (`VolumeLevel.builtInBoostDB`), the player's own volume takes
+  back the rest, and shaping changes settle for 0.4 s first (the dialogue slider too). The cost: the
+  limiter can work up to 3 dB harder than the level needs until the next load. Same key presses on a
+  silent test file, real `MezzaninePlayer`, no window: six rebuilds before, one after; loudness exact.
+- Disk writes: macOS reported 2.1 GB written in 10.6 h. Every sync loaded and sorted all episodes
+  to count them (14.8 MB spilled to disk each time on the owner's index); `LibraryIndex.count(section:kinds:)`
+  writes nothing.
+- A library removed from Plex stayed in the index (924 Courses titles in search and smart shelves).
+  Connecting now drops sections missing from a successful, non-empty list.
+- Plex was told version 0.1.0; `PlexIdentity` now reads the app's own.
+- Not yet checked in the running app: the owner was watching a film. Open, minor: SwiftUI's
+  duplicate `matchedGeometryEffect` source in Continue Watching (`ShelfView`, keyed by column).
+
 ## 2026-11-16 — Screen dimmed during playback (0.3.2)
 
 - Owner: the display dimmed and slept mid-film without a key press. AetherEngine sets

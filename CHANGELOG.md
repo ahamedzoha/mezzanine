@@ -3,6 +3,15 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 0.3.4 — 2026-11-24
+
+- Turning the volume above 100 % no longer stops the film at every step. A run of volume keys or a
+  drag on a sound slider is applied once, and most steps up or down now change the loudness at once
+  with no pause.
+- Titles of a library you removed from Plex no longer show up in search and smart shelves.
+- Checking the library in the background writes far less to disk.
+- Plex's dashboard shows Mezzanine's real version.
+
 ## 0.3.3 — 2026-11-23
 
 - Mezzanine no longer quits when the Mac's sound output changes, such as connecting AirPods or
