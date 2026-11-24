@@ -9,6 +9,8 @@ public struct PlexDiscover: Sendable {
     let identity: PlexIdentity
     let token: String
     let session: URLSession
+    /// Tells two accounts apart without giving the token away.
+    public var account: Int { token.hashValue }
 
     public init(identity: PlexIdentity, token: String, session: URLSession = Transport.makeAPISession()) {
         self.identity = identity

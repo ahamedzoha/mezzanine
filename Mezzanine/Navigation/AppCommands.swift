@@ -268,6 +268,11 @@ final class AppCommandCenter {
         focusContent()
     }
 
+    /// The page on screen holds titles it can shuffle (a collection, a pinned shelf, the watchlist).
+    var canShufflePage = false
+    private(set) var pageShuffle: (count: Int, unwatchedOnly: Bool) = (0, false)
+    func shufflePage(unwatchedOnly: Bool) { pageShuffle = (pageShuffle.count + 1, unwatchedOnly) }
+
     /// A title chosen outside the app (Spotlight, Shortcuts), waiting for the library, or for a
     /// film that owns the window to close.
     var pendingTitle: String?
@@ -524,6 +529,11 @@ struct MezzanineCommands: Commands {
                 .disabled(center.isBlocked || center.isEditingShelves)
             } else {
                 Text("No Title Selected")
+            }
+            if center.canShufflePage {
+                Divider()
+                Button("Shuffle This Page") { center.shufflePage(unwatchedOnly: false) }.disabled(center.isBlocked)
+                Button("Shuffle Unwatched on This Page") { center.shufflePage(unwatchedOnly: true) }.disabled(center.isBlocked)
             }
         }
         CommandMenu("Playback") {

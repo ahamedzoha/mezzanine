@@ -68,6 +68,10 @@ final class PlaybackCoordinator {
     }
     /// What plays next: the queue's head, else the episode after the one playing.
     var nextEpisode: PlexMetadata? { queuedNext ?? followingEpisode }
+    /// Something follows, the queue's head included while it's still being looked up.
+    var hasNext: Bool { nextEpisode != nil || !queue.queue.isEmpty }
+    /// What was queued by hand plays even with Up Next autoplay off.
+    var autoplaysNext: Bool { hasNext && (binge.upNextCountdown > 0 || !queue.queue.isEmpty) }
     /// The episode after the one playing (episodes only), resolved at load.
     private(set) var followingEpisode: PlexMetadata?
     /// The queue's head, looked up while something plays.
@@ -75,6 +79,8 @@ final class PlaybackCoordinator {
     /// Play Next, Add to Queue, Shuffle.
     let queue = QueueStore()
     @ObservationIgnored private var queueLookup: Task<Void, Never>?
+    /// The entry being started (a queued show plays as one of its episodes).
+    @ObservationIgnored private var startedFromQueue: PlayQueue.Entry.ID?
     /// The episode before it, for ⇧N.
     private(set) var previousEpisode: PlexMetadata?
     /// After a film: what to watch next (Plex's related rows), and the row's own name.
@@ -163,7 +169,7 @@ final class PlaybackCoordinator {
         }
         // An episode that ends on the TV hands over to the next one there (Up Next autoplay).
         cast.onFinished = { [weak self] device in
-            guard let self, self.nextEpisode != nil, self.binge.upNextCountdown > 0 else { return }
+            guard let self, self.autoplaysNext else { return }
             Task {
                 await self.playNext(autoplayed: true)
                 await self.startCasting(to: device)
@@ -190,8 +196,15 @@ final class PlaybackCoordinator {
 
     /// Starts the next episode (Up Next, or N while playing).
     func playNext(autoplayed: Bool) async {
+        // At the end before the queue's head was found: find it now, or go on without it.
+        if queuedNext == nil, let head = queue.queue.first {
+            queuedNext = await lookUp(head)
+            if queuedNext == nil { queue.change { $0.remove(head.id) } }
+        }
         guard let next = nextEpisode else { return }
+        startedFromQueue = queuedNext != nil ? queue.queue.first?.id : nil
         await play(next, from: nil, autoplayed: autoplayed)
+        startedFromQueue = nil
     }
 
     /// Starts the episode before this one, from its resume point.
@@ -236,6 +249,9 @@ final class PlaybackCoordinator {
             let stopped = self.item.map { (item: $0, time: stopTime, duration: player.duration) }
             onDevice.end()
             withAnimation(Theme.Motion.object) { self.item = detail }
+            // What was next may be what's on screen now.
+            followingEpisode = nil
+            queuedNext = nil
             if let reporter { await reporter.stop(at: stopped?.time, duration: stopped?.duration) }
             if let stopped, stopped.item.ratingKey != detail.ratingKey {
                 onStopped?(stopped.item, stopped.time, stopped.duration)
@@ -275,7 +291,8 @@ final class PlaybackCoordinator {
             followingEpisode = nil
             previousEpisode = nil
             suggestions = []
-            queue.change { $0.started(item.ratingKey); $0.started(detail.ratingKey) }
+            queue.change { $0.started(item.ratingKey); $0.started(detail.ratingKey); if let show = startedFromQueue { $0.remove(show) } }
+            startedFromQueue = nil
             resolveQueue()
             await resolveNext(after: detail, client: client)
         } catch is CancellationError {
@@ -615,27 +632,60 @@ final class PlaybackCoordinator {
     }
 
     /// Looks up the queue's head while something plays. A title that's gone from the server leaves
-    /// the queue, and the one after it is tried.
+    /// the queue, and the one after it is tried; a slow or failed answer is asked for again.
     private func resolveQueue() {
         queueLookup?.cancel()
         guard item != nil, let head = queue.queue.first else { queuedNext = nil; return }
-        guard queuedNext?.ratingKey != head.ratingKey else { return }
-        queuedNext = nil
-        guard let client = session.client else {
-            queuedNext = downloads?.record(head.ratingKey)?.decoded()
+        if session.client == nil {
+            // Offline: the first queued title that's on this Mac.
+            queuedNext = queue.queue.entries.lazy.compactMap { [downloads] entry -> PlexMetadata? in
+                guard downloads?.localFile(for: entry.ratingKey) != nil else { return nil }
+                return downloads?.record(entry.ratingKey)?.decoded()
+            }.first
             return
         }
+        queuedNext = nil
         queueLookup = Task { [weak self] in
-            do {
-                let found = try await client.metadata(head.ratingKey)
-                // The queue moved on, or the player closed, meanwhile.
-                guard let self, !Task.isCancelled, self.item != nil, self.queue.queue.first?.id == head.id else { return }
-                self.queuedNext = found
-            } catch PlexError.notFound {
-                guard !Task.isCancelled else { return }
-                self?.queue.change { $0.remove(head.id) }
-            } catch {}
+            for attempt in 0..<5 {
+                guard let self, let client = self.session.client else { return }
+                do {
+                    let found = try await self.playable(head, client: client)
+                    // The queue moved on, or the player closed, meanwhile.
+                    guard !Task.isCancelled, self.item != nil, self.queue.queue.first?.id == head.id else { return }
+                    self.queuedNext = found
+                    return
+                } catch PlexError.notFound {
+                    guard !Task.isCancelled else { return }
+                    self.queue.change { $0.remove(head.id) }
+                    return
+                } catch {
+                    try? await Task.sleep(for: .seconds(2 << attempt))
+                    guard !Task.isCancelled else { return }
+                }
+            }
         }
+    }
+
+    private func lookUp(_ entry: PlayQueue.Entry) async -> PlexMetadata? {
+        guard let client = session.client else { return downloads?.record(entry.ratingKey)?.decoded() }
+        return try? await playable(entry, client: client)
+    }
+
+    /// The film or episode a queued title plays (a show: its next unwatched episode).
+    private func playable(_ entry: PlayQueue.Entry, client: PlexServerClient) async throws -> PlexMetadata {
+        let found = try await client.metadata(entry.ratingKey)
+        let playable = try await resolvePlayable(found, client: client)
+        return playable.ratingKey == found.ratingKey ? found : try await client.metadata(playable.ratingKey)
+    }
+
+    /// Plays a queued title now; those before it stay queued.
+    func playQueued(_ entry: PlayQueue.Entry) async {
+        guard let found = await lookUp(entry) else {
+            error = "That title couldn’t be found on the server."
+            return
+        }
+        queue.change { $0.remove(entry.id) }
+        await play(found, from: nil, autoplayed: false)
     }
 
     /// Loads a film's post-play suggestions: the first related rows, unwatched first, never

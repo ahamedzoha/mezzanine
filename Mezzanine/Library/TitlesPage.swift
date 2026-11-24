@@ -88,6 +88,9 @@ struct TitlesPage: View {
         .onChange(of: focusedItem, initial: true) { _, _ in report() }
         // Back on top after a pushed page closed over it.
         .onChange(of: isTop) { _, top in if top { report() } }
+        .onChange(of: isTop && all.contains { TitleActions.canQueue($0) }, initial: true) { _, can in commands.canShufflePage = can }
+        .onChange(of: commands.pageShuffle.count) { _, _ in if isTop { shuffle(unwatchedOnly: commands.pageShuffle.unwatchedOnly) } }
+        .onDisappear { if isTop || commands.path.isEmpty { commands.canShufflePage = false } }
         .onDisappear { if route != nil, commands.detailFocusedItem?.ratingKey == focusedItem?.ratingKey { commands.detailFocusedItem = nil } }
         .onChange(of: commands.playFocusedRequests) { _, _ in if isTop, let item = focusedItem { start(item, from: nil) } }
         .navigationTitle(title)

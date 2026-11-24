@@ -109,7 +109,7 @@ struct AppShell: View {
         }
         .task(id: "\(library.indexKey ?? "")|\(library.lastSyncedAt?.timeIntervalSince1970 ?? 0)|\(spotlight.enabled)") {
             guard library.lastSyncedAt != nil else { return }
-            await spotlight.update(index: library.index, key: library.indexKey,
+            spotlight.update(index: library.index, key: library.indexKey,
                                    sections: commands.sections.filter { !$0.isPersonalMedia }.map(\.key))
         }
         .onContinueUserActivity(CSSearchableItemActionType) { activity in
@@ -123,6 +123,8 @@ struct AppShell: View {
         }
         .onChange(of: isOffline, initial: true) { _, offline in
             guard offline else { return }
+            // The queue of whoever the downloads were made for.
+            if let record = downloads.records.first { playback.queue.use(serverID: record.serverID, userID: record.userID) }
             commands.selection = .downloads
             AccessibilityNotification.Announcement("Offline. Showing downloads.").post()
         }

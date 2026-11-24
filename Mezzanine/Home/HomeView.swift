@@ -63,7 +63,15 @@ struct HomeView: View {
                 browsing
             }
         }
-        .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(scope)|\(library.revision)|\(watchlist.revision)") { await load() }
+        .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(scope)|\(library.revision)") { await load() }
+        // Only the Watchlist shelf, if there is one: the rest of Home has nothing new to read.
+        .onChange(of: watchlist.revision) { _, _ in
+            guard !editing, let spec = model.specs.first(where: { $0.source == .watchlist }), let client = session.client else { return }
+            Task {
+                await model.refresh(spec, client: client, index: library.index, watchlist: watchlist.items)
+                model.apply(model.specs)
+            }
+        }
         .onChange(of: showsDetails, initial: true) { _, shown in commands.detailsShown = shown }
         .onDisappear { commands.detailsShown = false }
         .onChange(of: layouts.revision) { _, _ in

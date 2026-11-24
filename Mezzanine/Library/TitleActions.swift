@@ -144,6 +144,8 @@ final class TitleActions {
         AccessibilityNotification.Announcement("\(Format.displayTitle(item)) plays next").post()
     }
 
+    @ObservationIgnored private var shuffles = 0
+
     func addToQueue(_ item: PlexMetadata) {
         playback?.queue.change { $0.add([QueueStore.entry(item)]) }
         AccessibilityNotification.Announcement("Added to queue").post()
@@ -164,16 +166,24 @@ final class TitleActions {
 
     /// The same for any page's titles. What was queued makes way.
     func shuffle(unwatchedOnly: Bool, titles: @escaping () async throws -> [PlexMetadata]) {
+        shuffles += 1
+        let mine = shuffles
+        let owner = library?.indexKey
         Task {
             do {
                 var generator = SystemRandomNumberGenerator()
                 let order = PlayQueue.shuffled(try await titles(), unwatchedOnly: unwatchedOnly, using: &generator)
+                // Another shuffle, or another profile, meanwhile.
+                guard mine == shuffles, owner == library?.indexKey else { return }
                 guard let first = order.first, let playback else {
                     AccessibilityNotification.Announcement("Nothing to shuffle").post()
                     return
                 }
+                // A show resumes where it was; a film or episode starts over.
+                await playback.play(first, from: nil, startAt: first.kind == .show ? nil : 0)
+                // What was queued makes way only once this plays.
+                guard mine == shuffles, owner == library?.indexKey, playback.isPresented, playback.error == nil else { return }
                 playback.queue.change { $0.replace(with: order.dropFirst().map(QueueStore.entry)) }
-                await playback.play(first, from: nil, startAt: 0)
             } catch {
                 self.error = (error as? PlexError)?.userMessage ?? "The server didn’t answer."
             }
@@ -182,7 +192,7 @@ final class TitleActions {
 
     /// W and ⇧W on a focused title: watched, and the watchlist.
     func key(_ press: KeyPress, on item: PlexMetadata?) -> KeyPress.Result {
-        guard let item else { return .ignored }
+        guard let item, press.modifiers.subtracting([.shift, .capsLock]).isEmpty else { return .ignored }
         if press.modifiers.contains(.shift) {
             guard let watchlist, watchlist.offers(item) else { return .ignored }
             watchlist.toggle(item)

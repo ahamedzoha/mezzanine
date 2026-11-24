@@ -349,7 +349,7 @@ struct PlayerOptions: View {
                     }
                 }
                 .frame(maxHeight: 300)
-                Button("Clear Queue") { playback.queue.change { $0.clear() } }
+                Button("Clear Queue") { playback.queue.change { $0.clear() }; say("Queue cleared") }
                     .buttonStyle(SecondaryButtonStyle())
                     .focusEffectDisabled(false)
                     .padding(Theme.Space.s)
@@ -359,16 +359,21 @@ struct PlayerOptions: View {
 
     private func queueRow(_ entry: PlayQueue.Entry, isFirst: Bool, isLast: Bool) -> some View {
         HStack(spacing: Theme.Space.s) {
-            VStack(alignment: .leading, spacing: 2) {
+            Button { Task { await playback.playQueued(entry) } } label: { VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title).font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink).lineLimit(1)
                 if !entry.detail.isEmpty {
                     Text(entry.detail).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary).lineLimit(1)
                 }
             }
-            Spacer(minLength: Theme.Space.s)
-            queueButton("chevron.up", "Move Up") { playback.queue.change { $0.move(entry.id, by: -1) } }.disabled(isFirst)
-            queueButton("chevron.down", "Move Down") { playback.queue.change { $0.move(entry.id, by: 1) } }.disabled(isLast)
-            queueButton("xmark", "Remove from Queue") { playback.queue.change { $0.remove(entry.id) } }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle()) }
+            .buttonStyle(.plain)
+            .focusEffectDisabled(false)
+            .help("Play now")
+            .accessibilityLabel("Play \(entry.title) now")
+            queueButton("chevron.up", "Move Up", entry) { playback.queue.change { $0.move(entry.id, by: -1) }; say("\(entry.title) moved up") }.disabled(isFirst)
+            queueButton("chevron.down", "Move Down", entry) { playback.queue.change { $0.move(entry.id, by: 1) }; say("\(entry.title) moved down") }.disabled(isLast)
+            queueButton("xmark", "Remove from Queue", entry) { playback.queue.change { $0.remove(entry.id) }; say("\(entry.title) removed") }
         }
         .padding(.horizontal, Theme.Space.m)
         .padding(.vertical, 4)
@@ -376,7 +381,9 @@ struct PlayerOptions: View {
         .accessibilityLabel([entry.title, entry.detail].filter { !$0.isEmpty }.joined(separator: ", "))
     }
 
-    private func queueButton(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
+    private func say(_ text: String) { AccessibilityNotification.Announcement(text).post() }
+
+    private func queueButton(_ symbol: String, _ label: String, _ entry: PlayQueue.Entry, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.ink)
                 .frame(width: 28, height: 28).contentShape(Rectangle())
@@ -384,7 +391,7 @@ struct PlayerOptions: View {
         .buttonStyle(.plain)
         .focusEffectDisabled(false)
         .help(label)
-        .accessibilityLabel(label)
+        .accessibilityLabel("\(label): \(entry.title)")
     }
 
     private var sleepPage: some View {

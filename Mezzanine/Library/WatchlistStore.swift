@@ -15,6 +15,12 @@ final class WatchlistStore {
     @ObservationIgnored private var discover: PlexDiscover?
     @ObservationIgnored private var index: LibraryIndex?
     @ObservationIgnored private var generation = 0
+    /// What Plex last listed, and this Mac's changes still on their way, by Discover id.
+    @ObservationIgnored private var listed: [PlexMetadata] = []
+    @ObservationIgnored private var pending: [String: (item: PlexMetadata, on: Bool, token: Int)] = [:]
+    @ObservationIgnored private var sending: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var token = 0
+    private var account: Int { discover?.account ?? 0 }
     /// Told when Plex refuses a change.
     @ObservationIgnored var onError: ((String) -> Void)?
 
@@ -29,14 +35,19 @@ final class WatchlistStore {
         let generation = generation
         self.discover = discover
         self.index = index
-        if changedAccount { set([], available: false) }
+        if changedAccount {
+            listed = []
+            pending = [:]
+            set([], available: false)
+        }
         guard let discover else { return }
         do {
             let list = try await discover.watchlist()
             let shown = await Self.onServer(list, index: index)
             // A newer request (another profile, a change) answers instead.
             guard generation == self.generation else { return }
-            set(shown, available: true)
+            listed = shown
+            show()
         } catch {
             guard generation == self.generation else { return }
             // A managed profile has none. Anything else keeps what was there.
@@ -47,28 +58,51 @@ final class WatchlistStore {
         }
     }
 
-    /// Adds or removes at once, and puts it back if Plex refuses. Logged, not sent, with
-    /// `-MezzanineNoActivity`.
+    /// Adds or removes at once, and puts it back if Plex refuses. Until Plex has answered, the
+    /// change is laid over whatever it lists. Logged, not sent, with `-MezzanineNoActivity`.
     func set(_ item: PlexMetadata, _ on: Bool) {
         guard let id = item.discoverID, let discover, on != ids.contains(id) else { return }
-        let before = items
-        generation += 1
-        set(on ? [item] + items : items.filter { $0.discoverID != id }, available: true)
+        token += 1
+        let token = token
+        pending[id] = (item, on, token)
+        show()
         AccessibilityNotification.Announcement(on ? "Added to Watchlist" : "Removed from Watchlist").post()
         if ActivityReporter.isDisabled {
             print("ACTION watchlist \(on ? "add" : "remove") \(item.ratingKey) not sent")
             return
         }
-        let generation = generation
-        Task {
+        // A title's changes go out in the order they were made.
+        let previous = sending[id]
+        sending[id] = Task { [weak self] in
+            await previous?.value
+            var refused: String?
             do { try await discover.setWatchlisted(id, on) } catch {
-                if generation == self.generation { set(before, available: true) }
-                onError?((error as? PlexError)?.userMessage ?? "Plex didn’t accept the change.")
+                refused = (error as? PlexError)?.userMessage ?? "Plex didn’t accept the change."
             }
+            guard let self else { return }
+            if refused == nil, self.account == discover.account { self.accept(item, id, on) }
+            // A newer change to this title stands; this one is settled.
+            if self.pending[id]?.token == token { self.pending[id] = nil }
+            self.show()
+            if let refused { self.onError?(refused) }
         }
     }
 
+    /// Plex took the change: it's part of the list now.
+    private func accept(_ item: PlexMetadata, _ id: String, _ on: Bool) {
+        listed.removeAll { $0.discoverID == id }
+        if on { listed.insert(item, at: 0) }
+    }
+
     func toggle(_ item: PlexMetadata) { set(item, !contains(item)) }
+
+    /// Plex's list with the changes it hasn't answered yet.
+    private func show() {
+        var list = listed.filter { item in item.discoverID.flatMap { pending[$0] }?.on != false }
+        for change in pending.values.sorted(by: { $0.token > $1.token })
+        where change.on && !list.contains(where: { $0.discoverID == change.item.discoverID }) { list.insert(change.item, at: 0) }
+        set(list, available: true)
+    }
 
     private func set(_ list: [PlexMetadata], available: Bool) {
         let new = Set(list.compactMap(\.discoverID))

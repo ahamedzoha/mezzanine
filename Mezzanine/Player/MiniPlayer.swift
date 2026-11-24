@@ -181,7 +181,7 @@ struct MiniPlayerTile: View {
     private func finished() {
         // The sleep timer ends here: nothing follows.
         if playback.sleep.titleEnded() { playback.close(); return }
-        if playback.nextEpisode != nil, playback.binge.upNextCountdown > 0 {
+        if playback.autoplaysNext {
             Task { await playback.playNext(autoplayed: true) }
         } else {
             AccessibilityNotification.Announcement("Finished \(Format.displayTitle(item))").post()

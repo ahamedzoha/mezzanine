@@ -413,7 +413,7 @@ struct PlayerStage: View {
             let remaining = max(0, min(1, (marker.end - player.currentTime) / max(1, marker.end - marker.start)))
             Button { skip() } label: {
                 HStack(spacing: 6) {
-                    Text(marker.kind == .intro ? "Skip Intro" : (playback.nextEpisode != nil ? "Next Episode" : "Skip Credits"))
+                    Text(marker.kind == .intro ? "Skip Intro" : (playback.nextEpisode != nil ? (playback.nextEpisode?.kind == .episode ? "Next Episode" : "Play Next") : "Skip Credits"))
                     Image(systemName: "forward.fill").font(.system(size: 11, weight: .bold))
                 }
             }
@@ -510,7 +510,7 @@ struct PlayerStage: View {
             upNextTrigger = BingePlanner.upNextTrigger(duration: player.duration, markers: item.markers) ?? .infinity
         }
         // Films: at the credits, suggestions instead of a countdown.
-        if item.kind == .movie, playback.queuedNext == nil, upNext == .hidden, playback.showsPostPlay, !playback.sleep.timer.stopsAtEnd, let trigger = upNextTrigger, t >= trigger,
+        if item.kind == .movie, playback.queue.queue.isEmpty, upNext == .hidden, playback.showsPostPlay, !playback.sleep.timer.stopsAtEnd, let trigger = upNextTrigger, t >= trigger,
            player.status == .playing {
             showPostPlay()
             return
@@ -573,10 +573,10 @@ struct PlayerStage: View {
         if upNext == .postPlay { _ = playback.sleep.titleEnded(); return }
         // The sleep timer ends here: the next episode waits to be asked for.
         if playback.sleep.titleEnded() {
-            if playback.nextEpisode != nil { withAnimation { upNext = .stillWatching } } else { _ = perform(.close) }
+            if playback.hasNext { withAnimation { upNext = .stillWatching } } else { _ = perform(.close) }
             return
         }
-        if playback.nextEpisode != nil, upNext != .dismissed, playback.binge.upNextCountdown > 0 {
+        if playback.autoplaysNext, upNext != .dismissed || !playback.queue.queue.isEmpty {
             if playback.shouldAskStillWatching { withAnimation { upNext = .stillWatching } }
             else { Task { await playback.playNext(autoplayed: true) } }
         } else {
@@ -753,7 +753,7 @@ struct PlayerStage: View {
         case .faster: setRate(PlayerSpeeds.step(from: player.rate, by: 1))
         case .skipMarker: return skip() ? .handled : .ignored
         case .nextEpisode:
-            guard playback.nextEpisode != nil else { showToast("Nothing next"); return .handled }
+            guard playback.hasNext else { showToast("Nothing next"); return .handled }
             Task { await playback.playNext(autoplayed: false) }
         case .previousEpisode:
             guard playback.previousEpisode != nil else { showToast("No previous episode"); return .handled }

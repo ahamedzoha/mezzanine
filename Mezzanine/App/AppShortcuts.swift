@@ -20,6 +20,18 @@ final class IntentBridge {
         self.commands = commands
     }
 
+    /// The server and profile in use.
+    var owner: String? { library?.indexKey }
+
+    nonisolated static func ratingKey(_ id: String, owner: String) -> String? {
+        id.hasPrefix(owner + "|") ? String(id.dropFirst(owner.count + 1)) : nil
+    }
+
+    func title(_ entity: TitleEntity) -> PlexMetadata? {
+        guard let owner, let key = Self.ratingKey(entity.id, owner: owner) else { return nil }
+        return (try? library?.index?.item(key))??.metadata()
+    }
+
     /// Waits (the app may just have been launched) until it's connected and has its library.
     func ready() async throws {
         for _ in 0..<150 {
@@ -56,8 +68,9 @@ nonisolated struct TitleEntity: AppEntity {
 
     var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)", subtitle: "\(detail)") }
 
-    init(_ item: PlexMetadata) {
-        id = item.ratingKey
+    /// `owner` is the server and profile: a saved shortcut never opens another one's title.
+    init(_ item: PlexMetadata, owner: String) {
+        id = "\(owner)|\(item.ratingKey)"
         name = item.title
         detail = [item.kind == .show ? "Show" : "Film", item.year.map(String.init)].compactMap { $0 }.joined(separator: " · ")
     }
@@ -65,18 +78,27 @@ nonisolated struct TitleEntity: AppEntity {
 
 nonisolated struct TitleQuery: EntityStringQuery {
     func entities(for identifiers: [String]) async throws -> [TitleEntity] {
-        guard let index = await IntentBridge.shared.library?.index else { return [] }
-        return identifiers.compactMap { (try? index.item($0))??.metadata().map(TitleEntity.init) }
+        let bridge = await IntentBridge.shared
+        try await bridge.ready()
+        guard let index = await bridge.library?.index, let owner = await bridge.owner else { return [] }
+        return identifiers.compactMap { id in
+            guard let key = IntentBridge.ratingKey(id, owner: owner) else { return nil }
+            return (try? index.item(key))??.metadata().map { TitleEntity($0, owner: owner) }
+        }
     }
 
     func entities(matching string: String) async throws -> [TitleEntity] {
-        guard let library = await IntentBridge.shared.library else { return [] }
-        return await library.search(string).filter { $0.kind == .movie || $0.kind == .show }.prefix(20).map(TitleEntity.init)
+        let bridge = await IntentBridge.shared
+        try await bridge.ready()
+        guard let library = await bridge.library, let owner = await bridge.owner else { return [] }
+        return await library.search(string).filter { $0.kind == .movie || $0.kind == .show }.prefix(20).map { TitleEntity($0, owner: owner) }
     }
 
     func suggestedEntities() async throws -> [TitleEntity] {
-        guard let library = await IntentBridge.shared.library else { return [] }
-        return await library.wallItems(limit: 20).map(TitleEntity.init)
+        let bridge = await IntentBridge.shared
+        try await bridge.ready()
+        guard let library = await bridge.library, let owner = await bridge.owner else { return [] }
+        return await library.wallItems(limit: 20).map { TitleEntity($0, owner: owner) }
     }
 }
 
@@ -108,7 +130,7 @@ struct PlayNextEpisodeIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         let bridge = IntentBridge.shared
         try await bridge.ready()
-        guard let item = (try? bridge.library?.index?.item(target.id))??.metadata() else { throw IntentProblem.gone }
+        guard let item = bridge.title(target) else { throw IntentProblem.gone }
         await bridge.playback?.play(item, from: nil)
         return .result()
     }
@@ -126,8 +148,8 @@ struct OpenTitleIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         let bridge = IntentBridge.shared
         try await bridge.ready()
-        guard (try? bridge.library?.index?.item(target.id)) ?? nil != nil else { throw IntentProblem.gone }
-        bridge.commands?.openWhenReady(target.id)
+        guard let item = bridge.title(target) else { throw IntentProblem.gone }
+        bridge.commands?.openWhenReady(item.ratingKey)
         return .result()
     }
 }
@@ -151,6 +173,10 @@ nonisolated struct MezzanineShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: ResumeWatchingIntent(), phrases: ["Resume watching in \(.applicationName)", "Resume \(.applicationName)"],
                     shortTitle: "Resume Watching", systemImageName: "play.fill")
+        AppShortcut(intent: PlayNextEpisodeIntent(), phrases: ["Play next episode in \(.applicationName)"],
+                    shortTitle: "Play Next Episode", systemImageName: "forward.end.fill")
+        AppShortcut(intent: OpenTitleIntent(), phrases: ["Open a title in \(.applicationName)"],
+                    shortTitle: "Open Title", systemImageName: "film")
         AppShortcut(intent: SurpriseMeIntent(), phrases: ["Surprise me in \(.applicationName)", "Surprise me with \(.applicationName)"],
                     shortTitle: "Surprise Me", systemImageName: "dice")
     }

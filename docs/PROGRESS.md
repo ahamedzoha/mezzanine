@@ -31,8 +31,13 @@ a GitHub Pages website that looks professional and asks for donations.
   345 titles, rewritten only when something changed; Debug builds leave it alone.
 - Differs from the plan: the Watchlist shelf holds only titles on this server (the page has them
   all); Spotlight has no posters.
-- Not yet: anything on screen, Spotlight and Siri for real, the HIG review. Watchlist add and remove
-  have never been sent: try each once on a title the owner names.
+- HIG review applied: Spotlight drops the other profile's titles first and writes one at a time; the
+  queue plays at a title's end even while its head is being looked up, with Up Next autoplay off, and
+  offline from downloads; watchlist changes are laid over Plex's list until it answers; Shuffle keeps
+  the old queue until it plays; Shortcuts ids carry the server and profile.
+- Not changed: casting doesn't ask Still Watching before the next title (it never did).
+- Not yet: anything on screen, Spotlight and Siri for real. Watchlist add and remove have never been
+  sent: try each once on a title the owner names.
 
 ## 2026-11-24 — 0.5.0: player comforts and diagnostics
 
