@@ -50,11 +50,7 @@ struct SearchView: View {
             return .handled
         }
         .onKeyPress(.space) { playFocused() }
-        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { _ in
-            guard let item = focusedItem, TitleActions.canMark(item) else { return .ignored }
-            titleActions.toggleWatched(item)
-            return .handled
-        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { titleActions.key($0, on: focusedItem) }
         .onChange(of: focusedItem, initial: true) { _, item in
             commands.hasFocusedTitle = item != nil
             commands.focusedItem = item

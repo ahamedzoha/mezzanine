@@ -153,11 +153,7 @@ struct LibraryView: View {
         .onKeyPress(.space) { playFocused() }
         .onKeyPress(.home) { jump(to: 0) }
         .onKeyPress(.end) { jump(to: items.count - 1) }
-        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { _ in
-            guard let item = focusedItem else { return .ignored }
-            titleActions.toggleWatched(item)
-            return .handled
-        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { titleActions.key($0, on: focusedItem) }
         .onChange(of: focusedItem, initial: true) { _, item in
             commands.hasFocusedTitle = item != nil
             commands.focusedItem = item
@@ -740,7 +736,7 @@ struct GridPoster: View {
                     .overlay(alignment: .topTrailing) { WatchedMark(item: item) }
                     .overlay(alignment: .bottomTrailing) {
                         // A collection opens; there's nothing to play by itself.
-                        if lifted, item.kind != .collection { PlayDisc { actions.play(item, frame) }.padding(10).transition(.opacity) }
+                        if lifted, item.kind != .collection, !item.isDiscoverOnly { PlayDisc { actions.play(item, frame) }.padding(10).transition(.opacity) }
                     }
             }
             .aspectRatio(2 / 3, contentMode: .fit)

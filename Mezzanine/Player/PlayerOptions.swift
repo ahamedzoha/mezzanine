@@ -22,7 +22,7 @@ struct PlayerOptions: View {
     @Environment(DownloadStore.self) private var downloads
     @Environment(\.openSettings) private var openSettings
 
-    enum Page { case root, audio, subtitles, search, sound, speed, quality, picture, sleep }
+    enum Page { case root, audio, subtitles, search, sound, speed, quality, picture, sleep, queue }
 
     private var player: MezzaninePlayer { playback.player }
     private var onDevice: OnDeviceSubtitles { playback.onDevice }
@@ -39,6 +39,7 @@ struct PlayerOptions: View {
             case .quality: quality
             case .picture: picturePage
             case .sleep: sleepPage
+            case .queue: queuePage
             }
         }
         .padding(Theme.Space.s)
@@ -71,6 +72,7 @@ struct PlayerOptions: View {
             row("Speed", value: speedLabel(player.rate)) { page = .speed }
             row("Picture", value: playback.pictureMode.label) { page = .picture }
             row("Quality", value: playback.mode.label) { page = .quality }
+            row("Queue", value: playback.queue.summary ?? "Empty") { page = .queue }
             if !playback.cast.isCasting { row("Sleep timer", value: playback.sleep.label(for: item)) { page = .sleep } }
         }
     }
@@ -330,6 +332,59 @@ struct PlayerOptions: View {
                 choice(speedLabel(rate), detail: nil, selected: abs(player.rate - rate) < 0.01) { player.setRate(rate) }
             }
         }
+    }
+
+    private var queuePage: some View {
+        let entries = playback.queue.queue.entries
+        return Group {
+            header("Queue")
+            if entries.isEmpty {
+                note("Nothing queued. Choose Play Next or Add to Queue on a title, or Shuffle on a show or collection.")
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(Array(entries.enumerated()), id: \.element.id) { i, entry in
+                            queueRow(entry, isFirst: i == 0, isLast: i == entries.count - 1)
+                        }
+                    }
+                }
+                .frame(maxHeight: 300)
+                Button("Clear Queue") { playback.queue.change { $0.clear() } }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .focusEffectDisabled(false)
+                    .padding(Theme.Space.s)
+            }
+        }
+    }
+
+    private func queueRow(_ entry: PlayQueue.Entry, isFirst: Bool, isLast: Bool) -> some View {
+        HStack(spacing: Theme.Space.s) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.title).font(Theme.Typeface.cardTitle).foregroundStyle(Theme.ink).lineLimit(1)
+                if !entry.detail.isEmpty {
+                    Text(entry.detail).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: Theme.Space.s)
+            queueButton("chevron.up", "Move Up") { playback.queue.change { $0.move(entry.id, by: -1) } }.disabled(isFirst)
+            queueButton("chevron.down", "Move Down") { playback.queue.change { $0.move(entry.id, by: 1) } }.disabled(isLast)
+            queueButton("xmark", "Remove from Queue") { playback.queue.change { $0.remove(entry.id) } }
+        }
+        .padding(.horizontal, Theme.Space.m)
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel([entry.title, entry.detail].filter { !$0.isEmpty }.joined(separator: ", "))
+    }
+
+    private func queueButton(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.ink)
+                .frame(width: 28, height: 28).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled(false)
+        .help(label)
+        .accessibilityLabel(label)
     }
 
     private var sleepPage: some View {

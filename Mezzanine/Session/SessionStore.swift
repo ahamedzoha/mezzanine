@@ -56,6 +56,9 @@ final class SessionStore {
     /// The token everything else uses: the active Home profile's, else the account's.
     var activeToken: String? { keychain.read(Self.profileKey) ?? token }
 
+    /// Plex's own service for the profile in use (its watchlist).
+    var discover: PlexDiscover? { activeToken.map { PlexDiscover(identity: identity, token: $0) } }
+
     /// One identifier per install. plex.tv ties the token and the Authorized
     /// Devices entry to it; Plex ties playback sessions to it.
     private static func stableClientIdentifier() -> String {
@@ -285,6 +288,8 @@ final class SessionStore {
 
     /// A poster at the pixel width it's drawn at (2:3), resized by the server.
     func posterURL(_ path: String?, pixelWidth: Int) -> URL? {
+        // Plex's own service (the watchlist) gives whole addresses; no token goes there.
+        if let path, path.hasPrefix("https://") { return URL(string: path) }
         guard let path, let client else { return nil }
         let w = Downsampler.bucket(for: pixelWidth)
         return client.urls.photo(path, width: w, height: w * 3 / 2)

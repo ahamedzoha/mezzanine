@@ -142,6 +142,7 @@ struct PlayerStage: View {
             case "audio": optionsPage = .audio; optionsOpen = true
             case "picture": optionsPage = .picture; optionsOpen = true
             case "sleep": optionsPage = .sleep; optionsOpen = true
+            case "queue": optionsPage = .queue; optionsOpen = true
             default: break
             }
             // -PlayerKeyScript "i,c,g,shift+c": posts real key events through the app's event
@@ -509,7 +510,7 @@ struct PlayerStage: View {
             upNextTrigger = BingePlanner.upNextTrigger(duration: player.duration, markers: item.markers) ?? .infinity
         }
         // Films: at the credits, suggestions instead of a countdown.
-        if item.kind == .movie, upNext == .hidden, playback.showsPostPlay, !playback.sleep.timer.stopsAtEnd, let trigger = upNextTrigger, t >= trigger,
+        if item.kind == .movie, playback.queuedNext == nil, upNext == .hidden, playback.showsPostPlay, !playback.sleep.timer.stopsAtEnd, let trigger = upNextTrigger, t >= trigger,
            player.status == .playing {
             showPostPlay()
             return
@@ -752,7 +753,7 @@ struct PlayerStage: View {
         case .faster: setRate(PlayerSpeeds.step(from: player.rate, by: 1))
         case .skipMarker: return skip() ? .handled : .ignored
         case .nextEpisode:
-            guard playback.nextEpisode != nil else { showToast("No next episode"); return .handled }
+            guard playback.nextEpisode != nil else { showToast("Nothing next"); return .handled }
             Task { await playback.playNext(autoplayed: false) }
         case .previousEpisode:
             guard playback.previousEpisode != nil else { showToast("No previous episode"); return .handled }
@@ -791,6 +792,7 @@ struct PlayerStage: View {
         case .goToTime:
             guard player.duration > 0, !upNextShown else { return .ignored }
             setGoToTime(!goingToTime)
+        case .queue: setOptions(open: !(optionsOpen && optionsPage == .queue), page: .queue)
         case .sleepTimer: setOptions(open: !(optionsOpen && optionsPage == .sleep), page: .sleep)
         case .pictureMode:
             withAnimation(Theme.Motion.object(reduceMotion)) { playback.pictureMode = playback.pictureMode.next }

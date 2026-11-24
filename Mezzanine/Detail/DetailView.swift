@@ -92,8 +92,10 @@ struct DetailView: View {
         .onKeyPress(.space) { playPrimary() }
         .onKeyPress(.return) { playFocusedEpisode() }
         .onKeyPress(.escape) { commands.goBack(); return .handled }
-        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { _ in
+        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { press in
             guard let item else { return .ignored }
+            // ⇧W is the title's watchlist, whatever episode is in hand.
+            if press.modifiers.contains(.shift) { return titleActions.key(press, on: item) }
             // On a show, W means the episode in hand (focused, else the one Play would start),
             // never the whole series on a stray key; the hero button covers that, with a confirmation.
             let focused = focusedEpisode.flatMap { episodes.indices.contains($0) ? episodes[$0] : nil }

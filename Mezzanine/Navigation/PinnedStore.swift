@@ -34,7 +34,7 @@ final class PinnedStore {
         var pin = shelf
         pin.hidden = false
         switch shelf.source {
-        case .hub: return nil
+        case .hub, .watchlist: return nil
         case .collection(let key, _): pin.id = id(collection: key)
         case .playlist(let key): pin.id = "playlist:\(key)"
         case .smart(let rule):

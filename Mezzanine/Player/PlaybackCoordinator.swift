@@ -66,8 +66,15 @@ final class PlaybackCoordinator {
     }() {
         didSet { if let data = try? JSONEncoder().encode(binge) { UserDefaults.standard.set(data, forKey: "bingeSettings.v1") } }
     }
+    /// What plays next: the queue's head, else the episode after the one playing.
+    var nextEpisode: PlexMetadata? { queuedNext ?? followingEpisode }
     /// The episode after the one playing (episodes only), resolved at load.
-    private(set) var nextEpisode: PlexMetadata?
+    private(set) var followingEpisode: PlexMetadata?
+    /// The queue's head, looked up while something plays.
+    private(set) var queuedNext: PlexMetadata?
+    /// Play Next, Add to Queue, Shuffle.
+    let queue = QueueStore()
+    @ObservationIgnored private var queueLookup: Task<Void, Never>?
     /// The episode before it, for ⇧N.
     private(set) var previousEpisode: PlexMetadata?
     /// After a film: what to watch next (Plex's related rows), and the row's own name.
@@ -145,6 +152,7 @@ final class PlaybackCoordinator {
         self.session = session
         onDevice = OnDeviceSubtitles(player: player)
         sleep.attach(self)
+        queue.onChange = { [weak self] in self?.resolveQueue() }
         onDevice.selectTrack = { [weak self] id in self?.selectSubtitle(trackID: id) }
         cast.onStopped = { [weak self] at in
             guard let self, self.item != nil else { return }
@@ -264,9 +272,11 @@ final class PlaybackCoordinator {
             reporter.start()
             publishNowPlaying(detail)
             if detail.kind == .episode { episodesThisSession += 1 }
-            nextEpisode = nil
+            followingEpisode = nil
             previousEpisode = nil
             suggestions = []
+            queue.change { $0.started(item.ratingKey); $0.started(detail.ratingKey) }
+            resolveQueue()
             await resolveNext(after: detail, client: client)
         } catch is CancellationError {
         } catch {
@@ -372,8 +382,10 @@ final class PlaybackCoordinator {
             mode = .direct
             playingDownload = true
             reporter = nil
-            nextEpisode = nil
+            followingEpisode = nil
             previousEpisode = nil
+            queue.change { $0.started(detail.ratingKey) }
+            resolveQueue()
             publishNowPlaying(detail)
         } catch is CancellationError {
         } catch {
@@ -530,6 +542,8 @@ final class PlaybackCoordinator {
     func close() {
         requestGeneration += 1
         catchUp = nil
+        queueLookup?.cancel()
+        queuedNext = nil
         sleep.playerClosed()
         AppLog.playback.notice("closed")
         isMini = false
@@ -597,7 +611,31 @@ final class PlaybackCoordinator {
         guard item?.ratingKey == episode.ratingKey else { return }
         let all = episodesCache[show] ?? []
         previousEpisode = BingePlanner.previousEpisode(before: episode, in: all)
-        nextEpisode = BingePlanner.nextEpisode(after: episode, in: all)
+        followingEpisode = BingePlanner.nextEpisode(after: episode, in: all)
+    }
+
+    /// Looks up the queue's head while something plays. A title that's gone from the server leaves
+    /// the queue, and the one after it is tried.
+    private func resolveQueue() {
+        queueLookup?.cancel()
+        guard item != nil, let head = queue.queue.first else { queuedNext = nil; return }
+        guard queuedNext?.ratingKey != head.ratingKey else { return }
+        queuedNext = nil
+        guard let client = session.client else {
+            queuedNext = downloads?.record(head.ratingKey)?.decoded()
+            return
+        }
+        queueLookup = Task { [weak self] in
+            do {
+                let found = try await client.metadata(head.ratingKey)
+                // The queue moved on, or the player closed, meanwhile.
+                guard let self, !Task.isCancelled, self.item != nil, self.queue.queue.first?.id == head.id else { return }
+                self.queuedNext = found
+            } catch PlexError.notFound {
+                guard !Task.isCancelled else { return }
+                self?.queue.change { $0.remove(head.id) }
+            } catch {}
+        }
     }
 
     /// Loads a film's post-play suggestions: the first related rows, unwatched first, never

@@ -65,7 +65,7 @@ final class HomeModel {
     @ObservationIgnored private var refreshTokens: [String: UUID] = [:]
 
     func load(scope: String, saved: [ShelfSpec]?, client: PlexServerClient, index: LibraryIndex?,
-              stops: [PlaybackStop] = [], removed: [String: Date] = [:]) async {
+              stops: [PlaybackStop] = [], removed: [String: Date] = [:], watchlist: [PlexMetadata] = []) async {
         loadGeneration += 1
         let generation = loadGeneration
         isLoading = shelves.isEmpty
@@ -88,7 +88,7 @@ final class HomeModel {
             }
             var out: [String: Shelf] = [:]
             for spec in layout {
-                out[spec.id] = await resolve(spec, hubs: hubs, client: client, index: index, stops: stops, removed: removed)
+                out[spec.id] = await resolve(spec, hubs: hubs, client: client, index: index, stops: stops, removed: removed, watchlist: watchlist)
             }
             // Superseded by a newer load (the layout changed): leave the state to it.
             guard !Task.isCancelled, generation == loadGeneration else { return }
@@ -140,7 +140,7 @@ final class HomeModel {
 
     /// Resolves one shelf in place (after Edit Home adds or changes it), without reloading Home.
     func refresh(_ spec: ShelfSpec, client: PlexServerClient, index: LibraryIndex?, stops: [PlaybackStop] = [],
-                 removed: [String: Date] = [:]) async {
+                 removed: [String: Date] = [:], watchlist: [PlexMetadata] = []) async {
         let token = UUID()
         refreshTokens[spec.id] = token
         let generation = loadGeneration
@@ -149,7 +149,7 @@ final class HomeModel {
             if let list = cache[section], list.contains(where: { $0.items.count > 1 }) { return list }
             if let section { return try await client.sectionHubs(section, count: 24) }
             return try await client.homeHubs(count: 24)
-        }, client: client, index: index, stops: stops, removed: removed)
+        }, client: client, index: index, stops: stops, removed: removed, watchlist: watchlist)
         // A newer edit of this shelf, or a full reload, answered meanwhile.
         guard refreshTokens[spec.id] == token, generation == loadGeneration else { return }
         resolved[spec.id] = shelf
@@ -157,7 +157,7 @@ final class HomeModel {
 
     private func resolve(_ spec: ShelfSpec, hubs: (String?) async throws -> [PlexHub],
                          client: PlexServerClient, index: LibraryIndex?, stops: [PlaybackStop],
-                         removed: [String: Date]) async -> Shelf {
+                         removed: [String: Date], watchlist: [PlexMetadata]) async -> Shelf {
         switch spec.source {
         case .hub(let identifier, let section):
             if let hub = try? await hubs(section).first(where: { $0.hubIdentifier == identifier }) {
@@ -177,6 +177,9 @@ final class HomeModel {
         case .smart(let rule):
             let items = ((try? index?.items(rule)) ?? []).compactMap { $0.metadata() }
             return Shelf(id: spec.id, title: spec.title.isEmpty ? rule.summary : spec.title, items: items)
+        case .watchlist:
+            // Only what can be played here; the rest is on the Watchlist page.
+            return Shelf(id: spec.id, title: spec.title.isEmpty ? "Watchlist" : spec.title, items: watchlist.filter { !$0.isDiscoverOnly })
         }
     }
 

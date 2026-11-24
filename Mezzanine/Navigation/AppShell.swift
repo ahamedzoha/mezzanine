@@ -21,6 +21,8 @@ struct AppShell: View {
     @Environment(DownloadStore.self) private var downloads
     @Environment(TitleActions.self) private var titleActions
     @Environment(PinnedStore.self) private var pins
+    @Environment(WatchlistStore.self) private var watchlist
+    @State private var watchlistAccount: String?
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
     @FocusState private var sidebarFocused: Bool
@@ -93,6 +95,17 @@ struct AppShell: View {
             await library.loadCounts(pins: pins.pins)
         }
         .onChange(of: library.indexKey, initial: true) { _, key in if let key { commands.useRecents(key) } }
+        // The watchlist follows the account, and each sync (a title on it may have arrived).
+        .task(id: "\(library.indexKey ?? "")|\(library.lastSyncedAt?.timeIntervalSince1970 ?? 0)") {
+            guard let key = library.indexKey, !isOffline else { return }
+            let changed = key != watchlistAccount
+            watchlistAccount = key
+            await watchlist.load(discover: session.discover, index: library.index, changedAccount: changed)
+        }
+        .onChange(of: watchlist.isAvailable, initial: true) { _, available in
+            commands.hasWatchlist = available
+            if !available, commands.selection == .watchlist, library.lastSyncedAt != nil { commands.selection = .home }
+        }
         .onChange(of: isOffline, initial: true) { _, offline in
             guard offline else { return }
             commands.selection = .downloads
@@ -337,6 +350,8 @@ struct AppShell: View {
                 }
             case .pinned(let id):
                 if let pin = pins.pin(id) { PinnedPage(pin: pin, contentFocus: $contentFocused).id(id) }
+            case .watchlist:
+                WatchlistPage(contentFocus: $contentFocused)
             case .title(let key):
                 DetailView(route: DetailRoute(ratingKey: key), contentFocus: $contentFocused, rootPage: true).id(key)
             default:
@@ -387,6 +402,7 @@ struct AppShell: View {
                                 userID: session.account?.uuid ?? "owner", sections: commands.sections)
                 layouts.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
                 pins.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
+                playback.queue.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
                 commands.layoutsReady = true
                 leaveMissingPage()
                 downloads.use(client: client, images: session.images, serverID: server.clientIdentifier,

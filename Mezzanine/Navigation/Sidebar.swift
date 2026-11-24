@@ -9,12 +9,14 @@ enum SidebarItem: Hashable {
     case pinned(String)
     /// A title in Continue: its page, as the window's root.
     case title(String)
+    case watchlist
     case downloads
 
     var storageKey: String? {
         switch self {
         case .home: "home"
         case .downloads: "downloads"
+        case .watchlist: "watchlist"
         case .library(let key): "library:\(key)"
         case .slice(let key, let slice): "slice:\(slice.rawValue):\(key)"
         case .pinned(let id): "pinned:\(id)"
@@ -27,6 +29,7 @@ enum SidebarItem: Hashable {
         func rest(_ prefix: String) -> String? { raw.hasPrefix(prefix) ? String(raw.dropFirst(prefix.count)) : nil }
         if raw == "home" { self = .home }
         else if raw == "downloads" { self = .downloads }
+        else if raw == "watchlist" { self = .watchlist }
         else if let key = rest("library:") { self = .library(key) }
         else if let id = rest("pinned:") { self = .pinned(id) }
         else if let tail = rest("slice:") {
@@ -89,6 +92,7 @@ struct Sidebar: View {
     @Environment(DownloadStore.self) private var downloads
     @Environment(PinnedStore.self) private var pins
     @Environment(HomeLayoutStore.self) private var layouts
+    @Environment(WatchlistStore.self) private var watchlist
     /// Closed sections and open libraries, remembered.
     @AppStorage("sidebar.continue") private var continueOpen = true
     @AppStorage("sidebar.libraries") private var librariesOpen = true
@@ -151,6 +155,9 @@ struct Sidebar: View {
 
     @ViewBuilder private var rows: some View {
         Label("Home", systemImage: "house").tag(SidebarItem.home)
+        if watchlist.isAvailable, !watchlist.items.isEmpty || commands.selection == .watchlist {
+            Label("Watchlist", systemImage: "bookmark").badge(watchlist.items.count).tag(SidebarItem.watchlist)
+        }
         if !watching.isEmpty {
             Section("Continue", isExpanded: $continueOpen) {
                 ForEach(watching) { item in

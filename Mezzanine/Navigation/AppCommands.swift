@@ -116,6 +116,8 @@ final class AppCommandCenter {
         if case .title = selection { return true }
         return !path.isEmpty
     }
+    /// The profile in use has a watchlist.
+    var hasWatchlist = false
     /// The index can answer Surprise Me.
     var canSurprise = false
 
@@ -251,6 +253,11 @@ final class AppCommandCenter {
 
     /// Opens a title's page. Episodes open their show; seasons open as themselves.
     func open(_ item: PlexMetadata) {
+        // On the watchlist but not on this server: there's no page to open.
+        guard !item.isDiscoverOnly else {
+            AccessibilityNotification.Announcement("Not on this server").post()
+            return
+        }
         open(ratingKey: item.kind == .episode ? (item.grandparentRatingKey ?? item.ratingKey) : item.ratingKey,
              isCollection: item.kind == .collection)
     }
@@ -477,6 +484,9 @@ struct MezzanineCommands: Commands {
             Button("Home") { center.go(to: .home) }
                 .keyboardShortcut("1", modifiers: .command)
                 .disabled(!center.isSignedIn || center.isPlayerOpen)
+            Button("Watchlist") { center.go(to: .watchlist) }
+                .keyboardShortcut("w", modifiers: [.command, .control])
+                .disabled(!center.isSignedIn || !center.hasWatchlist || center.isPlayerOpen)
             Button("Surprise Me") { center.surprise() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(!center.isSignedIn || !center.canSurprise || center.isBlocked)
@@ -539,6 +549,7 @@ struct MezzanineCommands: Commands {
                 item(.skipMarker, disabled: !center.hasActiveMarker)
                 item(.nextEpisode, disabled: !center.hasNextEpisode)
                 item(.previousEpisode, disabled: !center.hasPreviousEpisode)
+                item(.queue)
                 Divider()
                 Menu("Audio and Subtitles") {
                     item(.cycleAudio)

@@ -83,11 +83,7 @@ struct TitlesPage: View {
             commands.goBack()
             return .handled
         }
-        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { _ in
-            guard let item = focusedItem, TitleActions.canMark(item) else { return .ignored }
-            titleActions.toggleWatched(item)
-            return .handled
-        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { titleActions.key($0, on: focusedItem) }
         .onChange(of: filter) { _, _ in focused = nil }
         .onChange(of: focusedItem, initial: true) { _, _ in report() }
         // Back on top after a pushed page closed over it.
@@ -97,6 +93,17 @@ struct TitlesPage: View {
         .navigationTitle(title)
         .navigationSubtitle([place, loaded ? "\(items.count.formatted()) \(items.count == 1 ? noun.0 : noun.1)" : nil].compactMap { $0 }.joined(separator: " · "))
         .toolbar {
+            if all.contains(where: { TitleActions.canQueue($0) }) {
+                ToolbarItem {
+                    Menu {
+                        Button("Shuffle") { shuffle(unwatchedOnly: false) }
+                        Button("Shuffle Unwatched") { shuffle(unwatchedOnly: true) }
+                    } label: {
+                        Label("Shuffle", systemImage: "shuffle")
+                    }
+                    .help("Play these in random order")
+                }
+            }
             if let pin {
                 ToolbarItem(placement: .primaryAction) {
                     let pinned = pins.contains(pin.id)
@@ -135,8 +142,14 @@ struct TitlesPage: View {
         }
     }
 
+    private func shuffle(unwatchedOnly: Bool) {
+        let titles = items
+        titleActions.shuffle(unwatchedOnly: unwatchedOnly) { titles.filter { !$0.isDiscoverOnly } }
+    }
+
     /// A collection has nothing to play by itself: it opens.
     private func start(_ item: PlexMetadata, from frame: CGRect?) {
+        if item.isDiscoverOnly { return }
         if item.kind == .collection { commands.open(item) } else { Task { await playback.play(item, from: frame) } }
     }
 
@@ -227,7 +240,7 @@ struct PinnedPage: View {
                 // The page holds every match, not just the shelf's worth.
                 rule.limit = 0
                 return await library.items(rule)
-            case .hub: return []
+            case .hub, .watchlist: return []
             }
         }
     }

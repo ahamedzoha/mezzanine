@@ -17,6 +17,7 @@ struct DetailHero: View {
 
     @Environment(SessionStore.self) private var session
     @Environment(LibraryStore.self) private var library
+    @Environment(WatchlistStore.self) private var watchlist
     @State private var width: CGFloat = 1200
 
     var body: some View {
@@ -72,6 +73,16 @@ struct DetailHero: View {
                 .buttonStyle(SecondaryButtonStyle())
                 .focusEffectDisabled(false)
                 .help(watchedHelp)
+                if watchlist.offers(item) {
+                    let on = watchlist.contains(item)
+                    Button { watchlist.toggle(item) } label: {
+                        Label("Watchlist", systemImage: on ? "bookmark.fill" : "bookmark")
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .focusEffectDisabled(false)
+                    .help(on ? "Remove from Watchlist (⇧W)" : "Add to Watchlist (⇧W)")
+                    .accessibilityLabel(on ? "Remove from Watchlist" : "Add to Watchlist")
+                }
                 DownloadButton(item: item, season: season)
                 if let chooseArtwork {
                     Menu {
@@ -238,6 +249,9 @@ struct EpisodeRow: View {
                     }
                 }
             }
+            Divider()
+            Button("Play Next") { titleActions.playNext(episode) }
+            Button("Add to Queue") { titleActions.addToQueue(episode) }
             Divider()
             if !episode.isWatched { Button("Mark as Watched") { titleActions.requestWatched(episode, true) } }
             if episode.isWatched || TitleActions.isPartlyWatched(episode) {

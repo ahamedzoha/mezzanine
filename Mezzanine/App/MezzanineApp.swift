@@ -33,6 +33,7 @@ struct MezzanineApp: App {
     @State private var titleActions = TitleActions()
     @State private var pins = PinnedStore()
     @State private var diagnostics = Diagnostics()
+    @State private var watchlist = WatchlistStore()
     @State private var sound: SoundSettings
     @State private var subtitleSources = SubtitleSourceSettings()
     @State private var subtitleFinder = SubtitleFinder()
@@ -68,6 +69,7 @@ struct MezzanineApp: App {
                 .environment(remote)
                 .environment(titleActions)
                 .environment(pins)
+                .environment(watchlist)
                 .task {
                     playback.downloads = downloads
                     diagnostics.start(session: session, library: library, playback: playback, sound: sound)
@@ -82,7 +84,7 @@ struct MezzanineApp: App {
                         }
                     }
                     #endif
-                    titleActions.start(session: session, library: library, playback: playback, commands: commands, pins: pins)
+                    titleActions.start(session: session, library: library, playback: playback, commands: commands, pins: pins, watchlist: watchlist)
                     updater.isWatching = { [playback] in playback.item != nil }
                     notifier.start(library: library, session: session, commands: commands)
                     #if DEBUG

@@ -27,6 +27,7 @@ struct ShelfEditor: View {
     let done: () -> Void
 
     @Environment(PinnedStore.self) private var pins
+    @Environment(WatchlistStore.self) private var watchlist
     @Environment(AppCommandCenter.self) private var commands
     @Environment(\.undoManager) private var undoManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -184,6 +185,9 @@ struct ShelfEditor: View {
                         ForEach(playlists) { playlist in Button(playlist.title) { addPlaylist(playlist) } }
                     }
                 }
+                if isMain, watchlist.isAvailable, !specs.contains(where: { $0.source == .watchlist }) {
+                    Button("Watchlist") { add(.watchlist, title: "") }
+                }
                 Button("New Smart Shelf…") { editRules(nil) }
             }
         } label: {
@@ -281,6 +285,8 @@ struct ShelfEditor: View {
             parts.append("Collection")
         case .playlist:
             parts.append("Playlist")
+        case .watchlist:
+            parts.append("Watchlist")
         case .smart(let rule):
             parts.append("Smart")
             parts.append(rule.summary)

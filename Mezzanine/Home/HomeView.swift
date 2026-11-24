@@ -19,6 +19,7 @@ struct HomeView: View {
     @Environment(HomeLayoutStore.self) private var layouts
     @Environment(LibraryStore.self) private var library
     @Environment(TitleActions.self) private var titleActions
+    @Environment(WatchlistStore.self) private var watchlist
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model = HomeModel()
     @State private var showsDetails = false
@@ -62,7 +63,7 @@ struct HomeView: View {
                 browsing
             }
         }
-        .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(scope)|\(library.revision)") { await load() }
+        .task(id: "\(session.currentServer?.clientIdentifier ?? "")|\(scope)|\(library.revision)|\(watchlist.revision)") { await load() }
         .onChange(of: showsDetails, initial: true) { _, shown in commands.detailsShown = shown }
         .onDisappear { commands.detailsShown = false }
         .onChange(of: layouts.revision) { _, _ in
@@ -75,7 +76,7 @@ struct HomeView: View {
             // A shelf just added has nothing resolved yet: fetch its posters for the strip's peek.
             if let client = session.client {
                 for spec in specs where model.resolved[spec.id] == nil {
-                    Task { await model.refresh(spec, client: client, index: library.index, stops: library.recentStops, removed: library.removedFromContinue) }
+                    Task { await model.refresh(spec, client: client, index: library.index, stops: library.recentStops, removed: library.removedFromContinue, watchlist: watchlist.items) }
                 }
             }
             // Save as the edit happens (debounced), so a quit mid-edit keeps it.
@@ -106,7 +107,7 @@ struct HomeView: View {
             SmartShelfSheet(existing: target.spec, scope: scope, sections: commands.sections) { spec in
                 if let i = editSpecs.firstIndex(where: { $0.id == spec.id }) {
                     editSpecs[i] = spec
-                    if let client = session.client { Task { await model.refresh(spec, client: client, index: library.index, stops: library.recentStops, removed: library.removedFromContinue) } }
+                    if let client = session.client { Task { await model.refresh(spec, client: client, index: library.index, stops: library.recentStops, removed: library.removedFromContinue, watchlist: watchlist.items) } }
                 } else {
                     editSpecs.append(spec)
                 }
@@ -225,11 +226,7 @@ struct HomeView: View {
             return .handled
         }
         .onKeyPress(.space) { playFocused() }
-        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { _ in
-            guard let item = model.focusedItem, TitleActions.canMark(item) else { return .ignored }
-            titleActions.toggleWatched(item)
-            return .handled
-        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "wW")) { titleActions.key($0, on: model.focusedItem) }
         .onKeyPress(characters: CharacterSet(charactersIn: "iI")) { _ in
             withAnimation(Theme.Motion.object(reduceMotion)) { showsDetails.toggle() }
             return .handled
@@ -324,7 +321,7 @@ struct HomeView: View {
             guard !Task.isCancelled else { return }
         }
         let saved = layouts.saved(scope)
-        await model.load(scope: scope, saved: saved, client: client, index: library.index, stops: library.recentStops, removed: library.removedFromContinue)
+        await model.load(scope: scope, saved: saved, client: client, index: library.index, stops: library.recentStops, removed: library.removedFromContinue, watchlist: watchlist.items)
         // A newer load (the layout changed) supersedes this one.
         guard !Task.isCancelled else { return }
         loadedSaved = .some(saved)

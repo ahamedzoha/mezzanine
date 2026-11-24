@@ -79,6 +79,7 @@ private struct ActivityButton: View {
 }
 
 private struct ActivityPanel: View {
+    @Environment(PlaybackCoordinator.self) private var playback
     @Environment(SessionStore.self) private var session
     @Environment(AppCommandCenter.self) private var commands
     @Environment(LibraryStore.self) private var library
@@ -99,6 +100,13 @@ private struct ActivityPanel: View {
                 Text("Downloads").font(Theme.Typeface.cardTitle)
                 Text(downloadLine).foregroundStyle(Theme.inkSecondary)
                 Button("Show") { commands.isActivityShown = false; commands.go(to: .downloads) }
+            }
+            if let queued = playback.queue.summary {
+                GridRow {
+                    Text("Queue").font(Theme.Typeface.cardTitle)
+                    Text(queued).foregroundStyle(Theme.inkSecondary)
+                    Button("Clear") { playback.queue.change { $0.clear() } }
+                }
             }
             GridRow {
                 Text("Server").font(Theme.Typeface.cardTitle)

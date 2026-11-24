@@ -42,6 +42,7 @@ enum Format {
 
     /// The line under a poster.
     static func cardSubtitle(_ item: PlexMetadata) -> String {
+        if item.isDiscoverOnly { return "Not on this server" }
         switch item.kind {
         case .episode:
             return [episodeCode(item), timeLeft(item)].compactMap { $0 }.joined(separator: " · ")
