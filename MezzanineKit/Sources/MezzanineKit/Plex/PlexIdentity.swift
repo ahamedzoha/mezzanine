@@ -17,9 +17,12 @@ public struct PlexIdentity: Sendable, Equatable {
     /// `client,player,pubsub-player`).
     public var provides: String = "player"
 
+    /// The running app's version ("0.3.3"), as Plex's dashboards show it.
+    public static let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+
     public init(clientIdentifier: String,
                 product: String = "Mezzanine",
-                version: String = "0.1.0",
+                version: String = PlexIdentity.appVersion,
                 deviceName: String = Host.current().localizedName ?? "Mac",
                 platform: String = "macOS",
                 platformVersion: String = ProcessInfo.processInfo.operatingSystemVersionString,
