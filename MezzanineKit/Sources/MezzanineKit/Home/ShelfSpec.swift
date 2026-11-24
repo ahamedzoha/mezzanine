@@ -15,6 +15,8 @@ public struct ShelfSpec: Codable, Hashable, Identifiable, Sendable {
         case collection(ratingKey: String, section: String)
         case playlist(ratingKey: String)
         case smart(SmartRule)
+        /// The account's watchlist: its titles that are on this server.
+        case watchlist
     }
 
     public init(id: String = UUID().uuidString, title: String = "", source: Source, hidden: Bool = false) {

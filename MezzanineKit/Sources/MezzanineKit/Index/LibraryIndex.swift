@@ -37,6 +37,8 @@ public struct IndexedItem: Codable, Sendable, Hashable, FetchableRecord, Persist
     public var summary: String
     public var parentRatingKey: String?
     public var grandparentRatingKey: String?
+    /// "plex://movie/5d77…", shared with Plex's watchlist.
+    public var guid: String?
     public var index: Int?
     public var parentIndex: Int?
     /// The clean (pre-overlay) poster, resolved lazily when the clean-poster setting is on.
@@ -201,6 +203,12 @@ public final class LibraryIndex: Sendable {
         // next sync of each section runs in full to rewrite them.
         m.registerMigration("v2") { db in
             try db.execute(sql: "UPDATE sectionSync SET lastFullSyncAt = 0")
+        }
+        // v3: films' and shows' guids, for the watchlist; read out of the JSON already kept.
+        m.registerMigration("v3") { db in
+            try db.alter(table: "item") { t in t.add(column: "guid", .text) }
+            try db.create(indexOn: "item", columns: ["guid"])
+            try db.execute(sql: "UPDATE item SET guid = json_extract(CAST(json AS TEXT), '$.guid') WHERE kind IN ('movie','show')")
         }
         return m
     }
@@ -389,6 +397,30 @@ public final class LibraryIndex: Sendable {
         }
     }
 
+    /// Films and shows by guid (the watchlist's titles that are on this server).
+    public func items(guids: [String]) throws -> [IndexedItem] {
+        guard !guids.isEmpty else { return [] }
+        return try pool.read { db in
+            try IndexedItem.fetchAll(db, sql: "SELECT * FROM item WHERE kind IN ('movie','show') AND guid IN (\(guids.map { _ in "?" }.joined(separator: ",")))",
+                                     arguments: StatementArguments(guids))
+        }
+    }
+
+    /// Every film and show of these sections, without their JSON (Spotlight).
+    public func spotlightTitles(sections: [String]) throws -> [(ratingKey: String, kind: String, title: String, year: Int?, summary: String, genres: [String])] {
+        guard !sections.isEmpty else { return [] }
+        return try pool.read { db in
+            try Row.fetchAll(db, sql: """
+                SELECT ratingKey, kind, title, year, summary, genres FROM item
+                WHERE kind IN ('movie','show') AND section IN (\(sections.map { _ in "?" }.joined(separator: ","))) ORDER BY ratingKey
+                """, arguments: StatementArguments(sections)).map { row in
+                let genres: String = row["genres"]
+                return (row["ratingKey"], row["kind"], row["title"], row["year"], row["summary"],
+                        genres.split(separator: "|").map(String.init))
+            }
+        }
+    }
+
     public func item(_ ratingKey: String) throws -> IndexedItem? {
         try pool.read { db in try IndexedItem.fetchOne(db, key: ratingKey) }
     }
@@ -457,6 +489,7 @@ extension IndexedItem {
         summary = m.summary ?? ""
         parentRatingKey = m.parentRatingKey
         grandparentRatingKey = m.grandparentRatingKey
+        guid = m.kind == .movie || m.kind == .show ? m.guid : nil
         index = m.index
         parentIndex = m.parentIndex
         cleanPosterPath = nil
