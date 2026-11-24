@@ -39,8 +39,10 @@ a GitHub Pages website that looks professional and asks for donations.
   VoiceOver; a MetricKit payload has never arrived.
 - Seen: first frames took 4 to 7 s in these runs (0.5 s the same morning). The Mac's route to the
   server's LAN address went through a VPN interface (utun5); not looked into.
-- Seen: bitmap subtitles (VobSub) are drawn far too large (`SubtitleOverlay` scales each image to a
-  fifth of the picture's height and ignores its own position and size).
+- Bitmap subtitles (PGS here) were scaled to a fifth of the picture's height, wherever the disc put
+  them. `BitmapSubtitle.rect` (kit, tested) places them as the disc drew them: canvas across the coded
+  frame, centred, onto the picture as shown; kept whole on screen. Checked offscreen with the owner's
+  film and the real player (window, full screen, mini); not yet in the app's window.
 
 ## 2026-11-24 — 0.4.0: sidebar, top bar, card actions
 

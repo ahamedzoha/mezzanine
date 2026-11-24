@@ -48,6 +48,14 @@ public final class MezzaninePlayer {
         didSet { applyVolumeAndShaping() }
     }
 
+    /// The video's coded size, and its shape as shown (they differ on anamorphic video).
+    public var codedSize: CGSize { CGSize(width: Int(engine.sourceVideoWidth), height: Int(engine.sourceVideoHeight)) }
+    public var displaySize: CGSize {
+        if engine.videoRoute == .software, let size = engine.softwareDisplaySize, size.height > 0 { return size }
+        if let size = avPlayer?.currentItem?.presentationSize, size.width > 0, size.height > 0 { return size }
+        return codedSize
+    }
+
     /// The sleep timer's fade, 1 to 0, over whatever the volume is. The player's own volume only,
     /// so it never rebuilds the session.
     public var fade = 1.0 {
@@ -535,7 +543,9 @@ public struct PlayerTrack: Identifiable, Hashable, Sendable {
 public struct PlayerCue: Identifiable, Sendable {
     public enum Content: Sendable {
         case text(String)
-        case image(CGImage, CGRect)
+        /// The picture of a line, its box on the disc's canvas (0 to 1) and that canvas's size
+        /// (`BitmapSubtitle` turns them into a place on screen).
+        case image(CGImage, CGRect, canvas: CGSize)
     }
     public let id: Int
     public let start: Double
@@ -547,7 +557,7 @@ public struct PlayerCue: Identifiable, Sendable {
         start = cue.startTime
         end = cue.endTime
         switch cue.body {
-        case .image(let image): content = .image(image.cgImage, image.position)
+        case .image(let image): content = .image(image.cgImage, image.position, canvas: image.canvasSize)
         default: content = .text(cue.text ?? "")
         }
     }

@@ -251,7 +251,7 @@ struct PlayerStage: View {
                 PlayerSurface(player: player)
                     .frame(width: rect.width * zoom, height: rect.height * zoom)
                     .frame(width: rect.width, height: rect.height)
-                if !playback.cast.isCasting { SubtitleOverlay(player: player, onDevice: playback.onDevice) }
+                if !playback.cast.isCasting { SubtitleOverlay(player: player, onDevice: playback.onDevice, zoom: zoom) }
                 // The video is an AppKit layer, so its rounding is painted in the stage's black
                 // rather than left to SwiftUI clipping of a hosted view.
                 PictureCorners(radius: upNextShown ? Theme.Radius.panel : 0)
@@ -1176,54 +1176,71 @@ struct SubtitleOverlay: View {
     @AppStorage("subtitleBackground") private var background = false
     @AppStorage("subtitleOffset") private var offset: Double = 0
 
-    private enum Shown: Identifiable {
-        case text(id: String, String)
-        case image(id: Int, CGImage)
-        var id: String {
-            switch self {
-            case .text(let id, _): id
-            case .image(let id, _): "image-\(id)"
-            }
-        }
+    /// The picture's zoom (Picture ▸ Zoom), which bitmap lines follow.
+    var zoom: CGFloat = 1
+
+    private struct Line: Identifiable {
+        let id: String
+        let text: String
     }
 
-    private var shown: [Shown] {
+    /// A bitmap line: the disc drew it, with a place of its own.
+    private struct Picture: Identifiable {
+        let id: Int
+        let image: CGImage
+        let position: CGRect
+        let canvas: CGSize
+    }
+
+    private var lines: [Line] {
         let now = player.currentTime - offset
         if onDevice.showsGenerated {
             return onDevice.lines.filter { $0.start <= now && now < $0.end }
-                .map { .text(id: "g-\($0.start)", onDevice.display($0.text)) }
+                .map { Line(id: "g-\($0.start)", text: onDevice.display($0.text)) }
         }
-        return player.cues.filter { $0.start <= now && now < $0.end }.map { cue in
-            switch cue.content {
-            case .text(let text): .text(id: "c-\(cue.id)", onDevice.display(text))
-            case .image(let image, _): .image(id: cue.id, image)
-            }
+        return current(now).compactMap { cue in
+            if case .text(let text) = cue.content { Line(id: "c-\(cue.id)", text: onDevice.display(text)) } else { nil }
         }
     }
 
+    private var pictures: [Picture] {
+        guard !onDevice.showsGenerated else { return [] }
+        return current(player.currentTime - offset).compactMap { cue in
+            if case .image(let image, let position, let canvas) = cue.content {
+                Picture(id: cue.id, image: image, position: position, canvas: canvas)
+            } else { nil }
+        }
+    }
+
+    private func current(_ now: Double) -> [PlayerCue] { player.cues.filter { $0.start <= now && now < $0.end } }
+
     var body: some View {
-        let active = shown
+        let lines = lines
+        let pictures = pictures
         GeometryReader { geo in
             // Size follows the picture so subtitles read the same in a window and full screen.
             let size = (compact ? max(9, geo.size.height * 0.075) : max(16, geo.size.height * 0.042)) * scale
+            ForEach(pictures) { picture in
+                // At the size and place the disc gave it, over the picture as it's shown.
+                let box = BitmapSubtitle.rect(position: picture.position, canvas: picture.canvas, coded: player.codedSize,
+                                              display: player.displaySize, view: geo.size, fills: player.fillsView,
+                                              zoom: zoom, scale: compact ? scale * 1.8 : scale)
+                Image(decorative: picture.image, scale: 1).resizable()
+                    .frame(width: box.width, height: box.height)
+                    .position(x: box.midX, y: box.midY)
+            }
             VStack(spacing: 6) {
-                ForEach(active) { line in
-                    switch line {
-                    case .text(_, let text):
-                        Text(text)
-                            .font(.system(size: size, weight: .semibold))
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(background ? 0 : 0.9), radius: 2, y: 1)
-                            .shadow(color: .black.opacity(background ? 0 : 0.6), radius: 6)
-                            .padding(.horizontal, background ? 10 : 0)
-                            .padding(.vertical, background ? 4 : 0)
-                            .background(background ? RoundedRectangle(cornerRadius: 6).fill(.black.opacity(0.72)) : nil)
-                            .padding(.horizontal, 24)
-                    case .image(_, let image):
-                        Image(decorative: image, scale: 1).resizable().scaledToFit()
-                            .frame(maxHeight: geo.size.height * 0.2 * scale)
-                    }
+                ForEach(lines) { line in
+                    Text(line.text)
+                        .font(.system(size: size, weight: .semibold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(background ? 0 : 0.9), radius: 2, y: 1)
+                        .shadow(color: .black.opacity(background ? 0 : 0.6), radius: 6)
+                        .padding(.horizontal, background ? 10 : 0)
+                        .padding(.vertical, background ? 4 : 0)
+                        .background(background ? RoundedRectangle(cornerRadius: 6).fill(.black.opacity(0.72)) : nil)
+                        .padding(.horizontal, 24)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)

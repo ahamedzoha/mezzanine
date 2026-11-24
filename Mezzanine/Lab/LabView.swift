@@ -185,7 +185,7 @@ struct LabView: View {
                         .foregroundStyle(.white)
                         .shadow(color: .black, radius: 2)
                         .padding(.horizontal, 8)
-                } else if case .image(let image, _) = cue.content {
+                } else if case .image(let image, _, _) = cue.content {
                     Image(decorative: image, scale: 1).resizable().scaledToFit().frame(maxHeight: 120)
                 }
             }
