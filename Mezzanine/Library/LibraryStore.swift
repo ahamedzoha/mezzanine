@@ -56,6 +56,10 @@ final class LibraryStore {
                 openedFor = key
                 cleanPosters = [:]
                 continueItems = []
+                sliceCounts = [:]
+                pinCounts = [:]
+                newThisWeek = 0
+                lastSyncedAt = nil
                 removedFromContinue = [:]
                 overridesKey = "artworkOverrides.v1.\(key)"
                 artworkOverrides = (UserDefaults.standard.dictionary(forKey: overridesKey!) as? [String: [String: String]]) ?? [:]
@@ -109,8 +113,10 @@ final class LibraryStore {
             }
         }
         running = task
+        isSyncing = true
         await task.value
         running = nil
+        isSyncing = false
         onSynced?()
     }
 
@@ -141,6 +147,7 @@ final class LibraryStore {
             }
         }
         syncState = .idle
+        lastSyncedAt = Date()
     }
 
     /// Items for a library page, decoded off the main actor.
@@ -195,6 +202,83 @@ final class LibraryStore {
         return "\(f(films)) \(noun)"
     }
 
+    // MARK: Sidebar
+
+    struct SliceCounts: Equatable, Sendable {
+        var total = 0, unwatched = 0, inProgress = 0
+        var hasCollections = false
+    }
+
+    private(set) var sliceCounts: [String: SliceCounts] = [:]
+    private(set) var pinCounts: [String: Int] = [:]
+    /// Unwatched films and episodes added in the last seven days.
+    private(set) var newThisWeek = 0
+    private(set) var lastSyncedAt: Date?
+    private(set) var isSyncing = false
+    @ObservationIgnored private var countGeneration = 0
+
+    /// "7 in progress · 3 new this week", under Home's title.
+    var homeFacts: String {
+        let watching = continueItems.filter { $0.progress != nil }.count
+        return [watching > 0 ? "\(watching) in progress" : nil, newThisWeek > 0 ? "\(newThisWeek) new this week" : nil]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// Counts what the sidebar shows, with the same queries its pages run.
+    func loadCounts(pins: [ShelfSpec]) async {
+        guard let index else { return }
+        countGeneration += 1
+        let generation = countGeneration
+        let indexed = sections.filter { !LibrarySync.types(for: $0).isEmpty }
+        let result = await Task.detached(priority: .utility) {
+            var slices: [String: SliceCounts] = [:]
+            for section in indexed {
+                var q = LibraryQuery(section: section.key, kinds: section.kind == .show ? ["show"] : ["movie"])
+                var counts = SliceCounts()
+                counts.total = (try? index.count(q)) ?? 0
+                q.unwatchedOnly = true
+                counts.unwatched = (try? index.count(q)) ?? 0
+                q.unwatchedOnly = false
+                q.inProgressOnly = true
+                counts.inProgress = (try? index.count(q)) ?? 0
+                counts.hasCollections = !((try? index.collectionNames(sections: [section.key])) ?? []).isEmpty
+                slices[section.key] = counts
+            }
+            var pinned: [String: Int] = [:]
+            for pin in pins {
+                switch pin.source {
+                case .smart(let rule): pinned[pin.id] = try? index.count(rule)
+                case .collection(_, let section):
+                    pinned[pin.id] = try? index.count(SmartRule(sections: [section], conditions: [.collection(pin.title)]))
+                default: break
+                }
+            }
+            let libraries = indexed.filter { !$0.isPersonalMedia }.map(\.key)
+            let fresh = libraries.isEmpty ? 0 : (try? index.count(SmartRule(sections: libraries, kinds: ["movie", "episode"],
+                conditions: [.watch(.unwatched), .addedWithin(days: 7)]))) ?? 0
+            return (slices, pinned, fresh)
+        }.value
+        guard generation == countGeneration else { return }
+        (sliceCounts, pinCounts, newThisWeek) = result
+    }
+
+    /// A random unwatched film or show from these libraries (all video libraries when nil).
+    func surprise(section: String?, kinds: [String]) async -> PlexMetadata? {
+        guard let index else { return nil }
+        let keys = section.map { [$0] } ?? sections.filter { !LibrarySync.types(for: $0).isEmpty && !$0.isPersonalMedia }.map(\.key)
+        return await Task.detached(priority: .userInitiated) {
+            ((try? index.random(sections: keys, kinds: kinds)) ?? nil)?.metadata()
+        }.value
+    }
+
+    /// Every title a smart shelf matches, decoded off the main actor.
+    func items(_ rule: SmartRule) async -> [PlexMetadata] {
+        guard let index else { return [] }
+        return await Task.detached(priority: .userInitiated) {
+            ((try? index.items(rule)) ?? []).compactMap { $0.metadata() }
+        }.value
+    }
+
     // MARK: Continue Watching
 
     /// What's in progress, in Plex's order (the sidebar, and whether a title can be taken out).
@@ -216,7 +300,7 @@ final class LibraryStore {
         guard let client else { return }
         continueGeneration += 1
         let generation = continueGeneration
-        guard let items = try? await client.continueWatching() else { return }
+        guard let items = try? await client.continueWatching(limit: 40) else { return }
         guard generation == continueGeneration else { return }
         continueItems = ContinueWatching.applying(recentStops, removed: removedFromContinue, to: items)
     }

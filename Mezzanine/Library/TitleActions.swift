@@ -22,12 +22,15 @@ final class TitleActions {
     var confirmation: (item: PlexMetadata, watched: Bool)?
     var error: String?
 
+    @ObservationIgnored private(set) weak var pins: PinnedStore?
     @ObservationIgnored private weak var session: SessionStore?
     @ObservationIgnored private weak var library: LibraryStore?
     @ObservationIgnored private weak var playback: PlaybackCoordinator?
     @ObservationIgnored private weak var commands: AppCommandCenter?
 
-    func start(session: SessionStore, library: LibraryStore, playback: PlaybackCoordinator, commands: AppCommandCenter) {
+    func start(session: SessionStore, library: LibraryStore, playback: PlaybackCoordinator, commands: AppCommandCenter,
+               pins: PinnedStore) {
+        self.pins = pins
         self.session = session
         self.library = library
         self.playback = playback
@@ -150,8 +153,10 @@ struct TitleMenuItems: View {
     var play: (() -> Void)? = nil
 
     var body: some View {
-        Button(item.progress != nil ? "Resume" : "Play") {
-            if let play { play() } else { actions.play(item, from: frame) }
+        if item.kind != .collection {
+            Button(item.progress != nil ? "Resume" : "Play") {
+                if let play { play() } else { actions.play(item, from: frame) }
+            }
         }
         if item.progress != nil {
             Button("Play from Start") { actions.playFromStart(item, from: frame) }
@@ -160,6 +165,10 @@ struct TitleMenuItems: View {
             Button("Go to Show") { actions.goToShow(item) }
         } else if offersOpen {
             Button("Open") { commands.open(item) }
+        }
+        if item.kind == .collection, let pins = actions.pins, let section = item.librarySectionID {
+            let pin = PinnedStore.spec(for: item, section: String(section))
+            Button(pins.contains(pin.id) ? "Unpin from Sidebar" : "Pin to Sidebar") { pins.toggle(pin) }
         }
         if TitleActions.canMark(item) {
             Divider()

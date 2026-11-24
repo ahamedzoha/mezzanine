@@ -13,7 +13,7 @@ final class AppCommandCenter {
     var selection: SidebarItem? = AppCommandCenter.restoredSelection {
         didSet {
             if selection != oldValue { query = ""; path = [] }
-            UserDefaults.standard.set(selection.map(Self.storageKey), forKey: "lastSidebarItem")
+            UserDefaults.standard.set(selection?.storageKey, forKey: "lastSidebarItem")
         }
     }
 
@@ -22,17 +22,38 @@ final class AppCommandCenter {
     private static var restoredSelection: SidebarItem? {
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: "ApplePersistenceIgnoreState"), let raw = defaults.string(forKey: "lastSidebarItem") else { return .home }
-        if raw == "downloads" { return .downloads }
-        if raw.hasPrefix("library:") { return .library(String(raw.dropFirst("library:".count))) }
-        return .home
+        return SidebarItem(storageKey: raw) ?? .home
     }
 
-    private static func storageKey(_ item: SidebarItem) -> String {
-        switch item {
-        case .home: "home"
-        case .downloads: "downloads"
-        case .library(let key): "library:\(key)"
-        }
+    /// The activity popover is open (View ▸ Activity).
+    var isActivityShown = false
+    private(set) var surpriseRequests = 0
+    func surprise() { surpriseRequests += 1 }
+
+    // MARK: Recent searches (per server and profile)
+
+    private(set) var recentSearches: [String] = []
+    /// The search field is focused and empty: the panel lists recent searches.
+    var recentsShown = false
+    @ObservationIgnored private var recentsKey: String?
+
+    func useRecents(_ key: String) {
+        recentsKey = "recentSearches.v1.\(key)"
+        recentSearches = UserDefaults.standard.stringArray(forKey: recentsKey!) ?? []
+    }
+
+    func recordSearch(_ query: String) {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard q.count >= 2 else { return }
+        setRecents(Array(([q] + recentSearches.filter { $0.localizedCaseInsensitiveCompare(q) != .orderedSame }).prefix(8)))
+    }
+
+    func clearRecentSearches() { setRecents([]); recentsShown = false }
+
+    private func setRecents(_ list: [String]) {
+        guard let recentsKey else { return }
+        recentSearches = list
+        UserDefaults.standard.set(list, forKey: recentsKey)
     }
 
     /// The main window is key: bare-letter player shortcuts only act then, so typing in
@@ -74,10 +95,17 @@ final class AppCommandCenter {
     var focusedItem: PlexMetadata?
     var detailFocusedItem: PlexMetadata?
     /// What the Item menu acts on.
-    var actionItem: PlexMetadata? { path.isEmpty ? focusedItem : detailFocusedItem }
+    var actionItem: PlexMetadata? {
+        if case .title = selection { return detailFocusedItem }
+        return path.isEmpty ? focusedItem : detailFocusedItem
+    }
     var isLibraryVisible: Bool {
-        if case .library = selection, query.isEmpty { return true }
-        return false
+        guard query.isEmpty else { return false }
+        switch selection {
+        case .library: return true
+        case .slice(_, let slice): return slice != .collections
+        default: return false
+        }
     }
     var isHomeVisible: Bool { selection == .home && query.isEmpty }
 
@@ -196,12 +224,13 @@ final class AppCommandCenter {
 
     /// Opens a title's page. Episodes open their show; seasons open as themselves.
     func open(_ item: PlexMetadata) {
-        open(ratingKey: item.kind == .episode ? (item.grandparentRatingKey ?? item.ratingKey) : item.ratingKey)
+        open(ratingKey: item.kind == .episode ? (item.grandparentRatingKey ?? item.ratingKey) : item.ratingKey,
+             isCollection: item.kind == .collection)
     }
 
-    func open(ratingKey key: String) {
+    func open(ratingKey key: String, isCollection: Bool = false) {
         guard path.last?.ratingKey != key else { return }
-        path.append(DetailRoute(ratingKey: key))
+        path.append(DetailRoute(ratingKey: key, isCollection: isCollection))
         focusContent()
     }
 
@@ -369,6 +398,9 @@ struct MezzanineCommands: Commands {
             Button(center.detailsShown ? "Hide Details" : "Show Details") { center.toggleDetails() }
                 .keyboardShortcut("i", modifiers: .command)
                 .disabled(!center.isHomeVisible || center.isBlocked || center.isEditingShelves)
+            Button(center.isActivityShown ? "Hide Activity" : "Show Activity") { center.isActivityShown.toggle() }
+                .keyboardShortcut("a", modifiers: [.command, .option])
+                .disabled(!center.isSignedIn || center.isBlocked)
             Button("Larger Posters") { center.stepDensity(20) }
                 .keyboardShortcut("=", modifiers: .command)
                 .disabled(!center.isLibraryVisible || center.isPlayerOpen)
@@ -409,6 +441,9 @@ struct MezzanineCommands: Commands {
             Button("Home") { center.go(to: .home) }
                 .keyboardShortcut("1", modifiers: .command)
                 .disabled(!center.isSignedIn || center.isPlayerOpen)
+            Button("Surprise Me") { center.surprise() }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+                .disabled(!center.isSignedIn || center.isBlocked || center.isEditingShelves)
             Button("Downloads") { center.go(to: .downloads) }
                 .keyboardShortcut("l", modifiers: [.command, .option])
                 .disabled(center.isPlayerOpen)
@@ -433,7 +468,7 @@ struct MezzanineCommands: Commands {
             if !center.isPlayerOpen {
                 Button("Play") { center.playFocused() }
                     .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(!center.hasFocusedTitle || !center.isSignedIn || center.isBlocked || center.isEditingShelves)
+                    .disabled(!(center.hasFocusedTitle || center.actionItem != nil) || !center.isSignedIn || center.isBlocked || center.isEditingShelves)
                 Divider()
             }
             // Shown always (dimmed with no film open) so the keys can be learned from here;

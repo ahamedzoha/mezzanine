@@ -27,14 +27,15 @@ struct SearchPanel: View {
     @State private var lastPointer: CGPoint?
 
     enum Hit: Hashable {
-        case title(PlexMetadata.ID), person(String), episode(PlexMetadata.ID), seeAll
+        case title(PlexMetadata.ID), person(String), episode(PlexMetadata.ID), seeAll, recent(String)
     }
 
     private var query: String { commands.query.trimmingCharacters(in: .whitespaces) }
 
     /// Every row in reading order, for the arrow keys.
     private var hits: [Hit] {
-        titles.map { .title($0.id) } + people.map { .person($0.id) } + episodes.map { .episode($0.id) } + [.seeAll]
+        if query.isEmpty { return commands.recentSearches.map { .recent($0) } }
+        return titles.map { .title($0.id) } + people.map { .person($0.id) } + episodes.map { .episode($0.id) } + [.seeAll]
     }
 
     var body: some View {
@@ -84,7 +85,7 @@ struct SearchPanel: View {
                 }
             }
             Rectangle().fill(Theme.rule).frame(height: 1)
-            footer
+            if query.isEmpty { recentsFooter } else { footer }
         }
         .frame(width: 560, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous).fill(Theme.raised))
@@ -95,7 +96,43 @@ struct SearchPanel: View {
         .accessibilityLabel("Search results")
     }
 
+    private var recents: some View {
+        group("Recent Searches") {
+            ForEach(commands.recentSearches, id: \.self) { text in
+                row(.recent(text)) { selected in
+                    HStack(spacing: Theme.Space.s) {
+                        Image(systemName: "clock").foregroundStyle(Theme.inkTertiary).accessibilityHidden(true)
+                        Text(text).foregroundStyle(selected ? Theme.lilac : Theme.ink).lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .font(Theme.Typeface.body)
+                    .padding(.horizontal, Theme.Space.s)
+                    .frame(minHeight: 34)
+                    .background(RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous)
+                        .fill(selected ? Theme.raisedHover : .clear))
+                } open: { commands.query = text }
+            }
+        }
+    }
+
+    private var recentsFooter: some View {
+        HStack {
+            Spacer()
+            Button("Clear") { commands.clearRecentSearches() }
+                .buttonStyle(.plain)
+                .font(Theme.Typeface.cardMeta.weight(.semibold))
+                .foregroundStyle(Theme.inkSecondary)
+                .help("Clear recent searches")
+        }
+        .padding(.horizontal, Theme.Space.m)
+        .padding(.vertical, Theme.Space.s)
+    }
+
     @ViewBuilder private var content: some View {
+        if query.isEmpty { recents } else { results }
+    }
+
+    @ViewBuilder private var results: some View {
         if titles.isEmpty && people.isEmpty && episodes.isEmpty {
             Text(searched == query ? "Nothing called “\(query)” in your libraries." : "Searching…")
                 .font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary)
@@ -300,7 +337,9 @@ struct SearchPanel: View {
     // MARK: Actions
 
     private func open(_ item: PlexMetadata, play: Bool) {
+        commands.recordSearch(query)
         commands.query = ""
+        commands.recentsShown = false
         if play {
             Task { await playback.play(item, from: nil) }
         } else {
@@ -315,10 +354,13 @@ struct SearchPanel: View {
     }
 
     private func seeAll() {
+        guard !query.isEmpty else { return }
+        commands.recordSearch(query)
         commands.showsAllResults = true
     }
 
     private func dismiss() {
+        if query.isEmpty { commands.recentsShown = false; return }
         commands.searchPanelDismissedFor = commands.query
     }
 
@@ -329,6 +371,7 @@ struct SearchPanel: View {
         case .episode(let id): if let item = episodes.first(where: { $0.id == id }) { open(item, play: play) }
         case .person(let id): if let person = people.first(where: { $0.id == id }) { narrow(to: person) }
         case .seeAll: seeAll()
+        case .recent(let text): commands.query = text; selection = nil
         }
     }
 

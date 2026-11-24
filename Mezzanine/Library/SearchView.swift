@@ -59,7 +59,8 @@ struct SearchView: View {
             commands.hasFocusedTitle = item != nil
             commands.focusedItem = item
         }
-        .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }
+        // Quiet while another page is on top.
+        .onChange(of: commands.playFocusedRequests) { _, _ in if commands.path.isEmpty { _ = playFocused() } }
         .navigationTitle("Search")
         .navigationSubtitle(results.isEmpty ? "" : (results.count == 1 ? "1 result" : "\(results.count) results"))
         .task(id: query) { await search() }

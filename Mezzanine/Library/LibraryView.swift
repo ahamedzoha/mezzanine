@@ -32,6 +32,9 @@ enum LibraryLayout: String, CaseIterable, Identifiable {
 /// jump, Return opens, Space plays. Double-click opens; the play disc plays.
 struct LibraryView: View {
     let section: PlexLibrarySection
+    /// A cut of the library (from the sidebar), with its own sort and layout: the library's
+    /// remembered ones stay as they are.
+    let slice: LibrarySlice?
     var contentFocus: FocusState<Bool>.Binding
 
     @Environment(SessionStore.self) private var session
@@ -52,19 +55,22 @@ struct LibraryView: View {
 
     static let densityRange: ClosedRange<Double> = 110...260
 
-    init(section: PlexLibrarySection, contentFocus: FocusState<Bool>.Binding) {
+    init(section: PlexLibrarySection, slice: LibrarySlice? = nil, contentFocus: FocusState<Bool>.Binding) {
         self.section = section
+        self.slice = slice
+        _filters = State(initialValue: slice?.filters ?? LibraryFilters())
+        let store = "library.\(section.key)" + (slice.map { ".\($0.rawValue)" } ?? "")
         self.contentFocus = contentFocus
         _density = AppStorage(wrappedValue: 160, "library.\(section.key).density")
-        _sortRaw = AppStorage(wrappedValue: LibraryQuery.Sort.title.rawValue, "library.\(section.key).sortIndex")
+        _sortRaw = AppStorage(wrappedValue: (slice?.sort ?? .title).rawValue, "\(store).sortIndex")
         _layoutRaw = AppStorage(wrappedValue: (section.isPersonalMedia ? LibraryLayout.folders : .posters).rawValue,
-                                "library.\(section.key).layout")
+                                "\(store).layout")
     }
 
     private var sort: LibraryQuery.Sort { LibraryQuery.Sort(rawValue: sortRaw) ?? .title }
     private var layout: LibraryLayout { LibraryLayout(rawValue: layoutRaw) ?? .posters }
     private var kinds: [String] { section.kind == .show ? ["show"] : ["movie"] }
-    private var layouts: [LibraryLayout] { section.isPersonalMedia ? LibraryLayout.allCases : [.posters, .wide, .list, .shelves] }
+    private var layouts: [LibraryLayout] { section.isPersonalMedia ? LibraryLayout.allCases : (slice == nil ? [.posters, .wide, .list, .shelves] : [.posters, .wide, .list]) }
 
     private var query: LibraryQuery {
         var q = LibraryQuery(section: section.key, kinds: kinds, sort: sort)
@@ -82,8 +88,8 @@ struct LibraryView: View {
                 titles
             }
         }
-        .navigationTitle(section.title)
-        .navigationSubtitle(subtitle)
+        .navigationTitle(slice?.label ?? section.title)
+        .navigationSubtitle(slice == nil ? subtitle : [section.title, subtitle].filter { !$0.isEmpty }.joined(separator: " · "))
         .toolbar(id: "library") { toolbar }
         .task(id: "\(section.key)|\(sortRaw)|\(filters.hashValue)|\(library.revision)") { await load() }
         .onChange(of: layoutRaw, initial: true) { _, raw in
@@ -155,7 +161,8 @@ struct LibraryView: View {
             commands.hasFocusedTitle = item != nil
             commands.focusedItem = item
         }
-        .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }
+        // Quiet while another page is on top.
+        .onChange(of: commands.playFocusedRequests) { _, _ in if commands.path.isEmpty { _ = playFocused() } }
         .onChange(of: commands.densitySteps.count) { _, _ in
             withAnimation(Theme.Motion.object(reduceMotion)) {
                 density = min(Self.densityRange.upperBound, max(Self.densityRange.lowerBound, density + commands.densitySteps.delta))
@@ -175,7 +182,7 @@ struct LibraryView: View {
         guard layout != .folders, loaded else { return "" }
         let n = items.count
         let noun = section.kind == .show ? (n == 1 ? "show" : "shows") : (n == 1 ? "title" : "titles")
-        return filters.isActive ? "\(n.formatted()) \(noun), filtered" : "\(n.formatted()) \(noun)"
+        return filters.isActive && filters != slice?.filters ? "\(n.formatted()) \(noun), filtered" : "\(n.formatted()) \(noun)"
     }
 
     @ViewBuilder private var state: some View {

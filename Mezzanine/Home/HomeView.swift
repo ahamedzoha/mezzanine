@@ -21,6 +21,7 @@ struct HomeView: View {
     @Environment(TitleActions.self) private var titleActions
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model = HomeModel()
+    @AppStorage("homeKind") private var kindRaw = HomeKind.all.rawValue
     @State private var showsDetails = false
     @State private var heroFrame: CGRect = .zero
     /// True when the last focus change came from the keyboard (only then do we scroll).
@@ -123,10 +124,19 @@ struct HomeView: View {
         }
         .toolbar {
             if isMain {
+                ToolbarItem {
+                    Picker("Show", selection: $kindRaw) {
+                        ForEach(HomeKind.allCases, id: \.rawValue) { Text($0.label).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented)
+                    .help("Show everything, only films or only shows")
+                    .disabled(editing)
+                }
                 ToolbarItem(placement: .primaryAction) { editButton }
             }
         }
-        .modifier(MainTitle(isMain: isMain, editing: editing))
+        .modifier(MainTitle(isMain: isMain, editing: editing, facts: library.homeFacts))
+        .onChange(of: kindRaw, initial: true) { _, raw in if isMain { model.kind = HomeKind(rawValue: raw) ?? .all; updateRoom() } }
     }
 
     /// Edit Shelves / Done. Done is the screen's primary action while editing.
@@ -238,7 +248,8 @@ struct HomeView: View {
             guard !Task.isCancelled else { return }
             playback.prewarm(item)
         }
-        .onChange(of: commands.playFocusedRequests) { _, _ in _ = playFocused() }
+        // Quiet while another page is on top.
+        .onChange(of: commands.playFocusedRequests) { _, _ in if commands.path.isEmpty { _ = playFocused() } }
         .onChange(of: commands.detailsRequests) { _, _ in
             withAnimation(Theme.Motion.object(reduceMotion)) { showsDetails.toggle() }
         }
@@ -250,6 +261,8 @@ struct HomeView: View {
                 RoomMessage { ProgressView().controlSize(.small).accessibilityLabel("Loading") }
             } else if let error = model.error {
                 RoomMessage(title: isMain ? "Home didn’t load" : "Shelves didn’t load", detail: error, retry: { Task { await load() } })
+            } else if model.kind != .all, model.resolved.values.contains(where: { !$0.items.isEmpty }) {
+                RoomMessage(title: "No \(model.kind.label.lowercased()) on Home", detail: "Choose All in the toolbar to see every shelf.")
             } else if !model.specs.isEmpty && model.specs.allSatisfy(\.hidden) {
                 RoomMessage(title: "Every shelf is hidden", detail: "Edit Shelves (⌘E) to show some again.")
             } else {
@@ -398,8 +411,9 @@ struct HomeView: View {
 private struct MainTitle: ViewModifier {
     let isMain: Bool
     let editing: Bool
+    let facts: String
     func body(content: Content) -> some View {
-        if isMain { content.navigationTitle("Home").navigationSubtitle(editing ? "Editing shelves" : "") } else { content }
+        if isMain { content.navigationTitle("Home").navigationSubtitle(editing ? "Editing shelves" : facts) } else { content }
     }
 }
 

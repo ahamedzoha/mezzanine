@@ -4,6 +4,7 @@ import MezzanineKit
 /// Where a detail page points.
 struct DetailRoute: Hashable {
     let ratingKey: String
+    var isCollection = false
 }
 
 /// A title's page: the hero at full width, then what it is, who made it,
@@ -15,6 +16,9 @@ struct DetailRoute: Hashable {
 struct DetailView: View {
     let route: DetailRoute
     var contentFocus: FocusState<Bool>.Binding
+    /// The window's root page (a Continue row in the sidebar), not one pushed over another.
+    var rootPage = false
+    private var isRoot: Bool { rootPage && commands.path.isEmpty }
 
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
@@ -97,8 +101,12 @@ struct DetailView: View {
             titleActions.toggleWatched(target)
             return .handled
         }
+        .onChange(of: commands.playFocusedRequests) { _, _ in
+            if commands.path.last == route || isRoot { _ = playPrimary() }
+        }
         .onMoveCommand(perform: move)
         .navigationTitle(item.map(Format.displayTitle) ?? "")
+        .navigationSubtitle(facts)
         // A mark made anywhere (this page, a card, the Item menu) shows here at once.
         .onChange(of: titleActions.mark) { _, mark in if let mark { apply(mark) } }
         .task(id: route) { await load() }
@@ -242,6 +250,13 @@ struct DetailView: View {
     }
 
     // MARK: Data
+
+    /// "2009 · 14 seasons", under the window's title.
+    private var facts: String {
+        guard let item else { return "" }
+        let size: String? = item.kind == .show ? item.childCount.map { $0 == 1 ? "1 season" : "\($0) seasons" } : item.duration.map(Format.duration)
+        return [item.year.map(String.init), size].compactMap { $0 }.joined(separator: " · ")
+    }
 
     private var itemInHand: PlexMetadata? {
         focusedEpisode.flatMap { episodes.indices.contains($0) ? episodes[$0] : nil } ?? item

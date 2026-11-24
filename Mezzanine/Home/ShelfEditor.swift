@@ -26,6 +26,7 @@ struct ShelfEditor: View {
     let refocus: Int
     let done: () -> Void
 
+    @Environment(PinnedStore.self) private var pins
     @Environment(AppCommandCenter.self) private var commands
     @Environment(\.undoManager) private var undoManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -221,6 +222,9 @@ struct ShelfEditor: View {
         Button("Rename…") { beginRename(spec) }
         if spec.smartRule != nil { Button("Edit Rules…") { editRules(spec) } }
         Button("Duplicate") { duplicate(spec) }
+        if let pin = PinnedStore.spec(for: spec) {
+            Button(pins.contains(pin.id) ? "Unpin from Sidebar" : "Pin to Sidebar") { pins.toggle(pin) }
+        }
         Divider()
         Button("Move to Top") { move(spec.id, to: 0) }.disabled(specs.first?.id == spec.id)
         Button("Move Up") { selected = spec.id; moveSelected(-1) }.disabled(specs.first?.id == spec.id)
@@ -473,11 +477,11 @@ private struct ShelfStrip<MenuContent: View>: View {
             }
             Spacer(minLength: Theme.Space.l)
             HStack(spacing: 4) {
-                ForEach(Array((shelf?.items ?? []).prefix(5).enumerated()), id: \.offset) { i, item in
+                ForEach(Array((shelf?.items ?? []).prefix(5))) { item in
                     RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: 96), pixelWidth: 96)
                         .frame(width: 32, height: 48)
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                        .modifier(FoldMatch(fold: peek.map { FoldID(id: "\(spec.id)-\(i)", namespace: $0) }))
+                        .modifier(FoldMatch(fold: peek.map { FoldID(id: "\(spec.id)-\(item.ratingKey)", namespace: $0) }))
                 }
             }
             .saturation(spec.hidden ? 0 : 1)

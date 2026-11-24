@@ -35,7 +35,7 @@ struct ShelfView: View {
                                        onFocus: { onFocus(column) }, onPlay: { frame in onPlay(item, frame) },
                                        onOpen: { (onOpen ?? commands.open)(item) },
                                        // Under Reduce Motion the fold is a plain crossfade: nothing flies.
-                                       fold: column < 5 && !reduceMotion ? fold.map { FoldID(id: "\(shelf.id)-\(column)", namespace: $0) } : nil)
+                                       fold: column < 5 && !reduceMotion ? fold.map { FoldID(id: "\(shelf.id)-\(item.ratingKey)", namespace: $0) } : nil)
                             // No `.id(column)`: a position as identity kept the old cards on screen
                             // when a reload reordered the row (Continue Watching after a stop).
                         }

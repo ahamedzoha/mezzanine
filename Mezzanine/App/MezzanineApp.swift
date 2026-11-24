@@ -31,6 +31,7 @@ struct MezzanineApp: App {
     @State private var layouts = HomeLayoutStore()
     @State private var downloads = DownloadStore()
     @State private var titleActions = TitleActions()
+    @State private var pins = PinnedStore()
     @State private var sound: SoundSettings
     @State private var subtitleSources = SubtitleSourceSettings()
     @State private var subtitleFinder = SubtitleFinder()
@@ -65,9 +66,10 @@ struct MezzanineApp: App {
                 .environment(updater)
                 .environment(remote)
                 .environment(titleActions)
+                .environment(pins)
                 .task {
                     playback.downloads = downloads
-                    titleActions.start(session: session, library: library, playback: playback, commands: commands)
+                    titleActions.start(session: session, library: library, playback: playback, commands: commands, pins: pins)
                     updater.isWatching = { [playback] in playback.item != nil }
                     notifier.start(library: library, session: session, commands: commands)
                     #if DEBUG

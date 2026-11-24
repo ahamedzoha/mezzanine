@@ -25,6 +25,8 @@ struct ShelfFocus: Equatable, Hashable {
 final class HomeModel {
     /// Shown shelves: visible, resolved and non-empty, in the owner's order.
     private(set) var shelves: [Shelf] = []
+    /// The main Home's All / Films / Shows switch.
+    var kind: HomeKind = .all { didSet { if kind != oldValue { shelves = shown(specs, resolved); clampFocus() } } }
     /// Every shelf of the layout, hidden ones included (Edit Home's peeks and counts).
     private(set) var resolved: [String: Shelf] = [:]
     /// The layout in force (the saved one, or the defaults).
@@ -92,7 +94,7 @@ final class HomeModel {
             guard !Task.isCancelled, generation == loadGeneration else { return }
             specs = layout
             resolved = out
-            shelves = layout.filter { !$0.hidden }.compactMap { out[$0.id] }.filter { !$0.items.isEmpty && !$0.isMissing }
+            shelves = shown(layout, out)
             // The rows Add Shelf can offer here: global ones on the main Home, the library's own elsewhere.
             let catalog = try await hubs(isMain ? nil : scope)
             guard generation == loadGeneration else { return }
@@ -110,8 +112,18 @@ final class HomeModel {
     /// so the strips unfold into poster rows in the new order without a reload.
     func apply(_ layout: [ShelfSpec]) {
         specs = layout
-        shelves = layout.filter { !$0.hidden }.compactMap { resolved[$0.id] }.filter { !$0.items.isEmpty && !$0.isMissing }
+        shelves = shown(layout, resolved)
         clampFocus()
+    }
+
+    /// The visible shelves, with only the chosen kind's titles; emptied ones go.
+    private func shown(_ layout: [ShelfSpec], _ resolved: [String: Shelf]) -> [Shelf] {
+        layout.filter { !$0.hidden }.compactMap { resolved[$0.id] }.compactMap { shelf in
+            guard !shelf.isMissing else { return nil }
+            var shelf = shelf
+            shelf.items = shelf.items.filter(kind.includes)
+            return shelf.items.isEmpty ? nil : shelf
+        }
     }
 
     /// The default layout for a scope (what "Restore Default Shelves" returns to).

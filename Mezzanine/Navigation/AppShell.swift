@@ -1,12 +1,6 @@
 import SwiftUI
 import MezzanineKit
 
-enum SidebarItem: Hashable {
-    case home
-    case library(String)
-    case downloads
-}
-
 /// The window: sidebar (system glass), the room, and the player stage above both.
 ///
 /// Keyboard: ⌘1…⌘9 (Go menu) switch sections and put focus in the content;
@@ -26,6 +20,7 @@ struct AppShell: View {
     @Environment(HomeLayoutStore.self) private var layouts
     @Environment(DownloadStore.self) private var downloads
     @Environment(TitleActions.self) private var titleActions
+    @Environment(PinnedStore.self) private var pins
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
     @FocusState private var sidebarFocused: Bool
@@ -92,6 +87,12 @@ struct AppShell: View {
             guard !Task.isCancelled else { return }
             await library.loadContinue()
         }
+        .task(id: "\(library.indexKey ?? "")|\(library.revision)|\(pins.pins.map(\.id))") {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            await library.loadCounts(pins: pins.pins)
+        }
+        .onChange(of: library.indexKey, initial: true) { _, key in if let key { commands.useRecents(key) } }
         .onChange(of: isOffline, initial: true) { _, offline in
             guard offline else { return }
             commands.selection = .downloads
@@ -138,58 +139,14 @@ struct AppShell: View {
     private var split: some View {
         @Bindable var commands = commands
         return NavigationSplitView {
-            List(selection: $commands.selection) {
-                if isOffline {
-                    // Offline: only what's on this Mac.
-                    Label("Downloads", systemImage: "arrow.down.circle").tag(SidebarItem.downloads)
-                    Section {
-                        Text("Plex can’t be reached. Downloads still play.")
-                            .font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary)
-                            .lineLimit(3)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Button("Try Again") { Task { await session.restore() } }
-                    } header: {
-                        Text("Offline")
-                    }
-                } else {
-                    Label("Home", systemImage: "house").tag(SidebarItem.home)
-                    Section("Libraries") {
-                        ForEach(commands.sections) { section in
-                            Label(section.title, systemImage: icon(for: section)).tag(SidebarItem.library(section.key))
-                        }
-                        if let sectionsError {
-                            Button("Libraries didn’t load. Try Again") { Task { await loadSections() } }
-                                .help(sectionsError)
-                        }
-                    }
-                    Section("On This Mac") {
-                        Label("Downloads", systemImage: "arrow.down.circle").tag(SidebarItem.downloads)
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                if session.homeUsers.count > 1 { SidebarProfileButton() }
-            }
-            .focused($sidebarFocused)
-            .onKeyPress(.rightArrow) { contentFocused = true; return .handled }
-            .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
+            Sidebar(isOffline: isOffline, sectionsError: sectionsError,
+                    retrySections: { Task { await loadSections() } },
+                    enterContent: { contentFocused = true })
+                .focused($sidebarFocused)
         } detail: {
-            NavigationStack(path: $commands.path) {
-                sectionRoot
-                    // Quick Open is modal: VoiceOver and Tab stay inside it.
-                    .accessibilityHidden(commands.isQuickOpenShown)
-                    .disabled(commands.isQuickOpenShown)
-                    .modifier(PagePanels(onTop: commands.path.isEmpty, showsSearchPanel: showsSearchPanel))
-                    .navigationDestination(for: DetailRoute.self) { route in
-                        DetailView(route: route, contentFocus: $contentFocused)
-                            .background { RoomLight(palette: playback.roomPalette, intensity: playback.ownsWindow ? 0 : 1) }
-                            .modifier(PagePanels(onTop: commands.path.last == route, showsSearchPanel: showsSearchPanel))
-                    }
-            }
-            .background {
-                RoomLight(palette: playback.roomPalette, intensity: playback.ownsWindow ? 0 : 1)
-            }
+            detailColumn
         }
+        .onChange(of: commands.surpriseRequests) { _, _ in surprise() }
         .sheet(item: $commands.artworkRequest) { request in
             ArtworkPicker(request: request)
         }
@@ -215,54 +172,121 @@ struct AppShell: View {
         // Offline there's nothing to search: the field goes rather than sitting dead.
         .modifier(LibrarySearch(enabled: !isOffline, query: $commands.query))
         .searchFocused($searchFocused)
-        .onChange(of: searchFocused) { _, focused in commands.isSearchFieldFocused = focused }
+        .onChange(of: searchFocused) { _, focused in searchFocusChanged(focused) }
+        .onChange(of: commands.query.isEmpty) { _, empty in
+            commands.recentsShown = empty && searchFocused && !commands.recentSearches.isEmpty
+        }
         .onChange(of: commands.searchRequests) { _, _ in searchFocused = true }
         .onChange(of: commands.contentFocusRequests) { _, _ in contentFocused = true }
         .onChange(of: commands.sidebarFocusRequests) { _, _ in sidebarFocused = true }
         .task(id: session.currentServer?.clientIdentifier) {
             contentFocused = true
             #if DEBUG
-            // -SelectBehindAfter 14: switches the sidebar page under the player (Downloads, then
-            // back), the way a background update rebuilds the toolbar while a film plays.
-            let selectAfter = UserDefaults.standard.integer(forKey: "SelectBehindAfter")
-            if selectAfter > 0 {
-                Task {
-                    try? await Task.sleep(for: .seconds(selectAfter))
-                    let was = commands.selection
-                    print("CHROME poke: select downloads"); commands.selection = .downloads
-                    try? await Task.sleep(for: .seconds(2))
-                    print("CHROME poke: select back"); commands.selection = was
-                }
-            }
-            // -SearchQuery "south" types into the toolbar search at launch (search panel tests).
-            if let q = UserDefaults.standard.string(forKey: "SearchQuery") {
-                try? await Task.sleep(for: .seconds(4))
-                for i in 1...q.count { commands.query = String(q.prefix(i)); try? await Task.sleep(for: .milliseconds(40)) }
-            }
-            // -MezzanineAutoplay <ratingKey> starts a title at launch (player tests).
-            if let key = UserDefaults.standard.string(forKey: "MezzanineAutoplay"), let client = session.client,
-               let item = try? await client.metadata(key) {
-                // -MezzanineAutoplayDelay 5: wait first (prewarm measurements: open the page, then play).
-                let delay = UserDefaults.standard.integer(forKey: "MezzanineAutoplayDelay")
-                if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
-                if UserDefaults.standard.bool(forKey: "playerMuted") { playback.player.volume = VolumeLevel(percent: 0) }
-                await playback.play(item, from: nil)
-                Task {
-                    try? await Task.sleep(for: .seconds(8))
-                    let d = playback.player.diagnostics
-                    print("AUTOPLAY route=\(d.route) audio=\(d.audioDelivery) adec=\(d.audioDecoder ?? "-") shaping=\(d.audioShaping) profile=\(playback.player.audioProfile)")
-                    fflush(stdout)
-                }
-                let seekTo = UserDefaults.standard.integer(forKey: "MezzanineAutoSeek")
-                if seekTo > 0 { try? await Task.sleep(for: .seconds(3)); await playback.player.seek(to: Double(seekTo)) }
-                // -MezzanineAutoClose <seconds> closes the player like Esc (activity tests).
-                let close = UserDefaults.standard.integer(forKey: "MezzanineAutoClose")
-                if close > 0 {
-                    try? await Task.sleep(for: .seconds(close))
-                    playback.close()
-                }
-            }
+            await launchHooks()
             #endif
+        }
+    }
+
+    #if DEBUG
+    /// Launch arguments for tests and captures.
+    private func launchHooks() async {
+        // -SidebarSelect "slice:unwatched:1" (a SidebarItem storage key) and -ActivityOpen YES: captures.
+        if let raw = UserDefaults.standard.string(forKey: "SidebarSelect"), let item = SidebarItem(storageKey: raw) {
+            try? await Task.sleep(for: .seconds(4))
+            commands.selection = item
+        }
+        if UserDefaults.standard.bool(forKey: "ActivityOpen") {
+            try? await Task.sleep(for: .seconds(3))
+            commands.isActivityShown = true
+        }
+        // -SelectBehindAfter 14: switches the sidebar page under the player (Downloads, then
+        // back), the way a background update rebuilds the toolbar while a film plays.
+        let selectAfter = UserDefaults.standard.integer(forKey: "SelectBehindAfter")
+        if selectAfter > 0 {
+            Task {
+                try? await Task.sleep(for: .seconds(selectAfter))
+                let was = commands.selection
+                print("CHROME poke: select downloads"); commands.selection = .downloads
+                try? await Task.sleep(for: .seconds(2))
+                print("CHROME poke: select back"); commands.selection = was
+            }
+        }
+        // -SearchQuery "south" types into the toolbar search at launch (search panel tests).
+        if let q = UserDefaults.standard.string(forKey: "SearchQuery") {
+            try? await Task.sleep(for: .seconds(4))
+            for i in 1...q.count { commands.query = String(q.prefix(i)); try? await Task.sleep(for: .milliseconds(40)) }
+        }
+        // -MezzanineAutoplay <ratingKey> starts a title at launch (player tests).
+        if let key = UserDefaults.standard.string(forKey: "MezzanineAutoplay"), let client = session.client,
+           let item = try? await client.metadata(key) {
+            // -MezzanineAutoplayDelay 5: wait first (prewarm measurements: open the page, then play).
+            let delay = UserDefaults.standard.integer(forKey: "MezzanineAutoplayDelay")
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            if UserDefaults.standard.bool(forKey: "playerMuted") { playback.player.volume = VolumeLevel(percent: 0) }
+            await playback.play(item, from: nil)
+            Task {
+                try? await Task.sleep(for: .seconds(8))
+                let d = playback.player.diagnostics
+                let decoder = d.audioDecoder ?? "-"
+                print("AUTOPLAY route=\(d.route) audio=\(d.audioDelivery) adec=\(decoder) shaping=\(d.audioShaping) profile=\(playback.player.audioProfile)")
+                fflush(stdout)
+            }
+            let seekTo = UserDefaults.standard.integer(forKey: "MezzanineAutoSeek")
+            if seekTo > 0 { try? await Task.sleep(for: .seconds(3)); await playback.player.seek(to: Double(seekTo)) }
+            // -MezzanineAutoClose <seconds> closes the player like Esc (activity tests).
+            let close = UserDefaults.standard.integer(forKey: "MezzanineAutoClose")
+            if close > 0 {
+                try? await Task.sleep(for: .seconds(close))
+                playback.close()
+            }
+        }
+    }
+    #endif
+
+    private var detailColumn: some View {
+        @Bindable var commands = commands
+        return NavigationStack(path: $commands.path) { rootPage }
+            .background { roomLight }
+            .toolbar { ShellToolbar(shown: !isOffline, canSurprise: canSurprise) }
+    }
+
+    private var rootPage: some View {
+        sectionRoot
+            // Quick Open is modal: VoiceOver and Tab stay inside it.
+            .accessibilityHidden(commands.isQuickOpenShown)
+            .disabled(commands.isQuickOpenShown)
+            .modifier(PagePanels(onTop: commands.path.isEmpty, showsSearchPanel: showsSearchPanel))
+            .navigationDestination(for: DetailRoute.self) { (route: DetailRoute) in pushed(route) }
+    }
+
+    private var roomLight: some View {
+        RoomLight(palette: playback.roomPalette, intensity: playback.ownsWindow ? 0 : 1)
+    }
+
+    private var canSurprise: Bool { library.index != nil && !commands.isEditingShelves }
+
+    private func pushed(_ route: DetailRoute) -> some View {
+        Group {
+            if route.isCollection {
+                CollectionPage(route: route, contentFocus: $contentFocused)
+            } else {
+                DetailView(route: route, contentFocus: $contentFocused)
+            }
+        }
+        .background { roomLight }
+        .modifier(PagePanels(onTop: commands.path.last == route, showsSearchPanel: showsSearchPanel))
+    }
+
+    private func searchFocusChanged(_ focused: Bool) {
+        commands.isSearchFieldFocused = focused
+        if focused {
+            commands.recentsShown = commands.query.isEmpty && !commands.recentSearches.isEmpty
+        } else {
+            // After a click on a recent search has landed.
+            Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                if !searchFocused { commands.recentsShown = false }
+            }
         }
     }
 
@@ -270,7 +294,8 @@ struct AppShell: View {
     /// results grid, over Quick Open, the player, or after Esc for this query).
     private var showsSearchPanel: Bool {
         let q = commands.query.trimmingCharacters(in: .whitespaces)
-        return !q.isEmpty && !commands.showsAllResults && commands.searchPanelDismissedFor != commands.query
+        let wanted = q.isEmpty ? commands.recentsShown : commands.searchPanelDismissedFor != commands.query
+        return wanted && !commands.showsAllResults
             && !commands.isQuickOpenShown && !playback.ownsWindow
     }
 
@@ -286,9 +311,47 @@ struct AppShell: View {
                 if let section = commands.sections.first(where: { $0.key == key }) {
                     LibraryView(section: section, contentFocus: $contentFocused).id(key)
                 }
+            case .slice(let key, let slice):
+                if let section = commands.sections.first(where: { $0.key == key }) {
+                    if slice == .collections { CollectionsView(section: section, contentFocus: $contentFocused).id(key) }
+                    else { LibraryView(section: section, slice: slice, contentFocus: $contentFocused).id("\(key)|\(slice.rawValue)") }
+                }
+            case .pinned(let id):
+                if let pin = pins.pin(id) { PinnedPage(pin: pin, contentFocus: $contentFocused).id(id) }
+            case .title(let key):
+                DetailView(route: DetailRoute(ratingKey: key), contentFocus: $contentFocused, rootPage: true).id(key)
             default:
                 HomeView(contentFocus: $contentFocused)
             }
+        }
+    }
+
+    /// A page restored from the last launch that's gone (or another server's): Home.
+    private func leaveMissingPage() {
+        switch commands.selection {
+        case .library(let key), .slice(let key, _):
+            if !commands.sections.contains(where: { $0.key == key }) { commands.selection = .home }
+        case .pinned(let id):
+            if !pins.contains(id) { commands.selection = .home }
+        default: break
+        }
+    }
+
+    /// Opens a random unwatched title: from the library on screen, else by Home's switch.
+    private func surprise() {
+        var section: String?
+        var kinds = (HomeKind(rawValue: UserDefaults.standard.string(forKey: "homeKind") ?? "") ?? .all).kinds
+        switch commands.selection {
+        case .library(let key), .slice(let key, _): section = key; kinds = ["movie", "show"]
+        case .home: break
+        default: kinds = ["movie", "show"]
+        }
+        Task {
+            guard let item = await library.surprise(section: section, kinds: kinds) else {
+                AccessibilityNotification.Announcement("Nothing unwatched here").post()
+                return
+            }
+            commands.open(item)
         }
     }
 
@@ -300,14 +363,13 @@ struct AppShell: View {
             commands.sections = sections.filter { $0.kind == .movie || $0.kind == .show }
             sectionsError = nil
             // A library restored from the last launch that's gone (or another server's): Home.
-            if case .library(let key) = commands.selection, !commands.sections.contains(where: { $0.key == key }) {
-                commands.selection = .home
-            }
             if let server = session.currentServer {
                 library.connect(client: client, serverID: server.clientIdentifier,
                                 userID: session.account?.uuid ?? "owner", sections: commands.sections)
                 layouts.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
+                pins.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
                 commands.layoutsReady = true
+                leaveMissingPage()
                 downloads.use(client: client, images: session.images, serverID: server.clientIdentifier,
                               userID: session.account?.uuid ?? "owner")
                 downloads.applyKeepRules()
@@ -340,11 +402,6 @@ struct AppShell: View {
         } catch {
             sectionsError = (error as? PlexError)?.userMessage ?? "\(error)"
         }
-    }
-
-    private func icon(for section: PlexLibrarySection) -> String {
-        if section.isPersonalMedia { return "folder" }
-        return section.kind == .show ? "tv" : "film"
     }
 }
 
