@@ -297,6 +297,7 @@ struct MezzanineCommands: Commands {
     let updater: AppUpdater
     let actions: TitleActions
     let library: LibraryStore
+    let diagnostics: Diagnostics
 
     private var downloadTitle: String {
         switch center.currentDetailItem?.kind {
@@ -364,6 +365,8 @@ struct MezzanineCommands: Commands {
         CommandGroup(replacing: .help) {
             Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
                 .keyboardShortcut("/", modifiers: .command)
+            Divider()
+            Button("Save Diagnostics Report…") { diagnostics.saveReport() }
         }
         CommandGroup(after: .textEditing) {
             Button("Find…") { center.requestSearch() }

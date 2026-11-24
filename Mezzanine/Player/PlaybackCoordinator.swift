@@ -247,9 +247,11 @@ final class PlaybackCoordinator {
                     throw CancellationError()
                 } catch {
                     lastError = error
+                    AppLog.playback.error("\(candidate.label, privacy: .public) failed: \(String(describing: error), privacy: .private)")
                 }
             }
             if let lastError { throw lastError }
+            AppLog.playback.notice("loaded \(detail.kind.rawValue, privacy: .public) \(detail.ratingKey, privacy: .public), \(self.mode.label, privacy: .public)")
             guard generation == requestGeneration else { return }
             beginOnDevice(detail, carryFrom: previous)
             restorePictureMode()
@@ -523,6 +525,7 @@ final class PlaybackCoordinator {
         requestGeneration += 1
         catchUp = nil
         sleep.playerClosed()
+        AppLog.playback.notice("closed")
         isMini = false
         // Closing the player while casting stops the TV too.
         if cast.isCasting { Task { await cast.stop(resume: false) } }

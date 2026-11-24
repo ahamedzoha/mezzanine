@@ -16,6 +16,9 @@
 	<!-- Downloads for offline viewing live in Movies ▸ Mezzanine. -->
 	<key>com.apple.security.assets.movies.read-write</key>
 	<true/>
+	<!-- Help ▸ Save Diagnostics Report… writes where the save panel says. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
 	<!-- Sparkle's installer launcher and status services (sandboxed apps). -->
 	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
 	<array>

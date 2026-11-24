@@ -17,7 +17,9 @@ public struct Redactor: Sendable {
     public func callAsFunction(_ text: String) -> String {
         var out = text
         for name in names {
-            out = out.replacingOccurrences(of: name, with: "<name>", options: [.caseInsensitive, .diacriticInsensitive])
+            // Whole words: a film called "Cars" must not eat into other words.
+            out = out.replacingOccurrences(of: "(?<!\\w)\(NSRegularExpression.escapedPattern(for: name))(?!\\w)", with: "<name>",
+                                           options: [.regularExpression, .caseInsensitive])
         }
         if !home.isEmpty { out = out.replacingOccurrences(of: home, with: "~") }
         for (pattern, replacement) in Self.patterns {

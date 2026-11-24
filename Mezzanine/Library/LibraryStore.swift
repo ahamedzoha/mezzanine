@@ -143,11 +143,13 @@ final class LibraryStore {
                 return
             } catch {
                 syncState = .failed((error as? PlexError)?.userMessage ?? "\(error)")
+                AppLog.library.error("sync failed in section \(section.key, privacy: .public): \(String(describing: error), privacy: .private)")
                 return
             }
         }
         syncState = .idle
         lastSyncedAt = Date()
+        AppLog.library.info("synced")
     }
 
     /// Items for a library page, decoded off the main actor.

@@ -32,6 +32,7 @@ struct MezzanineApp: App {
     @State private var downloads = DownloadStore()
     @State private var titleActions = TitleActions()
     @State private var pins = PinnedStore()
+    @State private var diagnostics = Diagnostics()
     @State private var sound: SoundSettings
     @State private var subtitleSources = SubtitleSourceSettings()
     @State private var subtitleFinder = SubtitleFinder()
@@ -69,6 +70,18 @@ struct MezzanineApp: App {
                 .environment(pins)
                 .task {
                     playback.downloads = downloads
+                    diagnostics.start(session: session, library: library, playback: playback, sound: sound)
+                    #if DEBUG
+                    // -DiagnosticsReport YES writes the report into the container after 15 s (tests).
+                    if UserDefaults.standard.bool(forKey: "DiagnosticsReport") {
+                        Task {
+                            try? await Task.sleep(for: .seconds(15))
+                            let url = URL.temporaryDirectory.appending(path: "report.txt")
+                            try? await diagnostics.report().write(to: url, atomically: true, encoding: .utf8)
+                            print("DIAGNOSTICS \(url.path)")
+                        }
+                    }
+                    #endif
                     titleActions.start(session: session, library: library, playback: playback, commands: commands, pins: pins)
                     updater.isWatching = { [playback] in playback.item != nil }
                     notifier.start(library: library, session: session, commands: commands)
@@ -95,7 +108,7 @@ struct MezzanineApp: App {
         .defaultSize(width: 1440, height: 900)
         .windowResizability(.contentMinSize)
         .commands { MezzanineCommands(center: commands, sound: sound, session: session, downloads: downloads, updater: updater,
-                                        actions: titleActions, library: library) }
+                                        actions: titleActions, library: library, diagnostics: diagnostics) }
 
         Settings {
             SettingsView()

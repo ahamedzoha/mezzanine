@@ -110,5 +110,6 @@ struct RedactorTests {
     @Test func keepsTheEvidence() {
         let text = "2026-11-24 10:19:44.438 [engine] startup 8/8 presenting (gen 4) makeup +11.6 dB seg-255 1011.58s version 26.6.2"
         #expect(redact(text) == text)
+        #expect(Redactor(names: ["Cars", "It (2017)"])("scars, cars. Saw it, It (2017) too") == "scars, <name>. Saw it, <name> too")
     }
 }

@@ -203,6 +203,7 @@ final class SessionStore {
         UserDefaults.standard.set(server.clientIdentifier, forKey: Self.serverDefaultsKey)
         await images.setToken(server.accessToken ?? token, host: won.baseURL.host(), serverID: server.clientIdentifier)
         phase = .ready
+        AppLog.session.notice("connected, \(self.routeWords, privacy: .public)")
     }
 
     // MARK: Plex Home

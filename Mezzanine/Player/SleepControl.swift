@@ -112,6 +112,7 @@ final class SleepControl {
         loop?.cancel()
         stopping = nil
         stops += 1
+        AppLog.playback.notice("sleep timer stopped playback")
         AccessibilityNotification.Announcement("Sleep timer ended").post()
         // The level comes back once the pause has landed, so nothing is heard of it.
         Task {

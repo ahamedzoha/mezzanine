@@ -75,6 +75,7 @@ final class SoundSettings {
 
     private func apply() {
         let setup = current
+        AppLog.sound.info("\(setup.kind.rawValue, privacy: .public) \(Int(setup.volumePercent)) %")
         player.audioProfile = setup.profile
         player.volume = VolumeLevel(percent: setup.volumePercent)
     }
