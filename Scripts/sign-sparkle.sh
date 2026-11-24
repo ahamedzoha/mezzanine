@@ -16,3 +16,11 @@ sign "$v/Updater.app"
 sign "$fw"
 sign --preserve-metadata=entitlements,requirements,flags "$app"
 codesign --verify --deep --strict "$app"
+
+# get-task-allow lets any process of the same user attach and read the app's memory (the Plex token
+# included). Xcode adds it for Apple Development signing unless CODE_SIGN_INJECT_BASE_ENTITLEMENTS is NO.
+while IFS= read -r code; do
+  if codesign -d --entitlements - --xml "$code" 2>/dev/null | grep -q get-task-allow; then
+    echo "$code carries get-task-allow: not a release build." >&2; exit 1
+  fi
+done < <(print -rl -- "$app" "$v/XPCServices/Installer.xpc" "$v/XPCServices/Downloader.xpc" "$v/Autoupdate" "$v/Updater.app" "$fw")

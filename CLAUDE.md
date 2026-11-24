@@ -30,7 +30,7 @@ Scripts/release.sh 0.3.0 --local          # same, built and published from this 
   `CHANGELOG.md` (owner-facing notes; Sparkle's update window shows them). The script bumps
   `MARKETING_VERSION`, commits "Release x.y.z", tags `vx.y.z` and pushes; the `Release` workflow
   (`.github/workflows/release.yml`, runner `xcode-27`, Xcode 27.2) tests, builds, re-signs
-  Sparkle's helpers (`Scripts/sign-sparkle.sh`), makes the DMG (`Scripts/build-release.sh`,
+  Sparkle's helpers (`Scripts/sign-sparkle.sh`, which also refuses `get-task-allow`), makes the DMG (`Scripts/build-release.sh`,
   dmgbuild + `Scripts/dmg/`) and stages it in the public `ahamedzoha/mezzanine-releases` repo
   through a deploy key; that repo's Publish workflow creates its Release and the appcast entry and
   resets its history. The same DMG becomes a GitHub Release on this repo (`Scripts/github-release.sh`),

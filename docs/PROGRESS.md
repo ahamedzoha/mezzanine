@@ -21,6 +21,16 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
+## 2026-11-24 — No get-task-allow in Release (1.0.1, not released)
+
+- Published builds carried `com.apple.security.get-task-allow`: Xcode adds it for Apple Development
+  signing, so any process of the same user could attach and read memory, the Plex token included.
+  Release now sets `CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO`; Debug keeps it for the debugger.
+- `Scripts/sign-sparkle.sh` (local installs, `--local` releases and CI) fails if the app or a Sparkle
+  helper carries it; it refuses 1.0.0.
+- Checked: the entitlements differ by that key only, the designated requirement is the same (Keychain
+  access and updates are unaffected), a copy under a test bundle id launches, and lldb can't attach.
+
 ## 2026-11-24 — 1.0.0: queue, watchlist, Spotlight, Shortcuts (built as 0.6)
 
 - Spike (GET only): `discover.provider.plex.tv/library/sections/watchlist/all` pages and answers

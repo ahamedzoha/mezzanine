@@ -3,6 +3,10 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
+## 1.0.1 — unreleased
+
+- Other programs on your Mac can no longer attach to Mezzanine and read its memory.
+
 ## 1.0.0 — 2026-11-24
 
 - Play Next and Add to Queue on any film, episode or show; the queue plays before the next episode.
