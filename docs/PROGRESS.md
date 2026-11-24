@@ -39,8 +39,10 @@ Plan for 0.4 to 0.6: `~/.claude/plans/immutable-crunching-aho-of-578ae7c0-c3a6-4
   had no row, a Play disc on collections, a doubled Unwatched chip, clipped popover text. The Debug
   index dropped Courses on connect (0.3.4); no duplicate-geometry faults logged.
 - Not checked: the pointer (Continue's Play disc, pin drag), VoiceOver, larger text, Increase
-  Contrast, offline, volume above 100 % by ear, the version in Plex's dashboard. Remove from
-  Continue Watching has never been sent to the server: try it once on a title the owner names.
+  Contrast, offline, volume above 100 % by ear, the version in Plex's dashboard.
+- Remove from Continue Watching: sent once through `PlexServerClient` on a title the owner named.
+  Plex accepted it, the row and Home's hub lost only that title, and its resume point, watch count
+  and history didn't change.
 
 ## 2026-11-24 — Fixes from field diagnostics (for 0.3.4)
 
