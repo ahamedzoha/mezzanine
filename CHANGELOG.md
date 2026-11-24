@@ -3,7 +3,7 @@
 What's new in each version of Mezzanine. `Scripts/release.sh <version>` needs a section here;
 the update window shows it.
 
-## 1.0.2 — unreleased
+## 1.0.2 — 2026-11-24
 
 - A new icon: the lit screen, seen from the mezzanine.
 - Up Next shows a film's backdrop instead of its poster cut through the title.

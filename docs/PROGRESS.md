@@ -18,7 +18,7 @@ Open, waiting on the owner:
 - Cast's Connecting/Cancel and failure panels haven't been seen on the TV (only on the Mac).
 - Whether the logo still goes missing in full screen (see the grey-band entry).
 
-Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is built (2026-11-24);
+Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
 donations wait for GitHub Sponsors.
 
 ## 2026-11-24 — New app icon: The balcony
@@ -31,7 +31,7 @@ donations wait for GitHub Sponsors.
 
 ## 2026-11-24 — Website and demo library
 
-- Built, not published yet: `site/` for ahamedzoha.github.io/mezzanine ("One evening", Persuade, Bias Light): one page told by the
+- `site/` at ahamedzoha.github.io/mezzanine ("One evening", Persuade, Bias Light): one page told by the
   clock, a changelog and a 404; no JavaScript needed, no cookies, nothing from third parties.
 - The owner's user Pages repo had an expired custom domain, which every project page redirected to;
   removed.
