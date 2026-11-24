@@ -19,7 +19,7 @@ Open, waiting on the owner:
 - Whether the logo still goes missing in full screen (see the grey-band entry).
 
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
-donations wait for GitHub Sponsors.
+donations wait for the Patreon page.
 
 ## 2026-11-24 — 1.0.2: new app icon, The balcony
 
@@ -39,7 +39,8 @@ donations wait for GitHub Sponsors.
   automated downloads (429), so files come from download.blender.org and studio.blender.org.
 - All public pictures were replaced: no studio artwork, no real server behind them.
 - App: Up Next shows a film's backdrop instead of cropping its poster (1.0.2).
-- Waiting on the owner: GitHub Sponsors enrolment, then `sponsors: true` and `.github/FUNDING.yml`.
+- Donations: GitHub Sponsors can't pay out to the owner's country; Patreon instead. Waiting for the
+  owner to publish the page, then `sponsors: true` and `.github/FUNDING.yml`.
 
 ## 2026-11-24 — 1.0.1: no get-task-allow in Release
 

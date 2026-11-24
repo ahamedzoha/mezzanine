@@ -61,7 +61,7 @@ for t in json.loads((root / "Scripts" / "demo" / "library.json").read_text())["t
 fill = {
     "version": version, "download": dmg, "released": long_day(day), "released_iso": day,
     "size": f"{size / 1e6:.0f} MB" if size else "DMG", "versions": versions, "credits": "\n".join(rows),
-    "base": config["base"], "sponsor": f'<a class="quiet" href="{html.escape(config["sponsorURL"])}">Sponsor</a>' if config["sponsors"] else "",
+    "base": config["base"], "sponsor": f'<a class="quiet" href="{html.escape(config["sponsorURL"])}">Support</a>' if config["sponsors"] else "",
     "sponsor_block": config["sponsorBlock"].replace("{url}", html.escape(config["sponsorURL"])) if config["sponsors"] else "",
 }
 

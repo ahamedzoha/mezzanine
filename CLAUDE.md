@@ -44,7 +44,8 @@ Scripts/release.sh 0.3.0 --local          # same, built and published from this 
   `docs/screenshots/CREDITS.md` and `Scripts/demo/library.json` (the site's credits) in step.
 - Website: `site/`, built by `Scripts/site.py` (`--offline` for previews) into `build.noindex/site`,
   published by `.github/workflows/pages.yml` on `site/**` pushes and after each Release. Donations:
-  `site/config.json` `sponsors` stays false until the owner's GitHub Sponsors page is approved.
+  `site/config.json` `sponsors` stays false until the owner's Patreon page
+  is published (GitHub Sponsors doesn't pay out to the owner's country); then also `.github/FUNDING.yml`.
 - The Release workflow runs on tags and "Run workflow"; `--local` builds on the Mac instead.
 - Build number = `git rev-list --count HEAD` (local installs too), so releases always compare newer.
 - Secrets (private repo): `MAC_CERT_P12`/`MAC_CERT_PASSWORD` (the Apple Development identity,
