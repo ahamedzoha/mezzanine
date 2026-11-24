@@ -255,7 +255,9 @@ UserDefaults `soundSetups.v1`, starting from `AudioOutputKind.defaultProfile`, a
 profile and volume into `MezzaninePlayer` on every route change. The owner can reclassify a
 device (his 2.1 speakers look like headphones to macOS). In `MezzaninePlayer.applyVolumeAndShaping`
 the profile and the volume boost (above 100 % becomes gain before the engine's limiter, up to
-+12 dB at 400 %) map onto the engine. The design intent: a 5.1 fold is unnormalised into a
++12 dB at 400 %) map onto the engine. A shaping change rebuilds the session, so changes settle for
+0.4 s and boost is built in √2 steps, with the player's own volume taking back the rest
+(`VolumeLevel.builtInBoostDB`, `playerVolume`). The design intent: a 5.1 fold is unnormalised into a
 limiter with a dialogue lift, so films are about as loud as stereo; an HDMI receiver or AirPods
 get no shaping so Atmos/5.1 pass through. `PlayerDiagnostics` feeds the stats overlay (I).
 

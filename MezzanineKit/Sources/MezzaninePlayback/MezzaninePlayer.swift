@@ -64,6 +64,10 @@ public final class MezzaninePlayer {
     @ObservationIgnored private var bag = Set<AnyCancellable>()
     @ObservationIgnored private var loadStartedAt: ContinuousClock.Instant?
     @ObservationIgnored private var seekStartedAt: ContinuousClock.Instant?
+    /// Volume boost in the shaping last handed to the engine, and in the audio playing now.
+    @ObservationIgnored private var requestedBoostDB = 0.0
+    @ObservationIgnored private var playingBoostDB = 0.0
+    @ObservationIgnored private var settling: Task<Void, Never>?
     @ObservationIgnored private var pip: AVPictureInPictureController?
     @ObservationIgnored private var pipDelegate: PiPDelegate?
     /// A second reader over the playing file, for scrub previews and snapshots far from
@@ -153,7 +157,9 @@ public final class MezzaninePlayer {
                                   isForced: $0.isForced, isHearingImpaired: $0.isHearingImpaired,
                                   isDefault: false, httpHeaders: request.headers, formatHint: $0.format)
         }
-        options.audioShaping = engineShaping()
+        settling?.cancel()
+        requestedBoostDB = volume.builtInBoostDB(current: 0, passthrough: audioProfile.isPassthrough)
+        options.audioShaping = engineShaping(boostDB: requestedBoostDB)
         options.autoplay = request.autoplay
         do {
             try await engine.load(url: request.url, startPosition: request.startPosition, options: options)
@@ -163,7 +169,8 @@ public final class MezzaninePlayer {
             status = .failed(String(describing: error))
             throw error
         }
-        engine.volume = isMuted ? 0 : Float(volume.linearVolume)
+        playingBoostDB = requestedBoostDB
+        applyPlayerVolume()
     }
 
     /// Fetches a file's opening bytes ahead of a `load` (the next episode), so it starts at once.
@@ -295,13 +302,16 @@ public final class MezzaninePlayer {
 
     // MARK: Audio shaping
 
-    /// Maps the device profile plus the volume boost onto the engine.
-    func engineShaping() -> AudioShaping {
+    /// How long sound changes must rest before they reach the engine. Each one rebuilds the
+    /// session, so a run of volume keys or a slider drag becomes one rebuild.
+    private static let settleTime: Duration = .milliseconds(400)
+
+    /// Maps the device profile plus the built-in volume boost onto the engine.
+    private func engineShaping(boostDB boost: Double) -> AudioShaping {
         var shaping = AudioShaping(maxChannels: audioProfile.maxChannels,
                                    dialogueGainDB: audioProfile.dialogueGainDB,
                                    loudnessTargetLUFS: audioProfile.loudnessTargetLUFS,
                                    lfeMixDB: audioProfile.lfeMixDB)
-        let boost = volume.boostDB
         if audioProfile.nightMode {
             var night = AudioShaping.Compressor.night
             night.makeupGainDB = min(24, night.makeupGainDB + boost)
@@ -313,17 +323,43 @@ public final class MezzaninePlayer {
         return shaping
     }
 
+    /// The player's volume follows at once; shaping follows when the changes have settled.
     private func applyVolumeAndShaping() {
-        engine.volume = isMuted ? 0 : Float(volume.linearVolume)
-        let shaping = engineShaping()
+        applyPlayerVolume()
+        settling?.cancel()
+        settling = Task { [weak self] in
+            try? await Task.sleep(for: Self.settleTime)
+            guard !Task.isCancelled else { return }
+            self?.applyShaping()
+        }
+    }
+
+    private func applyShaping() {
+        let boost = volume.builtInBoostDB(current: requestedBoostDB, passthrough: audioProfile.isPassthrough)
+        requestedBoostDB = boost
+        let shaping = engineShaping(boostDB: boost)
         if shaping != engine.audioShaping { engine.setAudioShaping(shaping) }
+    }
+
+    /// Takes back the part of the built-in boost this level doesn't use. A session that can't
+    /// be shaped (AVPlayer owns its audio) has none built in.
+    private func applyPlayerVolume() {
+        let builtIn = engine.audioShapingState == .applied ? playingBoostDB : 0
+        engine.volume = isMuted ? 0 : Float(volume.playerVolume(builtInBoostDB: builtIn))
     }
 
     // MARK: Engine → Mezzanine
 
     private func bind() {
         engine.$state.receive(on: DispatchQueue.main).sink { [weak self] state in
-            self?.status = PlayerStatus(state)
+            guard let self else { return }
+            // A rebuild starts and ends in `.loading`, silent: from here the audio carries the
+            // boost last asked for.
+            if state == .loading || self.status == .loading {
+                self.playingBoostDB = self.requestedBoostDB
+                self.applyPlayerVolume()
+            }
+            self.status = PlayerStatus(state)
         }.store(in: &bag)
         engine.$isBuffering.receive(on: DispatchQueue.main).sink { [weak self] in self?.isBuffering = $0 }.store(in: &bag)
         engine.$duration.receive(on: DispatchQueue.main).sink { [weak self] in self?.duration = $0 }.store(in: &bag)
@@ -359,7 +395,10 @@ public final class MezzaninePlayer {
         // Diagnostics for the stats overlay and the Lab matrix.
         engine.$videoRoute.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.route = $0.rawValue }.store(in: &bag)
         engine.$audioDelivery.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.audioDelivery = $0.rawValue }.store(in: &bag)
-        engine.$audioShapingState.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.audioShaping = $0.rawValue }.store(in: &bag)
+        engine.$audioShapingState.receive(on: DispatchQueue.main).sink { [weak self] in
+            self?.diagnostics.audioShaping = $0.rawValue
+            self?.applyPlayerVolume()
+        }.store(in: &bag)
         engine.$videoFormat.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.videoFormat = String(describing: $0) }.store(in: &bag)
         engine.$activeVideoDecoder.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.videoDecoder = $0 }.store(in: &bag)
         engine.$activeAudioDecoder.receive(on: DispatchQueue.main).sink { [weak self] in self?.diagnostics.audioDecoder = $0 }.store(in: &bag)

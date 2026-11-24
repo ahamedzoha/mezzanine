@@ -91,4 +91,28 @@ public struct VolumeLevel: Sendable, Equatable {
     }
 
     public var isBoosted: Bool { percent > 100 }
+
+    // MARK: Built-in boost
+
+    /// Gain above 100 % sits in front of the engine's limiter, and changing it rebuilds the
+    /// playing session (the picture holds for about a second). So it is built in steps
+    /// (100, 141, 200, 283, 400 %) and the player's own volume takes back the rest.
+    public static let boostStepDB = 10 * log10(2.0)
+
+    /// The gain to build into the audio for this level: the level rounded up to a step, or
+    /// `current` (what is built in now) while it covers the level with at most a step to spare.
+    /// An untouched (`passthrough`) profile goes back to no gain at 100 % and below, so Atmos
+    /// and 5.1 pass through again.
+    public func builtInBoostDB(current: Double, passthrough: Bool) -> Double {
+        let wanted = boostDB
+        let slack = 1e-6
+        if wanted == 0, passthrough { return 0 }
+        if current >= wanted - slack, current - wanted <= Self.boostStepDB + slack { return current }
+        return ((wanted - slack) / Self.boostStepDB).rounded(.up) * Self.boostStepDB
+    }
+
+    /// 0…1 for the player's own volume when `builtIn` dB of gain is already in the audio.
+    public func playerVolume(builtInBoostDB builtIn: Double) -> Double {
+        min(1, linearVolume * pow(10, (boostDB - builtIn) / 20))
+    }
 }
