@@ -88,6 +88,9 @@ defaults and Keychain item), so test runs never change the installed app's setti
 (each starts a real transcode on the server: keep runs short, let the player close itself
 (`-MezzanineAutoClose`) so the session stops, and check `Scripts/plex.sh pms /transcode/sessions`).
 
+Sidebar and top bar: `-SidebarSelect "slice:unwatched:1"` (a `SidebarItem` storage key), `-ActivityOpen YES`.
+`TitleActions` writes (watched marks, Continue Watching removal) print `ACTION …` and send nothing under `-MezzanineNoActivity YES`.
+
 Shelves: `-HomeSeedShelves YES` (smart shelf, collection, hidden row), `-HomeEditing YES`,
 `-HomeKeyScript "down,opt+down,space"`, `-SmartShelfSheet YES`, `-CollectionPicker YES`,
 `-QuickOpenQuery "after"` (`_` for empty), `-SearchQuery "south"` (types into the toolbar search; logs `SEARCHPANEL`). Window snapshots of an attached sheet fail: capture

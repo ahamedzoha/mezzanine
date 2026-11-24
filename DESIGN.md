@@ -240,7 +240,7 @@ Poster, then title (card title) and one line of facts (card meta). The pointer l
 Backdrop right, logo or title card left at the bottom of the block, one 48 pt hairline, one caption line, then Play (primary) and Details (secondary). Title change crossfades in 0.32 s; Home prefetches every shelf title's backdrop and logo so the swap never waits on the server. Details toggle with I.
 
 ### Navigation
-Native sidebar (system glass) with Home and Libraries; native toolbar with search (prompt "Titles, people, collections"), Sort menu and a poster-size slider in libraries. Selection uses the system selection tinted ink. Dark scheme forced.
+Native sidebar (system glass): Home, Continue (up to three 28 × 42 posters with progress hairlines), Libraries (disclosures with counts), Pinned, On This Mac, then the server line and profile. Artwork is its only colour; counts are quiet badges; empty sections and zero counts don't show. Native toolbar with search (prompt "Titles, people, collections"), Surprise Me and Activity on every page (Activity is still when idle), All / Films / Shows on Home, Sort menu and a poster-size slider in libraries. Selection uses the system selection tinted ink. Dark scheme forced.
 
 ### Room message
 Heading, detail, optional small spinner; left-aligned on the gutter below the toolbar.

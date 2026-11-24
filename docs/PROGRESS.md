@@ -21,6 +21,21 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
+## 2026-11-24 — 0.4 under way: sidebar, top bar, card actions
+
+Plan for 0.4 to 0.6: `~/.claude/plans/immutable-crunching-aho-of-578ae7c0-c3a6-4148-b2ee-a5d1cf805ade.md`
+(owner-approved: "Watching + map" sidebar, "useful controls" top bar, three releases).
+
+- Built: `Sidebar`, `PinnedStore`, `ShellToolbar`, `TitlesPage` (collections, pinned pages),
+  `TitleActions` (card menus, Item menu, W), recent searches, Home's kind switch and facts.
+  `LibraryIndex.count(_:)` shares its WHERE with `items`; `LibrarySync.refresh` re-reads a title
+  after a mark (the incremental sync misses unwatched marks).
+- Differs from the plan: the sidebar asks `/hubs/continueWatching/items` itself rather than sharing
+  Home's hub; both lay the same stops and removals over Plex's answer.
+- Found on the way: In Progress never matched shows; ⌘Return on a title page played the page under it.
+- Not yet: on-screen checks of 0.3.4 and 0.4 (the owner was watching). Remove from Continue
+  Watching has never been sent to the server: try it once on a title the owner names.
+
 ## 2026-11-24 — Fixes from field diagnostics (for 0.3.4)
 
 Found by reading the Mac's reports and the unified log (AetherEngine logs there in Release, subsystem
@@ -38,8 +53,8 @@ Found by reading the Mac's reports and the unified log (AetherEngine logs there 
 - A library removed from Plex stayed in the index (924 Courses titles in search and smart shelves).
   Connecting now drops sections missing from a successful, non-empty list.
 - Plex was told version 0.1.0; `PlexIdentity` now reads the app's own.
-- Not yet checked in the running app: the owner was watching a film. Open, minor: SwiftUI's
-  duplicate `matchedGeometryEffect` source in Continue Watching (`ShelfView`, keyed by column).
+- Not yet checked in the running app: the owner was watching a film. The duplicate
+  `matchedGeometryEffect` source in Continue Watching is fixed in 0.4.
 
 ## 2026-11-16 — Screen dimmed during playback (0.3.2)
 
