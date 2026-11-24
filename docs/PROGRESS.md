@@ -21,6 +21,16 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
+## 2026-11-24 — 0.5 under way: player comforts and diagnostics
+
+- Spike: choosing a subtitle track, seeking and turning it off never rebuilds the session (native
+  and software routes, silent test files). The software route reads a track's lines from where it
+  was chosen, so `MezzaninePlayer.goBack(_:withSubtitle:)` chooses it again half a second after the
+  seek. First line on screen: 0.54 s native, 0.64 s software.
+- Built: `SleepTimer`, `TimeEntry`, `CatchUp`, `Redactor` (kit, tested); `SleepControl`, `GoToTimeField`,
+  `Diagnostics`, `AppLog` (app). The fade is the player's own volume (no shaping change).
+- Not yet: anything on screen or by ear; a MetricKit payload has never arrived; the HIG review.
+
 ## 2026-11-24 — 0.4.0: sidebar, top bar, card actions
 
 Plan for 0.4 to 0.6: `~/.claude/plans/immutable-crunching-aho-of-578ae7c0-c3a6-4148-b2ee-a5d1cf805ade.md`

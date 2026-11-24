@@ -78,7 +78,7 @@ Build output goes to `build.noindex/` (Spotlight skips it).
 `-MezzanineNoActivity YES` · `-ApplePersistenceIgnoreState YES` · Lab window: Window ▸ Lab
 (or the Open Lab button on the placeholder root). Player: `-MezzanineAutoplay <ratingKey>`
 `-MezzanineAutoSeek <s>` `-MezzanineAutoClose <s>` `-MezzanineAutoplayDelay <s>` `-MiniExpandAfter <s>` `-NotifyTest YES` (posts one new-episode notification) `-PlayerChromePinned YES`
-`-PlayerOptionsOpen YES` `-PlayerOptionsPage search|subtitles|audio|picture` `-FindSubtitlesChoose YES` (picks the first non-Plex result; local only) `-PlayerFullScreen YES` `-PlayerKeyScript "i,c,shift+right,!snapshot"`
+`-PlayerOptionsOpen YES` `-PlayerOptionsPage search|subtitles|audio|picture|sleep` `-SleepTimerSeconds 30` (a timed choice ends that soon) `-DiagnosticsReport YES` (writes the report into the container after 15 s) `-FindSubtitlesChoose YES` (picks the first non-Plex result; local only) `-PlayerFullScreen YES` `-PlayerKeyScript "i,c,shift+right,!snapshot"`
 (`~3` waits 3 s, `!fs` toggles full screen directly) `-SelectBehindAfter 14` (switches the page under the player)
 (real key events through the router; menus ignore keys while the app is in the background, so
 ⌘ items use `!action`) `-ScrubHoverAt 0.6` `-SnapshotNoClipboard YES`; detail:
