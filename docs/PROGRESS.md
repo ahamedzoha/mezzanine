@@ -21,7 +21,7 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. Later:
 a GitHub Pages website that looks professional and asks for donations.
 
-## 2026-11-24 — 0.4 under way: sidebar, top bar, card actions
+## 2026-11-24 — 0.4.0: sidebar, top bar, card actions
 
 Plan for 0.4 to 0.6: `~/.claude/plans/immutable-crunching-aho-of-578ae7c0-c3a6-4148-b2ee-a5d1cf805ade.md`
 (owner-approved: "Watching + map" sidebar, "useful controls" top bar, three releases).
@@ -44,7 +44,7 @@ Plan for 0.4 to 0.6: `~/.claude/plans/immutable-crunching-aho-of-578ae7c0-c3a6-4
   Plex accepted it, the row and Home's hub lost only that title, and its resume point, watch count
   and history didn't change.
 
-## 2026-11-24 — Fixes from field diagnostics (for 0.3.4)
+## 2026-11-24 — Fixes from field diagnostics (shipped in 0.4.0)
 
 Found by reading the Mac's reports and the unified log (AetherEngine logs there in Release, subsystem
 `de.superuser404.AetherEngine`) after a few days' use. No crash report since 0.3.3.
