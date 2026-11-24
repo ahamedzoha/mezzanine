@@ -1,6 +1,6 @@
 # Progress
 
-## Where things stand (2026-11-24: 1.0.1)
+## Where things stand (2026-11-24: 1.0.2)
 
 Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
 picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
@@ -21,7 +21,7 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
 donations wait for GitHub Sponsors.
 
-## 2026-11-24 — New app icon: The balcony
+## 2026-11-24 — 1.0.2: new app icon, The balcony
 
 - The old icon (lavender ground, glass stack, play sign) didn't belong to the graphite room the app and
   the website share. Four directions drawn and rendered with `ictool`; the owner picked The balcony.
@@ -38,7 +38,7 @@ donations wait for GitHub Sponsors.
 - `Scripts/demo`: a stand-in server for pictures (Blender's open films). Wikimedia Commons refused
   automated downloads (429), so files come from download.blender.org and studio.blender.org.
 - All public pictures were replaced: no studio artwork, no real server behind them.
-- App: Up Next shows a film's backdrop instead of cropping its poster (next release).
+- App: Up Next shows a film's backdrop instead of cropping its poster (1.0.2).
 - Waiting on the owner: GitHub Sponsors enrolment, then `sponsors: true` and `.github/FUNDING.yml`.
 
 ## 2026-11-24 — 1.0.1: no get-task-allow in Release
