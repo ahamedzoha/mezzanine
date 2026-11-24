@@ -17,8 +17,11 @@ crop credits credits "2880:1120:0:190"; put credits $tmp/credits.png 1200 2400
 crop queue queue "840:570:2000:705"; put queue $tmp/queue.png 420 840
 crop sleep sleep "840:860:2000:420"; put sleep $tmp/sleep.png 420 840
 cp -f $root/docs/screenshots/icon.png $out/icon.png
-sips -s format png -z 64 64 $out/icon.png --out $out/icon-64.png > /dev/null
-sips -s format png -z 180 180 $out/icon.png --out $out/icon-180.png > /dev/null
+# Edge to edge (no Dock margin) for the page header, the tab and home screens.
+ictool="/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool"
+for px in 64 180; do
+  "$ictool" $root/Mezzanine/AppIcon.icon --export-image --output-file $out/icon-$px.png --platform macOS --rendition Default --width $px --height $px --scale 1 > /dev/null
+done
 swift ${0:A:h}/og.swift $shots/home.png $out/og.jpg
 rm -r $tmp
 du -sh $out

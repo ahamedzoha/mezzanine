@@ -5,6 +5,7 @@ the update window shows it.
 
 ## 1.0.2 — unreleased
 
+- A new icon: the lit screen, seen from the mezzanine.
 - Up Next shows a film's backdrop instead of its poster cut through the title.
 
 ## 1.0.1 — 2026-11-24

@@ -21,6 +21,14 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is built (2026-11-24);
 donations wait for GitHub Sponsors.
 
+## 2026-11-24 — New app icon: The balcony
+
+- The old icon (lavender ground, glass stack, play sign) didn't belong to the graphite room the app and
+  the website share. Four directions drawn and rendered with `ictool`; the owner picked The balcony.
+- Drawn by `Scripts/make-icon.py`, reviewed in Affinity (fixed there: the screen's lower corners showed
+  above the rail), glass tuned in Icon Composer (rail: blur, refraction, translucency 45 %). Checked in
+  all six styles, both design generations, 16 to 512 px, and as macOS 26 draws the built app.
+
 ## 2026-11-24 — Website and demo library
 
 - Built, not published yet: `site/` for ahamedzoha.github.io/mezzanine ("One evening", Persuade, Bias Light): one page told by the

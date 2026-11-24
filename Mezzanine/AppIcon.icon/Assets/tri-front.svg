@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-<defs>
-<linearGradient id="f" gradientUnits="userSpaceOnUse" x1="392" y1="158" x2="512" y2="548"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.94"/><stop offset="0.6" stop-color="#F3EFFC" stop-opacity="0.84"/><stop offset="1" stop-color="#FFE9C8" stop-opacity="0.9"/></linearGradient>
-</defs>
-<path d="M392.0 218.3 L392.3 210.1 L393.1 202.9 L394.5 196.7 L396.4 191.3 L398.9 186.9 L402.0 183.5 L405.6 180.9 L409.8 179.3 L414.5 178.7 L419.7 179.0 L425.6 180.2 L432.0 182.3 L438.9 185.4 L446.4 189.4 L728.3 352.3 L737.8 358.2 L745.8 363.9 L752.4 369.5 L757.5 374.9 L761.2 380.1 L763.4 385.2 L764.1 390.2 L763.4 395.0 L761.2 399.7 L757.5 404.2 L752.4 408.6 L745.8 412.9 L737.8 417.0 L728.3 420.9 L446.4 527.4 L438.9 530.0 L432.0 531.7 L425.6 532.5 L419.7 532.6 L414.5 531.8 L409.8 530.2 L405.6 527.8 L402.0 524.5 L398.9 520.5 L396.4 515.6 L394.5 509.8 L393.1 503.3 L392.3 495.9 L392.0 487.7 Z" fill="url(#f)"/>
-</svg>
