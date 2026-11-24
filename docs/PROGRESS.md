@@ -43,7 +43,8 @@ a GitHub Pages website that looks professional and asks for donations.
 - A film played to its end in a test marks itself watched in the Debug index only; the server wasn't
   touched (checked: Cars unwatched, 190 unwatched films, no play history).
 - Not yet: opening a Spotlight result, Siri and Shortcuts, menus by pointer, offline, VoiceOver.
-  Watchlist add and remove have never been sent: try each once on a title the owner names.
+- Watchlist add and remove: sent once each through `PlexDiscover` on a title the owner named. Plex took
+  both, the list showed it first in between and was identical after.
 
 ## 2026-11-24 — 0.5.0: player comforts and diagnostics
 
