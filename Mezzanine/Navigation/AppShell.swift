@@ -247,6 +247,32 @@ struct AppShell: View {
             try? await Task.sleep(for: .seconds(4))
             commands.selection = item
         }
+        // -PageCycle "activate,row:7,row:0" (-PageCycleCount 3, -PageCycleMs 900): changes the page
+        // in turn. "row:7" clicks the sidebar's eighth row (section headers count) with real mouse
+        // events, "activate" brings the window forward (clicks need it key), and a SidebarItem storage
+        // key ("home", "library:1") sets the selection directly. Scripts/sidebar-clicks.sh runs it.
+        if let raw = UserDefaults.standard.string(forKey: "PageCycle") {
+            let steps = raw.split(separator: ",").map(String.init)
+            let count = max(UserDefaults.standard.integer(forKey: "PageCycleCount"), 1) * steps.count
+            let pause = UserDefaults.standard.integer(forKey: "PageCycleMs")
+            try? await Task.sleep(for: .seconds(4))
+            for step in 0..<count {
+                let token = steps[step % steps.count]
+                let window = NSApp.windows.first { $0.isVisible && $0.canBecomeMain }
+                if token == "activate" {
+                    NSApp.activate()
+                    window?.makeKeyAndOrderFront(nil)
+                } else if token.hasPrefix("row:"), let row = Int(token.dropFirst(4)), let window {
+                    DebugKeys.clickSidebarRow(row, in: window)
+                } else if let page = SidebarItem(storageKey: token) {
+                    commands.selection = page
+                }
+                print("PAGE \(step) \(token) on \(commands.selection.map { "\($0)" } ?? "none") key=\(window?.isKeyWindow == true)")
+                fflush(stdout)
+                try? await Task.sleep(for: .milliseconds(pause > 0 ? pause : 700))
+            }
+            print("PAGE done"); fflush(stdout)
+        }
         // -WindowSize 900x600: the window at that size (captures).
         if let size = UserDefaults.standard.string(forKey: "WindowSize")?.split(separator: "x").compactMap({ Double($0) }), size.count == 2 {
             NSApp.windows.first { $0.isVisible && $0.canBecomeMain }?.setFrame(CGRect(x: 200, y: 300, width: size[0], height: size[1]), display: true)

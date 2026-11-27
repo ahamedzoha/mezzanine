@@ -98,7 +98,11 @@ defaults and Keychain item), so test runs never change the installed app's setti
 
 Sidebar and top bar: `-SidebarSelect "slice:unwatched:1"` (a `SidebarItem` storage key), `-ActivityOpen YES`, `-WindowSize 900x600`,
 `-QueueSeed "58528,57206"` (queues titles), `-SpotlightClear YES` (with `-SpotlightIndex YES`: takes a test's titles out),
-`-SidebarKeyScript "down,right,down"` (prints `SIDEBAR` with the selection after each key).
+`-SidebarKeyScript "down,right,down"` (prints `SIDEBAR` with the selection after each key),
+`-PageCycle "activate,row:7,row:0"` (real mouse clicks on sidebar rows; prints `PAGE`). Clicks only
+land in a key window and a shell-launched Debug build isn't activated on its own, so run them through
+`Scripts/sidebar-clicks.sh` (re-activates it with `osascript`): the regression check for the macOS 27.2
+crash where a sidebar click swapped the toolbar mid-click (`Sidebar.deferredSelection`).
 `TitleActions` writes (watched marks, Continue Watching removal) print `ACTION …` and send nothing under `-MezzanineNoActivity YES`; so do watchlist changes. Spotlight is only written by
 Debug builds with `-SpotlightIndex YES`. `Scripts/plex.sh discover …` reads plex.tv's watchlist service.
 

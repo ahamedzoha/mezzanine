@@ -103,8 +103,7 @@ struct Sidebar: View {
     private static let continueLimit = 3
 
     var body: some View {
-        @Bindable var commands = commands
-        List(selection: $commands.selection) {
+        List(selection: deferredSelection) {
             if isOffline { offline } else { rows }
         }
         // A bar, not an inset: rows scroll under it without showing through the words.
@@ -122,11 +121,24 @@ struct Sidebar: View {
         .onKeyPress(.leftArrow) {
             switch commands.selection {
             case .library(let key) where isOpen(key): setOpen(key, false); return .handled
-            case .slice(let key, _): commands.selection = .library(key); return .handled
+            case .slice(let key, _): select(.library(key)); return .handled
             default: return .ignored
             }
         }
         .navigationSplitViewColumnWidth(min: 190, ideal: 230, max: 300)
+    }
+
+    /// A click selects inside the outline view's own mouse handling. Changing the page there swaps
+    /// every toolbar item mid-click, and on macOS 27.2 AppKit's toolbar layout then throws
+    /// (NSToolbarItemViewer: nil positioning constraint, or a NaN min/max size) and the app quits.
+    /// The page changes on the next turn of the main queue instead, after the click is done.
+    private var deferredSelection: Binding<SidebarItem?> {
+        Binding(get: { commands.selection }, set: { select($0) })
+    }
+
+    /// Changes the page from the sidebar's own clicks and keys (see `deferredSelection`).
+    private func select(_ item: SidebarItem?) {
+        DispatchQueue.main.async { commands.selection = item }
     }
 
     // MARK: Rows
@@ -294,7 +306,7 @@ struct Sidebar: View {
         if open { keys.insert(key) } else { keys.remove(key) }
         openLibraries = keys.sorted().joined(separator: ",")
         // A closed library's selected row would vanish: the library takes the selection.
-        if !open, case .slice(key, _) = commands.selection { commands.selection = .library(key) }
+        if !open, case .slice(key, _) = commands.selection { select(.library(key)) }
     }
 
     private func movePin(_ id: String, _ delta: Int) {

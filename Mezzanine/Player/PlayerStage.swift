@@ -1386,5 +1386,25 @@ enum DebugKeys {
                                            charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code) else { return }
         NSApp.postEvent(event, atStart: false)
     }
+
+    /// A mouse click (down, then up) on the middle of the sidebar's row, through the event queue
+    /// like a hardware click (`-PageCycle "row:5"`).
+    static func clickSidebarRow(_ row: Int, in window: NSWindow) {
+        func outline(in view: NSView) -> NSOutlineView? {
+            if let found = view as? NSOutlineView { return found }
+            return view.subviews.lazy.compactMap { outline(in: $0) }.first
+        }
+        guard let root = window.contentView?.superview, let list = outline(in: root), row < list.numberOfRows else {
+            print("ROW \(row) not found"); return
+        }
+        let rect = list.rect(ofRow: row)
+        let point = list.convert(CGPoint(x: rect.midX, y: rect.midY), to: nil)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                                                 timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                 context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) else { continue }
+            NSApp.postEvent(event, atStart: false)
+        }
+    }
 }
 #endif
