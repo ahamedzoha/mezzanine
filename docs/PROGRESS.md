@@ -1,6 +1,6 @@
 # Progress
 
-## Where things stand (2026-11-24: 1.0.2)
+## Where things stand (2026-11-27: 1.0.3)
 
 Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
 picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
@@ -20,6 +20,16 @@ Open, waiting on the owner:
 
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
 donations wait for the Patreon page.
+
+## 2026-11-27 — 1.0.3: sidebar clicks crashed on macOS 27.2
+
+- After macOS 27.2.1 every click on a sidebar row quit the app (NSToolbarItemViewer threw during
+  toolbar layout: a nil positioning constraint, or a NaN min/max size). The click changed the page,
+  and with it every toolbar item, inside the outline view's mouse handling. The sidebar's selection
+  now reaches the page on the next main-queue turn (`Sidebar.deferredSelection`).
+- Only a real click in the key window reproduced it: selection set from code, the Go menu, keys, and
+  every click in a shell-launched (never key) Debug window survived. `Scripts/sidebar-clicks.sh` is the
+  regression check (crashes without the fix, survives with it).
 
 ## 2026-11-24 — 1.0.2: new app icon, The balcony
 
