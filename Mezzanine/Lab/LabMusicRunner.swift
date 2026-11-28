@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import MezzanineKit
+import AVFAudio
 import MezzaninePlayback
 
 /// Silent Lab runner for Music M1: `-LabMusic YES` exercises `TrackCache`, `MusicRoute`,
@@ -74,13 +75,17 @@ enum LabMusicRunner {
 
         let only = UserDefaults.standard.string(forKey: "LabOnly")
         for c in cases where only == nil || c.id == only {
-            guard let track = tracks.first(where: c.match) else {
+            guard let track = tracks.first(where: { $0.duration >= 20 && c.match($0) }) else {
                 emit("LABMUSIC \(c.id) | skipped (no matching track)")
                 continue
             }
             await runSingle(id: c.id, track: track, client: client, cache: cache, engine: engine)
             engine.stop()
             try? await Task.sleep(for: .milliseconds(300))
+        }
+
+        if only == nil || only == "offline-joins" {
+            await runOfflineJoins(tracks: tracks, client: client, cache: cache)
         }
 
         if only == nil || only == "gapless-join" {
@@ -92,12 +97,26 @@ enum LabMusicRunner {
         emit("LABMUSIC done")
     }
 
-    /// Fetches a bounded slice of tracks with full stream detail from the first music section.
+    /// Candidate tracks with full stream detail: from the whole listing, per codec the smallest
+    /// files (they download fastest), plus FLACs spread over the size range so hi-res files appear.
     static func sampleTracks(client: PlexServerClient) async throws -> [QueuedTrack] {
         let sections = try await client.sections()
         guard let musicSection = sections.first(where: { $0.kind == .artist }) else { return [] }
-        let page = try await client.items(section: musicSection.key, type: 10, offset: 0, limit: 250)
-        let keys = page.items.map(\.ratingKey)
+        let page = try await client.items(section: musicSection.key, type: 10, offset: 0, limit: 5000)
+        func size(_ m: PlexMetadata) -> Int64 { m.media.first?.parts.first?.size ?? .max }
+        func codec(_ m: PlexMetadata) -> String { (m.media.first?.audioCodec ?? "").lowercased() }
+        var keys: [String] = []
+        for name in ["mp3", "aac", "vorbis", "eac3", "wmav2"] {
+            let sorted = page.items.filter { codec($0) == name }.sorted { size($0) < size($1) }
+            // The very smallest are often clips: sample the lower half of the size range.
+            let step = max(1, sorted.count / 16)
+            keys += stride(from: 0, to: sorted.count / 2 + 1, by: step).compactMap { sorted.indices.contains($0) ? sorted[$0].ratingKey : nil }
+        }
+        let flacs = page.items.filter { codec($0) == "flac" }.sorted { size($0) < size($1) }
+        if !flacs.isEmpty {
+            let step = max(1, flacs.count / 40)
+            keys += stride(from: 0, to: flacs.count, by: step).map { flacs[$0].ratingKey }
+        }
         guard !keys.isEmpty else { return [] }
         let detailed = try await client.musicMetadata(keys: keys)
         return detailed.compactMap { QueuedTrack($0) }
@@ -122,20 +141,102 @@ enum LabMusicRunner {
                                   cache: TrackCache, engine: MusicEngine) async {
         do {
             let req = try await makeRequest(for: track, client: client, cache: cache)
+            let began = ContinuousClock.now
             try await engine.play(req, startAt: 0, autoplay: true)
+            let loadMs = ms(ContinuousClock.now - began)
             try? await Task.sleep(for: .seconds(1))
+            let advanced = engine.position
 
+            // Seek, pause at once, and read where it landed (running time would blur the error).
             let target = max(1, engine.duration / 2)
             await engine.seek(to: target)
-            try? await Task.sleep(for: .milliseconds(300))
+            engine.pause()
+            try? await Task.sleep(for: .milliseconds(400))
             let seekErrMs = Int(abs(engine.position - target) * 1000)
 
-            let firstAudio = engine.firstAudioLatency.map {
-                "\(Int($0.components.seconds * 1000 + $0.components.attoseconds / 1_000_000_000_000_000))ms"
-            } ?? "-"
-            emit("LABMUSIC \(id) | route=\(engine.activeRoute.rawValue) codec=\(track.codec ?? "-") sr=\(track.samplingRate ?? 0) firstAudio=\(firstAudio) seekErr=\(seekErrMs)ms status=\(engine.status)")
+            let firstAudio = engine.firstAudioLatency.map { "\(ms($0))ms" } ?? "-"
+            emit("LABMUSIC \(id) | route=\(engine.activeRoute.rawValue) codec=\(track.codec ?? "-") bits=\(track.bitDepth ?? 0) sr=\(track.samplingRate ?? 0) ch=\(track.channels ?? 0) play=\(loadMs)ms firstAudio=\(firstAudio) after1s=\(String(format: "%.2f", advanced))s seekErr=\(seekErrMs)ms status=\(engine.status)")
         } catch {
             emit("LABMUSIC \(id) | error \(error)")
+        }
+    }
+
+    private static func ms(_ d: Duration) -> Int {
+        Int(d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000)
+    }
+
+    /// Renders a join offline (no output device: silent by construction) and finds where the
+    /// second file's first samples land against where they should: 0 frames is gapless.
+    /// `gainDB` on the follower forces the cross-deck path (different leveling gain).
+    static func offlineJoin(id: String, first: URL, second: URL, followerGainDB: Double = 0) async {
+        do {
+            let fa = try AVAudioFile(forReading: first)
+            let fb = try AVAudioFile(forReading: second)
+            let rate = fa.processingFormat.sampleRate
+            guard fb.processingFormat.sampleRate == rate, fb.processingFormat.channelCount == fa.processingFormat.channelCount else {
+                emit("LABMUSIC \(id) | skipped (formats differ)")
+                return
+            }
+            let tail = AVAudioFrameCount(rate)   // the last second of the first file
+            let startFrame = max(0, fa.length - AVAudioFramePosition(tail))
+            let tailFrames = Int(fa.length - startFrame)
+            let engine = try MusicEngine(mode: .offline(sampleRate: rate), bypassLimiter: true)
+            func req(_ url: URL, _ gain: Double) -> MusicTrackRequest {
+                MusicTrackRequest(track: QueuedTrack(ratingKey: "lab", title: "lab", artist: "", album: "", duration: 1),
+                                  route: .native, fileURL: url, gainDB: gain)
+            }
+            try await engine.play(req(first, 0), startAt: Double(startFrame) / rate)
+            engine.enqueueNext(req(second, followerGainDB))
+            var rendered: [Float] = []
+            let total = tailFrames + Int(rate / 2)
+            while rendered.count < total {
+                let buffer = try engine.renderOffline(frames: 4096)
+                rendered += UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength))
+                try? await Task.sleep(for: .milliseconds(1))   // let completion handlers hop to the main actor
+            }
+            // The second file's opening samples (first loud stretch), scaled by the follower's gain.
+            let head = AVAudioPCMBuffer(pcmFormat: fb.processingFormat, frameCapacity: 44_100)!
+            try fb.read(into: head, frameCount: min(44_100, AVAudioFrameCount(fb.length)))
+            let left = Array(UnsafeBufferPointer(start: head.floatChannelData![0], count: Int(head.frameLength)))
+            let scale = Float(pow(10, followerGainDB / 20))
+            guard let k = left.firstIndex(where: { abs($0) > 1e-3 }), k + 256 <= left.count else {
+                emit("LABMUSIC \(id) | skipped (no clear opening)")
+                return
+            }
+            var gap: Int?
+            for d in -60000...60000 {
+                let base = tailFrames + k + d
+                guard base >= 0, base + 256 <= rendered.count else { continue }
+                if (0..<256).allSatisfy({ abs(rendered[base + $0] - left[k + $0] * scale) < 2e-4 }) { gap = d; break }
+            }
+            let path = followerGainDB == 0 ? "same-deck" : "cross-deck"
+            emit("LABMUSIC \(id) | \(path) sr=\(Int(rate)) join gap=\(gap.map { "\($0) frames" } ?? "no match")")
+        } catch {
+            emit("LABMUSIC \(id) | error \(error)")
+        }
+    }
+
+    /// Pairs of the same codec and sample rate, one pair per family, joined offline.
+    private static func runOfflineJoins(tracks: [QueuedTrack], client: PlexServerClient, cache: TrackCache) async {
+        let families: [(String, @Sendable (QueuedTrack) -> Bool)] = [
+            ("flac-16-44", { $0.codec == "flac" && ($0.bitDepth ?? 16) <= 16 && $0.samplingRate == 44_100 }),
+            ("flac-24", { $0.codec == "flac" && ($0.bitDepth ?? 0) >= 24 }),
+            ("mp3", { $0.codec == "mp3" && $0.samplingRate == 44_100 }),
+            ("aac", { $0.codec == "aac" && $0.samplingRate == 44_100 }),
+        ]
+        for (name, match) in families {
+            var pool = tracks.filter { $0.duration >= 20 && match($0) }
+            if name == "flac-24", let rate = pool.first?.samplingRate { pool = pool.filter { $0.samplingRate == rate } }
+            guard pool.count >= 2 else { emit("LABMUSIC join-\(name) | skipped (need 2 tracks)"); continue }
+            do {
+                let a = try await makeRequest(for: pool[0], client: client, cache: cache)
+                let b = try await makeRequest(for: pool[1], client: client, cache: cache)
+                guard let ua = a.fileURL, let ub = b.fileURL else { continue }
+                await offlineJoin(id: "join-\(name)", first: ua, second: ub)
+                if name == "flac-16-44" { await offlineJoin(id: "join-\(name)-gain", first: ua, second: ub, followerGainDB: -3) }
+            } catch {
+                emit("LABMUSIC join-\(name) | error \(error)")
+            }
         }
     }
 

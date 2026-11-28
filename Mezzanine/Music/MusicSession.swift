@@ -300,11 +300,14 @@ final class MusicSession {
 
             do {
                 try await engine.play(request, startAt: 0, autoplay: true)
+                // A newer start replaced this one while it loaded: its answer is stale.
+                guard !Task.isCancelled else { return }
                 self.status = engine.status
                 self.duration = engine.duration
                 self.activeRoute = engine.activeRoute
                 self.startPositionTimer()
-                if let client = self.session?.client {
+                // `trackStarted` (fired inside `play`) already made this track's reporter.
+                if self.reporter == nil, let client = self.session?.client {
                     let rep = MusicActivityReporter(client: client, track: track)
                     rep.currentPositionProvider = { [weak self] in
                         guard let self else { return (0, .idle) }

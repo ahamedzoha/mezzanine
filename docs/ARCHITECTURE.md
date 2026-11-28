@@ -77,6 +77,9 @@ engine. Platform is `.macOS(.v26)`, Swift tools 6.2.
 | `MezzaninePlayer.swift` | The player. Also defines Mezzanine's own `PlaybackRequest`, `ExternalSubtitle`, `PlayerStatus`, `PlayerTrack`, `PlayerCue`, `PlayerChapter`, `PlayerDiagnostics`, and `AirPlayButton`. One instance for the app's life (`makeShared()`) |
 | `PlayerSurface.swift` | `PlayerSurface` (hosts the engine's layer) and `PictureCorners` |
 
+Music (M1) adds `MusicEngine.swift` (the two-deck `AVAudioEngine` player), `EngineDeck.swift`, `AudioGraphCompat.swift`,
+`MusicTypes.swift` (`MusicStatus`, `MusicTrackRequest`, `MusicEvent`) and `NowPlayingPublisher.swift`; see section 11.
+
 ### App target (`Mezzanine/`)
 
 | Folder | Contents |
@@ -354,7 +357,7 @@ profile PIN) and player-menu state. `MezzanineCommands` builds the menus. Rule: 
 shortcut has a menu item.
 
 **Player keys.**
-- `PlayerKey` (`Player/PlayerShortcuts.swift`) enumerates the rebindable player actions (28),
+- `PlayerKey` (`Player/PlayerShortcuts.swift`) enumerates the rebindable player actions (38),
   each with a title, group and default `KeyBinding`.
 - `PlayerShortcuts` stores only changes from the defaults, resolves conflicts (a key taken from
   another action moves it and reports it), and offers a SwiftUI key equivalent so the Playback
@@ -374,7 +377,7 @@ shortcut has a menu item.
 | plex.tv account token | Keychain, service `<bundleID>.plex`, one generic-password item per account (`Session/Keychain.swift`) | Never logged. Release `com.mezzanine.mac.plex`, Debug `com.mezzanine.mac.debug.plex` |
 | Plex Home profile token | Keychain, same service, separate account | Cleared on sign-in and when switching back to the owner |
 | Subtitle API keys, OpenSubtitles password/sign-in token | Keychain, service `<bundleID>.subtitles` | Set in Settings ▸ Subtitles |
-| Local library index | `Application Support/Mezzanine/Index/<server>-<user>.sqlite` | GRDB pool, migrations `v1`, `v2`; rebuildable from the server |
+| Local library index | `Application Support/Mezzanine/Index/<server>-<user>.sqlite` | GRDB pool, migrations `v1` to `v4` (v4 is music: columns, `external_id`, `musicDetail`, `credits` search column); rebuildable from the server |
 | Downloads manifest, resume data | `Application Support/Mezzanine/Downloads/` | Video files in `~/Movies/Mezzanine/` |
 | Saved internet subtitles, generated subtitles | `Application Support/Mezzanine/Subtitles/<server>/<title>/` | `generated.srt` + `.json` for speech-made lines |
 | Image cache | `Caches/<bundleID>/Images` | 512 MB LRU; Settings ▸ Clear Cache |
@@ -486,7 +489,45 @@ were built differently:
 - Downloads use a default `URLSession`, not a background session.
 - Subtitle upload from OpenSubtitles results to the server is not done: only Plex-source results
   are stored on the server; internet results stay on this Mac (`SavedSubtitles`).
-- No mini player or pop-out player (PiP and AirPlay exist). The app-level `MezzanineTests` folder is not described here.
+- The mini player (corner tile) exists; there is no separate pop-out player (PiP and AirPlay exist). The app-level `MezzanineTests` folder is not described here.
+
+## 11. Music (M1: engine, queue, index; UI surfaces come next)
+
+- **Engine** (`MusicEngine`): decks A and B (`AVAudioPlayerNode` into a per-deck mixer that carries the track's leveling
+  gain) feed one bus, then a bypassed `AVAudioUnitEQ` (M2 seam), a peak limiter and the main mixer. Consecutive tracks
+  with the same format and gain are scheduled back to back on one player (sample-exact); otherwise the follower is
+  scheduled on the idle deck and started at the first deck's end time. Seeks are frame-exact. `Mode.offline` renders
+  without a device (tests, Lab). Completion handlers are built by a nonisolated helper (main-actor closures trap off-main).
+  macOS 27 deprecates `connect`, `play()` and `play(at:)`; `AudioGraphCompat` uses the new throwing calls under
+  `#available(macOS 27, *)` and the old ones below (no deprecation warnings at a macOS 26 target).
+- **EngineDeck** (a second AetherEngine, never `MezzaninePlayer.shared`, `ownsAudioNowPlaying = false`): Vorbis (seeks
+  896 frames off on `AVAudioFile`), WMA (will not open), E-AC-3 and anything above two channels, anything `AVAudioFile`
+  refuses. `MusicRoute.choose` decides; joins to or from it are not gapless.
+- **TrackCache** (kit actor): whole files under `Caches/<bundle>/Music/<server>/<partID>`, `.part` file resumed with
+  `Range`, integrity by the server's Content-Length only (never Plex's `Part.size`), 4 GB LRU with pinned parts,
+  measured throughput for the engine-deck decision.
+- **MusicQueue / QueuedTrack** (kit, `Codable`): current, manual Play Next / Play Later, context with original order kept
+  for shuffle, history of 200, repeat, continue-similar flag. No Plex play queues exist anywhere; `MusicQueueStore`
+  persists it. `LoudnessPlan` (off / track / album / auto, peak guard, pre-amp), `LoudnessRamp`, `AlbumType`,
+  `AudioQuality`, `LRC`, `ScrobbleRules`.
+- **MusicSession** (app) ties queue, engine, cache, Now Playing and `MusicActivityReporter` together; async loads drop
+  stale answers (`loadTask` cancellation). `MusicActivityReporter` and ratings print `ACTION …` under `-MezzanineNoActivity`.
+- **MediaFocus** (app) owns `none | film | music`: a video starting pauses music and releases Now Playing; closing a clip
+  under 10 minutes resumes it, a film or episode leaves it paused; starting music pauses a film. `KeepAwake` has a music
+  mode that holds only idle system sleep.
+- **Now Playing coexistence.** `MPNowPlayingInfoCenter` and `MPRemoteCommandCenter` are process-wide. The film engine
+  (`ownsVideoNowPlayingSession/Commands`) publishes there only while a video session is loaded and removes its card and
+  targets on `stop()`; AetherEngine's own arbiter only arbitrates between AetherEngine instances, so it cannot see the
+  music publisher. The EngineDeck has the audio opt-in off and plans no publisher. `NowPlayingPublisher.activate/deactivate`
+  is the claim/release API: it keeps its own command tokens and removes only those (never `removeTarget(nil)`), so a
+  film's targets survive. `MediaFocus` must release before a film starts and re-claim after it closes.
+- **Index v4**: item columns for parent/grandparent titles, original title, studio, album type, moods/styles/countries
+  (pipe-wrapped), ratings and counts, audio fields (codec, bit depth, rate, gains, peak, loudness, lyrics), MusicBrainz id;
+  `credits` joins the FTS table; `external_id(ratingKey, scheme, value)` indexed by (scheme, value); `musicDetail` holds
+  the batched detail JSON (the listing lacks streams, moods, formats). Upsert is `INSERT … ON CONFLICT DO UPDATE` and keeps
+  detail columns and clean posters. Sync types for a music section are 8 artists, 9 albums, 10 tracks, then
+  `musicDetailPass` (100 per call, only new or changed rows). The app still filters music sections out of its shell.
+- Lab: `-LabMusic YES` (muted rows per codec, offline join gaps); `-LabOnly <row>`.
 
 ## 10. Distribution and updates
 

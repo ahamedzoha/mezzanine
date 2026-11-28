@@ -1,6 +1,6 @@
 # Progress
 
-## Where things stand (2026-11-28: 1.0.3, Music M0 done)
+## Where things stand (2026-11-28: 1.0.3, Music M1 foundations built, not shipped)
 
 Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
 picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
@@ -9,7 +9,9 @@ Ship with `Scripts/release.sh <x.y.z>` (CLAUDE.md ▸ Releases and updates). Nex
 `docs/ROADMAP.md` (Plex-only features first, then optional Seerr, Sonarr/Radarr, Bazarr,
 Tautulli and Playbill integrations); the owner picks the order. **Music is next** (the owner's call,
 2026-11-28; plan in `~/.claude/plans/let-s-make-a-plan-kind-seahorse-of-5ad056f4-2273-4581-b78a-320a2ea6c15c.md`): M0
-spikes are done (see below), development has not started and waits for the owner's go-ahead.
+spikes are done and M1's foundations are built (kit, engine, queue, index v4, session, Lab; see below);
+the music UI surfaces (sidebar, album and artist pages, Now Playing bar) wait for a design round with the owner, and
+the shell still hides music sections.
 
 Open, waiting on the owner:
 - API work, deferred by the owner: OpenSubtitles and Subdl keys (Find Subtitles skips those two
@@ -22,6 +24,56 @@ Open, waiting on the owner:
 
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
 donations wait for the Patreon page.
+
+## 2026-11-28 — Music M1 (parts 1–2): foundations and app integration (not released)
+
+Built
+- Kit: music model fields (moods, styles, formats, parent year/studio, counts, similar, popular tracks; stream
+  samplingRate, gains, peaks, loudness, ramps, lyric `timed`/`provider`), `PlexServerClient+Music` (batched detail,
+  audio playlists, `nearest`, `similar`, `computePath`, lyrics, history, `rate`; `reportTimeline` takes a `type`), index v4 with
+  `external_id`, detail table and sorts, sync of artists/albums/tracks plus the detail pass, and `Music/` (queue,
+  loudness plan and ramps, album type, quality captions, LRC, scrobble rules, route choice, `TrackCache`).
+- Playback: `MusicEngine`, `EngineDeck`, `NowPlayingPublisher`. App: `MusicSession`, queue store, activity reporter,
+  `MediaFocus`, a music `KeepAwake` mode, Controls menu and music keys, Lab rows. Details: ARCHITECTURE section 11.
+
+Differs from the plan
+- The first track is played from a complete cached file; there is no ranged early start yet (`TrackCache.head` and
+  throughput estimates exist for the session to pick the engine deck). Cross-format joins are aligned to the engine
+  clock, not sample-exact by construction. `MusicActivityReporter` sends `type=track`; the probe below says the server
+  ignores timelines of both types. Part 2 reviewer fixes: a stale load no longer overwrites a newer one, and a
+  track's reporter is no longer created twice (its heartbeat leaked).
+
+Checked
+- `swift test`: 159 tests in 39 suites (111 in 32 before); v4 migration on fixtures and on a copy of the Debug index
+  (4,714 items, 0.29 s, integrity ok, FTS rebuilt, 14,020 external ids); `xcodebuild` succeeds, no new warnings.
+- Lab, muted (engine volume 0, joins rendered offline with no device), Debug build with `-MezzanineNoActivity YES`:
+
+  | row | route | play to first audio | seek error | join gap |
+  | --- | --- | --- | --- | --- |
+  | FLAC 16/44.1 | native | 34 ms | 0 | 0 frames (same deck) and 0 (cross deck, -3 dB follower) |
+  | FLAC 24/96 | native | 7 ms | 0 | 0 frames |
+  | MP3 | native | 20 ms | 0 | 0 frames |
+  | AAC | native | 8–12 ms | 0 | 0 frames |
+  | Vorbis | engine deck | 86–111 ms load | 0 | not gapless by design |
+  | E-AC-3 5.1 | engine deck | 81–97 ms load | 0 | not gapless by design |
+  | WMA | engine deck | 50–78 ms load | 0 | not gapless by design |
+
+  Files came from the local cache (download time excluded). Native seek error is 0 by construction (positions are
+  frames); bit-exact seek content was shown in M0, not re-run. Gap = offset of the next file's opening samples against
+  where they belong in the rendered output.
+- Write probes on one rarely played track (no name recorded): rating 6 set, read back 6, cleared (-1), read back none.
+  Timelines (`playing`, `playing` at 95 %, `stopped`) with `type=music`, then `type=track`: the server answers
+  `playbackState: ignore`, viewCount and lastViewedAt unchanged, no history row, so timelines from this client do not
+  count a music play. `/:/scrobble` raised viewCount 0 to 1 and set lastViewedAt; `/:/unscrobble` restored both; the
+  section's history gained no row.
+- Reviewed: Now Playing claim/release, `-MezzanineNoActivity` coverage (timelines, stop, rating print `ACTION`), music
+  KeepAwake (system sleep only), stale-answer guards.
+
+Not checked
+- No music UI yet. Not done: real audible playback, media keys after a film, `pmset` assertions,
+  device or sample-rate changes, cold first-track download over a slow link, VBR MP3 seeks, Vorbis/engine-deck seek
+  accuracy, play counts through a path the server accepts (probably needs `playQueueItemID`/`containerKey` as Plexamp
+  sends; scrobble works), Tautulli and Aurral.
 
 ## 2026-11-28 — Music M0: spikes (no feature code; nothing shipped)
 
