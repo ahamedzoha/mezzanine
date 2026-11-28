@@ -25,6 +25,15 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
 donations wait for the Patreon page.
 
+## 2026-11-28 — Music M1 design: the owner picked "Sleeve"
+
+- Design round (three directions as HTML sketches, kept local and gitignored): A Lit Room (full room light,
+  floating bar pill), B Ledger (thin wash, 32 pt ruled rows, docked strip), C Sleeve. **Owner's pick: C, as drawn.**
+- Sleeve: album and artist pages keep a sticky 340 pt art column beside a scrolling track list; medium room light;
+  the Music root leads with a 4 × 2 cover wall; the Now Playing bar is a docked panel (16 pt radius) that slides the
+  Now Playing room up. Known cost: lists get half the width and squeeze in narrow windows (check at 900 × 600).
+- Next: the surface contract and the M1 screens built to it (Sonnet), then the HIG review.
+
 ## 2026-11-28 — Music: plays count (timelines work without a play queue)
 
 Found
