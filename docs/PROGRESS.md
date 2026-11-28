@@ -1,6 +1,6 @@
 # Progress
 
-## Where things stand (2026-11-28: 1.0.3, Music M1 foundations built, not shipped)
+## Where things stand (2026-11-28: 1.1.0 released, Music M1 shipped)
 
 Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
 picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
@@ -9,8 +9,9 @@ Ship with `Scripts/release.sh <x.y.z>` (CLAUDE.md ▸ Releases and updates). Nex
 `docs/ROADMAP.md` (Plex-only features first, then optional Seerr, Sonarr/Radarr, Bazarr,
 Tautulli and Playbill integrations); the owner picks the order. **Music is next** (the owner's call,
 2026-11-28; plan in `~/.claude/plans/let-s-make-a-plan-kind-seahorse-of-5ad056f4-2273-4581-b78a-320a2ea6c15c.md`): M0
-spikes are done and M1's foundations are built (kit, engine, queue, index v4, session, Lab; see below);
-the music screens are built to the owner's pick (Sleeve; see the 2026-11-28 entry) and wait for the HIG review.
+and M1 are done and shipped in 1.1.0 (library, pages, Now Playing bar, gapless engine, leveling, keys,
+plays counted). **Next: Music M2** (engine depth: wire the committed `CrossfadePlanner` into
+`MusicEngine`, auto leveling, EQ, match sample rate); see the 1.1.0 entry below for the handoff.
 
 Open, waiting on the owner:
 - API work, deferred by the owner: OpenSubtitles and Subdl keys (Find Subtitles skips those two
@@ -24,7 +25,29 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
 donations wait for the Patreon page.
 
-## 2026-11-28 — Music M1 screens, built to Sleeve (not committed)
+## 2026-11-28 — 1.1.0: Music (M1) released
+
+Shipped: everything in the M1 entries below (commits 132b933 → 67763da, release 6ccd68f, tag
+v1.1.0; CI published the DMG and the appcast). Also in: `docs/ROADMAP.md` gained the Music phase
+(M0–M9 table, service kinds, safety rows, Not planned) and `PRODUCT.md` the Music section;
+kit `CrossfadePlanner` (for M2: gapless inside an in-order album, ramp-aware fades otherwise) and
+`TrackIdentity` (for M5: port of Crossfade's matcher) with tests. 270 kit tests.
+
+Handoff for the next session
+- Next: **M2 engine depth**: `CrossfadePlanner` into `MusicEngine`'s deck scheduling, auto
+  leveling polish, EQ (+ Hold to Compare), Match source sample rate per output device, pre-cache
+  tuning, EngineDeck fallback polish. `/impeccable` round first for the Settings ▸ Music surface.
+- Left from the M1 HIG pass: Full Keyboard Access Tab walk; the compact bar below 900 pt wide;
+  Controls ▸ AirPlay (M3, with the room); an app-level test for music key defaults (no app test
+  target; DEBUG asserts in `MusicShortcuts.init` for now).
+- Waiting on the owner: an Aurral per-user API key (the admin key can't call user routes) and the
+  Tautulli key, both for later milestones (M7, M8); the sample-rate test on the owner's DAC and
+  receiver (M2); owner testing of 1.1.0.
+- Plex rules for Music stay: never create play queues; radio client-side; never offer delete;
+  Debug runs with `-MezzanineNoActivity YES` (a real play counts once timelines run from the start
+  past half).
+
+## 2026-11-28 — Music M1 screens, built to Sleeve (shipped in 1.1.0)
 
 Built
 - Shell: music sections reach the sidebar (`commands.allSections` / `musicSections`; `commands.sections` stays video-only, so Surprise Me, Home, library pages, smart shelves, Spotlight and the Go digits are unchanged). A Music row opens the root; Artists, Albums, Songs and Playlists are `SidebarItem.musicSlice` (storage key `slice:albums:<key>`), clicked through `Sidebar.deferredSelection`. The library syncs music (counts in the sidebar). Radio has no row until M4.
@@ -46,7 +69,7 @@ Not checked
 - Keyboard-only run of every page, VoiceOver, Increase Contrast, the scrub gesture, AirPlay picking, a play of every codec from the new pages, Plex apps' Item-menu keys against the rebinding UI (none yet).
 - HIG review (`apple:hig-reviewer`) of the milestone.
 
-## 2026-11-28 — Music M1 review fixes (not committed)
+## 2026-11-28 — Music M1 review fixes (shipped in 1.1.0)
 
 - Bar: the scrub layer no longer covers the bar (a 20 pt strip behind the controls; a real Next click lands), Reduce Transparency and Increase Contrast honoured, Previous/Next kept to 600 pt, restored queues show their length at once.
 - Keys: Settings ▸ Shortcuts ▸ Music and the ⌘/ sheet list every `MusicKey` (a Form drops sections and rows whose ids repeat the player's, so ids are the titles); Skip Back/Forward 10 Seconds; Space pauses or resumes what plays; double-click plays a row; ← goes to the sidebar; Prev/Next ⌘←/⌘→ yield to text fields; Play Now / Play Shuffled; sort Ascending/Descending and clickable Songs headings; biography Show More/Less (button and View menu).
@@ -84,7 +107,7 @@ Changed
 - End to end, real reports, muted, one short track: viewCount none to 1, one new history row, session visible while
   playing and gone after the stop. The probe track was unscrobbled and its probe history rows deleted afterwards.
 
-## 2026-11-28 — Music M1 (parts 1–2): foundations and app integration (not released)
+## 2026-11-28 — Music M1 (parts 1–2): foundations and app integration (shipped in 1.1.0)
 
 Built
 - Kit: music model fields (moods, styles, formats, parent year/studio, counts, similar, popular tracks; stream
