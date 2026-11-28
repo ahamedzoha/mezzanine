@@ -220,7 +220,7 @@ struct AppShell: View {
         .onChange(of: commands.downloadRemoval == nil) { _, closed in commands.isModalShown = !closed }
         .onChange(of: commands.artworkRequest == nil) { _, closed in commands.isModalShown = !closed }
         // Offline there's nothing to search: the field goes rather than sitting dead.
-        .modifier(LibrarySearch(enabled: !isOffline, query: $commands.query))
+        .modifier(LibrarySearch(enabled: !isOffline, query: $commands.query, prompt: commands.isMusicPage ? "Artists, albums, songs" : "Titles, people, collections"))
         .searchFocused($searchFocused)
         .onChange(of: searchFocused) { _, focused in searchFocusChanged(focused) }
         .onChange(of: commands.query.isEmpty) { _, empty in
@@ -385,18 +385,27 @@ struct AppShell: View {
             .accessibilityHidden(commands.isQuickOpenShown)
             .disabled(commands.isQuickOpenShown)
             .modifier(PagePanels(onTop: commands.path.isEmpty, showsSearchPanel: showsSearchPanel))
+            .modifier(NowPlayingDock(onTop: commands.path.isEmpty, hidden: isOffline))
             .navigationDestination(for: DetailRoute.self) { (route: DetailRoute) in pushed(route) }
     }
 
     private var roomLight: some View {
-        RoomLight(palette: playback.roomPalette, intensity: playback.ownsWindow ? 0 : 1)
+        // An album, artist or playlist page lights its left side only (Sleeve's medium room).
+        RoomLight(palette: playback.roomPalette, intensity: playback.ownsWindow ? 0 : 1,
+                  style: commands.path.last?.music != nil ? .sleeve : .full)
     }
 
     private var canSurprise: Bool { library.index != nil && !commands.isEditingShelves }
 
     private func pushed(_ route: DetailRoute) -> some View {
         Group {
-            if route.isCollection {
+            if let page = route.music {
+                switch page {
+                case .album: AlbumPage(route: route, contentFocus: $contentFocused)
+                case .artist: ArtistPage(route: route, contentFocus: $contentFocused)
+                case .playlist: PlaylistPage(route: route, contentFocus: $contentFocused)
+                }
+            } else if route.isCollection {
                 CollectionPage(route: route, contentFocus: $contentFocused)
             } else {
                 DetailView(route: route, contentFocus: $contentFocused)
@@ -406,6 +415,7 @@ struct AppShell: View {
         // A pushed page has a toolbar of its own.
         .toolbar { ShellToolbar(shown: !isOffline, canSurprise: canSurprise) }
         .modifier(PagePanels(onTop: commands.path.last == route, showsSearchPanel: showsSearchPanel))
+        .modifier(NowPlayingDock(onTop: commands.path.last == route, hidden: isOffline))
     }
 
     private func searchFocusChanged(_ focused: Bool) {
@@ -441,6 +451,17 @@ struct AppShell: View {
             case .library(let key):
                 if let section = commands.sections.first(where: { $0.key == key }) {
                     LibraryView(section: section, contentFocus: $contentFocused).id(key)
+                } else if let section = commands.musicSections.first(where: { $0.key == key }) {
+                    MusicRootView(section: section, contentFocus: $contentFocused).id(key)
+                }
+            case .musicSlice(let key, let slice):
+                if let section = commands.musicSections.first(where: { $0.key == key }) {
+                    switch slice {
+                    case .albums: MusicGridPage(section: section, slice: .albums, contentFocus: $contentFocused).id("\(key)|albums")
+                    case .artists: MusicGridPage(section: section, slice: .artists, contentFocus: $contentFocused).id("\(key)|artists")
+                    case .songs: SongsPage(section: section, contentFocus: $contentFocused).id("\(key)|songs")
+                    case .playlists: MusicGridPage(section: section, slice: .playlists, contentFocus: $contentFocused).id("\(key)|playlists")
+                    }
                 }
             case .slice(let key, let slice):
                 if let section = commands.sections.first(where: { $0.key == key }) {
@@ -469,8 +490,8 @@ struct AppShell: View {
     /// A page restored from the last launch that's gone (or another server's): Home.
     private func leaveMissingPage() {
         switch commands.selection {
-        case .library(let key), .slice(let key, _):
-            if !commands.sections.contains(where: { $0.key == key }) { commands.selection = .home }
+        case .library(let key), .slice(let key, _), .musicSlice(let key, _):
+            if !commands.allSections.contains(where: { $0.key == key }) { commands.selection = .home }
         case .pinned(let id):
             if !pins.contains(id) { commands.selection = .home }
         default: break
@@ -481,14 +502,20 @@ struct AppShell: View {
     private func surprise() {
         var section: String?
         var kinds = commands.homeKind.kinds
+        var unwatchedOnly = true
+        var isMusic = false
         switch commands.selection {
-        case .library(let key), .slice(let key, _): section = key; kinds = ["movie", "show"]
+        case .library(let key), .slice(let key, _), .musicSlice(let key, _):
+            section = key
+            // On a Music page a surprise is a random album (albums have no unwatched state).
+            if commands.musicSections.contains(where: { $0.key == key }) { kinds = ["album"]; unwatchedOnly = false; isMusic = true }
+            else { kinds = ["movie", "show"] }
         case .home: break
         default: kinds = ["movie", "show"]
         }
         Task {
-            guard let item = await library.surprise(section: section, kinds: kinds) else {
-                AccessibilityNotification.Announcement("Nothing unwatched here").post()
+            guard let item = await library.surprise(section: section, kinds: kinds, unwatchedOnly: unwatchedOnly) else {
+                AccessibilityNotification.Announcement(isMusic ? "Nothing here" : "Nothing unwatched here").post()
                 return
             }
             commands.open(item)
@@ -499,13 +526,16 @@ struct AppShell: View {
         guard let client = session.client else { return }
         do {
             let sections = try await client.sections()
-            // Music stays with Plexamp; photos aren't part of Mezzanine.
+            // Films and shows stay in `sections` (everything video reads it); Music has its own list.
+            // Photos aren't part of Mezzanine.
             commands.sections = sections.filter { $0.kind == .movie || $0.kind == .show }
+            commands.musicSections = sections.filter { $0.kind == .artist }
+            commands.allSections = sections.filter { $0.kind == .movie || $0.kind == .show || $0.kind == .artist }
             sectionsError = nil
             // A library restored from the last launch that's gone (or another server's): Home.
             if let server = session.currentServer {
                 library.connect(client: client, serverID: server.clientIdentifier,
-                                userID: session.account?.uuid ?? "owner", sections: commands.sections)
+                                userID: session.account?.uuid ?? "owner", sections: commands.allSections)
                 layouts.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
                 pins.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
                 playback.queue.use(serverID: server.clientIdentifier, userID: session.account?.uuid ?? "owner")
@@ -539,6 +569,11 @@ struct AppShell: View {
             if let key = UserDefaults.standard.string(forKey: "MezzanineOpen") {
                 commands.path = [DetailRoute(ratingKey: key)]
             }
+            // -MusicOpen "album:<key>" (or artist:, playlist:) opens a Music page at launch.
+            if let raw = UserDefaults.standard.string(forKey: "MusicOpen")?.split(separator: ":").map(String.init), raw.count == 2,
+               let page = MusicPageKind(rawValue: raw[0]) {
+                commands.path = [DetailRoute(ratingKey: raw[1], music: page)]
+            }
             #endif
         } catch {
             sectionsError = (error as? PlexError)?.userMessage ?? "\(error)"
@@ -571,6 +606,23 @@ private struct PagePanels: ViewModifier {
     }
 }
 
+/// The Now Playing bar, docked at the bottom of whichever page is on top. A navigation stack draws
+/// a pushed page above anything outside it (its safe-area insets and overlays included; checked on
+/// a pushed album), so every page carries the bar and only the top one shows it. Hidden while a
+/// video is on screen or nothing is queued.
+private struct NowPlayingDock: ViewModifier {
+    let onTop: Bool
+    let hidden: Bool
+    @Environment(MusicSession.self) private var music
+    @Environment(PlaybackCoordinator.self) private var playback
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            if onTop && !hidden && music.isActive && !playback.isPresented { NowPlayingBar() }
+        }
+    }
+}
+
 /// Asked once, app-wide: marking a whole show or season, and a change the server refused.
 private struct TitleActionPrompts: ViewModifier {
     @Bindable var actions: TitleActions
@@ -598,9 +650,10 @@ private struct TitleActionPrompts: ViewModifier {
 private struct LibrarySearch: ViewModifier {
     let enabled: Bool
     @Binding var query: String
+    let prompt: String
     func body(content: Content) -> some View {
         if enabled {
-            content.searchable(text: $query, placement: .toolbar, prompt: "Titles, people, collections")
+            content.searchable(text: $query, placement: .toolbar, prompt: prompt)
         } else {
             content
         }

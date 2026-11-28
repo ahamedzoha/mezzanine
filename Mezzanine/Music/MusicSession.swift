@@ -11,7 +11,15 @@ import MezzaninePlayback
 @Observable
 final class MusicSession {
     private(set) var queue = MusicQueue()
-    private(set) var status: MusicStatus = .idle
+    private(set) var status: MusicStatus = .idle {
+        didSet {
+            // Said once when a song fails, not on every repeated failure of the same one.
+            if case .failed = status {
+                if case .failed = oldValue { return }
+                AccessibilityNotification.Announcement("Couldn’t play this song").post()
+            }
+        }
+    }
     private(set) var position: TimeInterval = 0
     private(set) var duration: TimeInterval = 0
     private(set) var activeRoute: MusicRoute = .native
@@ -66,6 +74,9 @@ final class MusicSession {
             let userID = session?.account.map { String($0.id) } ?? "default"
             if let saved = MusicQueueStore.load(serverID: serverID, userID: userID), queue.isEmpty {
                 queue = saved
+                // The bar shows the restored song's length at once, not 0:00 until it plays.
+                duration = saved.current?.duration ?? 0
+                position = 0
             }
         }
     }
@@ -103,6 +114,23 @@ final class MusicSession {
     func enqueueLater(_ track: QueuedTrack) {
         syncServerState()
         queue.playLater([track])
+        saveQueue()
+        Task { await prepareNextTrack() }
+    }
+
+    /// Several songs after the current one, in their order.
+    func enqueueNext(_ tracks: [QueuedTrack]) {
+        guard !tracks.isEmpty else { return }
+        syncServerState()
+        queue.playNext(tracks)
+        saveQueue()
+        Task { await prepareNextTrack() }
+    }
+
+    func enqueueLater(_ tracks: [QueuedTrack]) {
+        guard !tracks.isEmpty else { return }
+        syncServerState()
+        queue.playLater(tracks)
         saveQueue()
         Task { await prepareNextTrack() }
     }
@@ -180,6 +208,13 @@ final class MusicSession {
         publishNowPlaying()
     }
 
+    /// Skips within the song (Controls ▸ Skip Back / Forward 10 Seconds).
+    func skip(by seconds: TimeInterval) {
+        guard queue.current != nil, status == .playing || status == .paused else { return }
+        let target = min(max(0, duration), max(0, position + seconds))
+        Task { await seek(to: target) }
+    }
+
     func adjustVolume(by delta: Float) {
         volume = min(1, max(0, volume + delta))
     }
@@ -197,7 +232,7 @@ final class MusicSession {
         engine?.stop()
         status = .idle
         position = 0
-        duration = 0
+        duration = queue.current?.duration ?? 0
         deactivateNowPlaying()
         mediaFocus?.musicDidStop()
     }
@@ -490,7 +525,7 @@ final class MusicSession {
     private func loadArtwork(for track: QueuedTrack) {
         artworkTask?.cancel()
         currentArtwork = nil
-        guard let session, let url = session.posterURL(track.thumb, pixelWidth: 600) else { return }
+        guard let session, let url = session.squareURL(track.thumb, pixelWidth: 600) else { return }
         artworkTask = Task { [weak self] in
             guard let cg = try? await session.images.image(for: url, pixelSize: 600),
                   !Task.isCancelled else { return }

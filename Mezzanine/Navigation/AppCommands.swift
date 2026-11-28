@@ -8,8 +8,38 @@ import MezzanineKit
 @MainActor
 @Observable
 final class AppCommandCenter {
-    /// Video libraries, for the Go menu (⌘2…⌘9).
+    /// Video libraries, for the Go menu (⌘2…⌘9). Everything that is only about films and shows reads
+    /// this one; music libraries are in `musicSections` and join it only where they belong.
     var sections: [PlexLibrarySection] = []
+    /// Music libraries (Artists, Albums, Songs, Playlists).
+    var musicSections: [PlexLibrarySection] = []
+    /// Every library in the server's order (the sidebar).
+    var allSections: [PlexLibrarySection] = []
+    /// The Music page on screen: its sorts, and the one in force (View ▸ Sort Music By).
+    var musicSorts: [LibraryQuery.Sort] = []
+    var musicSort: String?
+    /// The Music page's sort direction (View ▸ Sort Music By ▸ Descending).
+    var musicDescending = false
+    private(set) var directionRequest: (count: Int, descending: Bool) = (0, false)
+    func setSortDirection(descending: Bool) { directionRequest = (directionRequest.count + 1, descending) }
+    /// The open artist's biography: whether it is long enough to fold, and whether it is open.
+    var biography: (foldable: Bool, open: Bool) = (false, false)
+    private(set) var biographyRequests = 0
+    func toggleBiography() { biographyRequests += 1 }
+    /// A text field is being edited: ⌘← and ⌘→ belong to it (line start and end), not to Previous
+    /// and Next Track.
+    private(set) var isTextEditing = false
+    @ObservationIgnored private var editingObservers: [NSObjectProtocol] = []
+
+    init() {
+        let center = NotificationCenter.default
+        editingObservers = [(NSControl.textDidBeginEditingNotification, true), (NSControl.textDidEndEditingNotification, false)].map { name, editing in
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.isTextEditing = editing }
+            }
+        }
+    }
+
     var selection: SidebarItem? = AppCommandCenter.restoredSelection {
         didSet {
             if selection != oldValue {
@@ -133,6 +163,16 @@ final class AppCommandCenter {
         default: return false
         }
     }
+    /// A Music page is on top: a pushed album, artist or playlist, or a Music library page.
+    var isMusicPage: Bool {
+        if let top = path.last { return top.music != nil }
+        switch selection {
+        case .musicSlice: return true
+        case .library(let key), .slice(let key, _): return musicSections.contains { $0.key == key }
+        default: return false
+        }
+    }
+
     var isHomeVisible: Bool { selection == .home && query.isEmpty }
 
     // Requests from the menu bar; views observe the counters.
@@ -253,6 +293,7 @@ final class AppCommandCenter {
 
     /// Opens a title's page. Episodes open their show; seasons open as themselves.
     func open(_ item: PlexMetadata) {
+        if item.isMusic { openMusic(item); return }
         // On the watchlist but not on this server: there's no page to open.
         guard !item.isDiscoverOnly else {
             AccessibilityNotification.Announcement("Not on this server").post()
@@ -327,6 +368,7 @@ struct MezzanineCommands: Commands {
     let library: LibraryStore
     let diagnostics: Diagnostics
     let music: MusicSession
+    let musicActions: MusicActions
 
     private var downloadTitle: String {
         switch center.currentDetailItem?.kind {
@@ -358,8 +400,38 @@ struct MezzanineCommands: Commands {
         return nil
     }
 
+    /// What an artist, album, song or playlist offers in the Item menu.
+    @ViewBuilder private func musicItemMenu(_ item: PlexMetadata) -> some View {
+        let keys = MusicShortcuts.shared
+        let live = !center.isPlayerOpen
+        Button("Play Now") { musicActions.play(item) }
+        Button("Play Shuffled") { musicActions.play(item, shuffled: true) }
+            .keyboardShortcut(live ? keys.menuShortcut(.shufflePlay) : nil)
+            .disabled(item.kind == .track)
+        Divider()
+        Button("Play Next") { musicActions.playNext(item) }
+            .keyboardShortcut(live ? keys.menuShortcut(.playNext) : nil)
+        Button("Play Later") { musicActions.playLater(item) }
+            .keyboardShortcut(live ? keys.menuShortcut(.playLater) : nil)
+        if item.kind != .artist && item.kind != .playlist {
+            Divider()
+            Button("Go to Artist") { musicActions.goToArtist(of: item) }
+                .keyboardShortcut(live ? keys.menuShortcut(.goToArtist) : nil)
+            if item.kind == .track {
+                Button("Go to Album") { musicActions.goToAlbum(of: item) }
+                    .keyboardShortcut(live ? keys.menuShortcut(.goToAlbum) : nil)
+            }
+        }
+    }
+
     private func removeCurrentDownload() { center.downloadRemoval = removableDownload }
     @Environment(\.openWindow) private var openWindow
+
+    private func musicPage(_ title: String, _ slice: MusicSlice, _ key: Character, in library: PlexLibrarySection) -> some View {
+        Button(title) { center.go(to: .musicSlice(library.key, slice)) }
+            .keyboardShortcut(KeyEquivalent(key), modifiers: [.control, .command])
+            .disabled(center.isPlayerOpen)
+    }
 
     private var shortcuts: PlayerShortcuts { .shared }
 
@@ -486,6 +558,17 @@ struct MezzanineCommands: Commands {
                 }
             }
             .disabled(!center.isLibraryVisible || center.isPlayerOpen || center.isFolderBrowserVisible)
+            Menu("Sort Music By") {
+                ForEach(center.musicSorts, id: \.self) { sort in
+                    Toggle(sort.label, isOn: Binding(get: { center.musicSort == sort.rawValue }, set: { _ in center.setSort(sort.rawValue) }))
+                }
+                Divider()
+                Toggle("Ascending", isOn: Binding(get: { !center.musicDescending }, set: { _ in center.setSortDirection(descending: false) }))
+                Toggle("Descending", isOn: Binding(get: { center.musicDescending }, set: { _ in center.setSortDirection(descending: true) }))
+            }
+            .disabled(center.musicSorts.isEmpty || center.isBlocked)
+            Button(center.biography.open ? "Show Less of Biography" : "Show More of Biography") { center.toggleBiography() }
+                .disabled(!center.biography.foldable || center.isBlocked)
             Divider()
         }
         CommandMenu("Go") {
@@ -520,12 +603,30 @@ struct MezzanineCommands: Commands {
                     .keyboardShortcut(KeyEquivalent(Character(String(index + 2))), modifiers: .command)
                     .disabled(center.isPlayerOpen)
             }
+            ForEach(Array(center.musicSections.enumerated()), id: \.element.key) { index, section in
+                let digit = min(center.sections.count, 8) + index + 2
+                Button(section.title) { center.go(to: .library(section.key)) }
+                    .keyboardShortcut(digit <= 9 ? KeyboardShortcut(KeyEquivalent(Character(String(digit))), modifiers: .command) : nil)
+                    .disabled(center.isPlayerOpen)
+            }
+            if let library = center.musicSections.first {
+                Divider()
+                // Control-Command letters: the digits are the libraries, ⌃⌘1–5 are layouts.
+                musicPage("Artists", .artists, "a", in: library)
+                musicPage("Albums", .albums, "b", in: library)
+                musicPage("Songs", .songs, "t", in: library)
+                musicPage("Playlists", .playlists, "p", in: library)
+            }
         }
         CommandMenu("Item") {
             if let item = center.actionItem, center.isSignedIn {
                 Section(Format.displayTitle(item)) {
-                    TitleMenuItems(item: item, actions: actions, library: library, commands: center,
-                                   offersOpen: !center.isTitlePage)
+                    if item.isMusic {
+                        musicItemMenu(item)
+                    } else {
+                        TitleMenuItems(item: item, actions: actions, library: library, commands: center,
+                                       offersOpen: !center.isTitlePage)
+                    }
                 }
                 .disabled(center.isBlocked || center.isEditingShelves)
             } else {
@@ -661,9 +762,13 @@ struct MezzanineCommands: Commands {
                 Button(music.isPlaying ? "Pause" : "Play") { music.togglePlayPause() }
                     .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.playPause) : nil)
                 Button("Next Track") { music.next() }
-                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.nextTrack) : nil)
+                    .keyboardShortcut(shortcutsActive && !center.isTextEditing ? musicShortcuts.menuShortcut(.nextTrack) : nil)
                 Button("Previous Track") { music.previous() }
-                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.previousTrack) : nil)
+                    .keyboardShortcut(shortcutsActive && !center.isTextEditing ? musicShortcuts.menuShortcut(.previousTrack) : nil)
+                Button("Skip Back 10 Seconds") { music.skip(by: -10) }
+                    .keyboardShortcut(shortcutsActive && !center.isTextEditing ? musicShortcuts.menuShortcut(.skipBack) : nil)
+                Button("Skip Forward 10 Seconds") { music.skip(by: 10) }
+                    .keyboardShortcut(shortcutsActive && !center.isTextEditing ? musicShortcuts.menuShortcut(.skipForward) : nil)
                 Divider()
                 Button("Increase Volume") { music.adjustVolume(by: 0.1) }
                     .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.volumeUp) : nil)
@@ -685,6 +790,10 @@ struct MezzanineCommands: Commands {
                     Button(MusicKey.rate0.menuTitle) { music.rateCurrent(0) }
                         .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.rate0) : nil)
                 }
+                Divider()
+                // The room itself is Music M3: until then this shows the album of what plays.
+                Button("Now Playing") { musicActions.showPlaying() }
+                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.nowPlaying) : nil)
             }
             .disabled(!musicActive)
         }

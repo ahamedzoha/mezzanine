@@ -57,6 +57,7 @@ final class LibraryStore {
                 cleanPosters = [:]
                 continueItems = []
                 sliceCounts = [:]
+                musicCounts = [:]
                 pinCounts = [:]
                 newThisWeek = 0
                 lastSyncedAt = nil
@@ -172,7 +173,7 @@ final class LibraryStore {
     /// Posters for the onboarding wall: recently added films and shows, mixed.
     func wallItems(limit: Int) async -> [PlexMetadata] {
         guard let index else { return [] }
-        let keys = sections.filter { !LibrarySync.types(for: $0).isEmpty && !$0.isPersonalMedia }
+        let keys = sections.filter { !LibrarySync.types(for: $0).isEmpty && !$0.isPersonalMedia && $0.kind != .artist }
         return await Task.detached(priority: .userInitiated) {
             var all: [IndexedItem] = []
             for section in keys {
@@ -212,6 +213,12 @@ final class LibraryStore {
     }
 
     private(set) var sliceCounts: [String: SliceCounts] = [:]
+
+    /// What the Music sidebar rows count, by music library.
+    struct MusicCounts: Equatable, Sendable {
+        var artists = 0, albums = 0, songs = 0, playlists = 0
+    }
+    private(set) var musicCounts: [String: MusicCounts] = [:]
     private(set) var pinCounts: [String: Int] = [:]
     /// Unwatched films and episodes added in the last seven days.
     private(set) var newThisWeek = 0
@@ -234,7 +241,13 @@ final class LibraryStore {
         let indexed = sections.filter { !LibrarySync.types(for: $0).isEmpty }
         let result = await Task.detached(priority: .utility) {
             var slices: [String: SliceCounts] = [:]
+            var music: [String: MusicCounts] = [:]
             for section in indexed {
+                if section.kind == .artist {
+                    func n(_ kind: String) -> Int { (try? index.count(section: section.key, kinds: [kind])) ?? 0 }
+                    music[section.key] = MusicCounts(artists: n("artist"), albums: n("album"), songs: n("track"))
+                    continue
+                }
                 var q = LibraryQuery(section: section.key, kinds: section.kind == .show ? ["show"] : ["movie"])
                 var counts = SliceCounts()
                 counts.total = (try? index.count(q)) ?? 0
@@ -255,21 +268,27 @@ final class LibraryStore {
                 default: break
                 }
             }
-            let libraries = indexed.filter { !$0.isPersonalMedia }.map(\.key)
+            let libraries = indexed.filter { !$0.isPersonalMedia && $0.kind != .artist }.map(\.key)
             let fresh = libraries.isEmpty ? 0 : (try? index.count(SmartRule(sections: libraries, kinds: ["movie", "episode"],
                 conditions: [.watch(.unwatched), .addedWithin(days: 7)]))) ?? 0
-            return (slices, pinned, fresh)
+            return (slices, pinned, fresh, music)
         }.value
         guard generation == countGeneration else { return }
-        (sliceCounts, pinCounts, newThisWeek) = result
+        (sliceCounts, pinCounts, newThisWeek, musicCounts) = result
+        // Playlists come from the server (they aren't indexed); one read per count pass.
+        if let client, let key = musicCounts.keys.first {
+            let playlists = (try? await client.audioPlaylists().count) ?? musicCounts[key]?.playlists ?? 0
+            guard generation == countGeneration else { return }
+            for k in musicCounts.keys { musicCounts[k]?.playlists = playlists }
+        }
     }
 
     /// A random unwatched film or show from these libraries (all video libraries when nil).
-    func surprise(section: String?, kinds: [String]) async -> PlexMetadata? {
+    func surprise(section: String?, kinds: [String], unwatchedOnly: Bool = true) async -> PlexMetadata? {
         guard let index else { return nil }
-        let keys = section.map { [$0] } ?? sections.filter { !LibrarySync.types(for: $0).isEmpty && !$0.isPersonalMedia }.map(\.key)
+        let keys = section.map { [$0] } ?? sections.filter { !LibrarySync.types(for: $0).isEmpty && !$0.isPersonalMedia && $0.kind != .artist }.map(\.key)
         return await Task.detached(priority: .userInitiated) {
-            ((try? index.random(sections: keys, kinds: kinds)) ?? nil)?.metadata()
+            ((try? index.random(sections: keys, kinds: kinds, unwatchedOnly: unwatchedOnly)) ?? nil)?.metadata()
         }.value
     }
 

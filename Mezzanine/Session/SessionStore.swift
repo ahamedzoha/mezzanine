@@ -346,6 +346,13 @@ final class SessionStore {
         return client.urls.photo(path, width: w, height: w * 3 / 2)
     }
 
+    /// Album art, an artist's photo or a playlist cover at the pixel width it's drawn at (1:1).
+    func squareURL(_ path: String?, pixelWidth: Int) -> URL? {
+        guard let path, let client else { return nil }
+        let w = Downsampler.bucket(for: pixelWidth)
+        return client.urls.photo(path, width: w, height: w)
+    }
+
     /// A 16:9 still or backdrop at the pixel width it's drawn at.
     func backdropURL(_ path: String?, pixelWidth: Int) -> URL? {
         guard let path, let client else { return nil }

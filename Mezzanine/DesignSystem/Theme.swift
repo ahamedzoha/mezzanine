@@ -21,7 +21,9 @@ enum Theme {
     /// Secondary type. 66 % ink on graphite ≈ 7:1, still AA over the room light.
     /// Increase Contrast resolves it to full ink at draw time.
     static let inkSecondary = contrastAware(normal: NSColor(white: 0.949, alpha: 0.66), increased: NSColor(white: 0.949, alpha: 1))
-    static let inkTertiary = contrastAware(normal: NSColor(white: 0.949, alpha: 0.46), increased: NSColor(white: 0.949, alpha: 0.85))
+    /// Quiet small type. 62 % ink is 6.9:1 on graphite, 6.1:1 on Raised Hover and clears 4.5:1 over room
+    /// light up to about #434343 (the floor on the darkest surfaces is 51 %).
+    static let inkTertiary = contrastAware(normal: NSColor(white: 0.949, alpha: 0.62), increased: NSColor(white: 0.949, alpha: 0.85))
     /// The one accent: primary action and current selection only.
     static let lilac = Color(hex: 0xA08CFF)
     /// Type set on lilac.

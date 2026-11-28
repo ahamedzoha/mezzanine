@@ -84,6 +84,11 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
     public let location: [String]
     /// Sonic distance from the seed, on `nearest` answers.
     public let distance: Double?
+    /// A playlist's cover (`/playlists/<id>/composite/<ts>`); playlists have no `thumb`.
+    public let composite: String?
+    /// Playlists: `audio`, `video`, `photo`; and whether the server builds it from rules.
+    public let playlistType: String?
+    public let isSmart: Bool
 
     public let media: [PlexMedia]
     public let markers: [PlexMarker]
@@ -150,7 +155,7 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
 
     /// The poster to show for this item in a grid (episodes fall back to the show).
     public var posterPath: String? {
-        image(.coverPoster) ?? thumb ?? parentThumb ?? grandparentThumb
+        image(.coverPoster) ?? thumb ?? parentThumb ?? grandparentThumb ?? composite
     }
 
     public var backdropPath: String? {
@@ -182,6 +187,7 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
         case moods = "Mood", styles = "Style", formats = "Format", subformats = "Subformat"
         case parentYear, parentStudio, skipCount, ratingCount, similar = "Similar"
         case popularLeaves = "PopularLeaves", location = "Location", distance
+        case composite, playlistType, smart
     }
 
     struct LeavesContainer: Decodable {
@@ -273,6 +279,9 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
         popularLeaves = (try? c.decodeIfPresent(LeavesContainer.self, forKey: .popularLeaves))?.items ?? []
         location = c.list(LocationEntry.self, .location).compactMap(\.path)
         distance = c.lenientDouble(.distance)
+        composite = try? c.decodeIfPresent(String.self, forKey: .composite)
+        playlistType = try? c.decodeIfPresent(String.self, forKey: .playlistType)
+        isSmart = ((try? c.decodeIfPresent(Bool.self, forKey: .smart)) ?? nil) ?? ((c.lenientInt(.smart) ?? 0) != 0)
     }
 
     public static func == (lhs: PlexMetadata, rhs: PlexMetadata) -> Bool {

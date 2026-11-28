@@ -211,13 +211,13 @@ struct KeyBinding: Codable, Hashable, Sendable {
 
     /// The binding a key press is, or nil for keys the player never rebinds
     /// (⌘/⌃ combinations, Esc, Tab, Return).
-    init?(_ event: NSEvent) {
+    init?(_ event: NSEvent, allowingCommand: Bool = false) {
         let mods = event.modifierFlags
-        if mods.contains(.command) || mods.contains(.control) { return nil }
-        let shift = mods.contains(.shift), option = mods.contains(.option)
+        if (mods.contains(.command) && !allowingCommand) || mods.contains(.control) { return nil }
+        let shift = mods.contains(.shift), option = mods.contains(.option), command = mods.contains(.command)
         if [Self.escape, Self.tab, Self.returnKey, Self.enter].contains(event.keyCode) { return nil }
         if Self.specialKeys[event.keyCode] != nil {
-            self = .code(event.keyCode, shift: shift, option: option)
+            self = .code(event.keyCode, shift: shift, option: option, command: command)
             return
         }
         var character = event.charactersIgnoringModifiers ?? ""
@@ -227,7 +227,7 @@ struct KeyBinding: Codable, Hashable, Sendable {
         }) else { return nil }
         // Caps Lock types capitals without ⇧: still the plain key.
         if !shift { character = character.lowercased() }
-        self = .char(character, option: option)
+        self = .char(character, option: option, command: command)
     }
 
     private init(keyCode: UInt16?, character: String?, shift: Bool, option: Bool, command: Bool = false) {

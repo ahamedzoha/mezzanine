@@ -13,11 +13,15 @@ struct SearchPanel: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
+    @Environment(MusicActions.self) private var musicActions
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var titles: [PlexMetadata] = []
     @State private var episodes: [PlexMetadata] = []
     @State private var people: [PlexHub.Person] = []
+    @State private var artists: [PlexMetadata] = []
+    @State private var albums: [PlexMetadata] = []
+    @State private var songs: [PlexMetadata] = []
     @State private var total = 0
     @State private var searched = ""
     @State private var selection: Int?
@@ -27,15 +31,18 @@ struct SearchPanel: View {
     @State private var lastPointer: CGPoint?
 
     enum Hit: Hashable {
-        case title(PlexMetadata.ID), person(String), episode(PlexMetadata.ID), seeAll, recent(String), clearRecents
+        case title(PlexMetadata.ID), person(String), episode(PlexMetadata.ID), music(PlexMetadata.ID), seeAll, recent(String), clearRecents
     }
 
     private var query: String { commands.query.trimmingCharacters(in: .whitespaces) }
+    /// Artists, then albums, then songs: the order they read in.
+    private var musicHits: [PlexMetadata] { artists + albums + songs }
 
     /// Every row in reading order, for the arrow keys.
     private var hits: [Hit] {
         if query.isEmpty { return commands.recentSearches.map { .recent($0) } + [.clearRecents] }
-        return titles.map { .title($0.id) } + people.map { .person($0.id) } + episodes.map { .episode($0.id) } + [.seeAll]
+        return titles.map { .title($0.id) } + people.map { .person($0.id) } + episodes.map { .episode($0.id) }
+            + musicHits.map { .music($0.id) } + [.seeAll]
     }
 
     var body: some View {
@@ -138,7 +145,7 @@ struct SearchPanel: View {
     }
 
     @ViewBuilder private var results: some View {
-        if titles.isEmpty && people.isEmpty && episodes.isEmpty {
+        if titles.isEmpty && people.isEmpty && episodes.isEmpty && musicHits.isEmpty {
             Text(searched == query ? "Nothing called “\(query)” in your libraries." : "Searching…")
                 .font(Theme.Typeface.body).foregroundStyle(Theme.inkSecondary)
                 .padding(Theme.Space.s)
@@ -164,6 +171,19 @@ struct SearchPanel: View {
             group("Episodes") {
                 ForEach(episodes) { item in
                     row(.episode(item.id)) { selected in episodeRow(item, selected: selected) } open: { open(item, play: false) }
+                }
+            }
+        }
+        musicGroups
+    }
+
+    @ViewBuilder private var musicGroups: some View {
+        ForEach([("Artists", artists), ("Albums", albums), ("Songs", songs)], id: \.0) { name, list in
+            if !list.isEmpty {
+                group(name) {
+                    ForEach(list) { item in
+                        row(.music(item.id)) { selected in musicRow(item, selected: selected) } open: { open(item, play: false) }
+                    }
                 }
             }
         }
@@ -214,6 +234,33 @@ struct SearchPanel: View {
         .frame(minHeight: 50)
         .background(RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous)
             .fill(selected ? Theme.raisedHover : .clear))
+    }
+
+    /// An artist (round photo), album (square cover) or song (its album's cover), then its facts.
+    private func musicRow(_ item: PlexMetadata, selected: Bool) -> some View {
+        HStack(spacing: Theme.Space.m) {
+            MusicArt(path: item.kind == .track ? (item.parentThumb ?? item.thumb) : item.posterPath, round: item.kind == .artist,
+                     pixelWidth: 80, radius: 4)
+                .frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                highlighted(item.kind == .track ? MusicFormat.songTitle(item.title) : item.title, selected: selected).lineLimit(1)
+                Text(musicCaption(item)).font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+            }
+            Spacer(minLength: Theme.Space.m)
+            if selected { Text("↩ Open · ⌘↩ Play").font(Theme.Typeface.cardMeta).foregroundStyle(Theme.inkTertiary) }
+        }
+        .padding(.horizontal, Theme.Space.s)
+        .frame(minHeight: 50)
+        .background(RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous)
+            .fill(selected ? Theme.raisedHover : .clear))
+    }
+
+    private func musicCaption(_ item: PlexMetadata) -> String {
+        switch item.kind {
+        case .artist: return ["Artist", item.childCount.map(MusicFormat.albums)].compactMap { $0 }.joined(separator: " · ")
+        case .album: return ["Album", item.parentTitle, item.year.map(String.init)].compactMap { $0 }.joined(separator: " · ")
+        default: return ["Song", item.originalTitle ?? item.grandparentTitle, item.parentTitle].compactMap { $0 }.joined(separator: " · ")
+        }
     }
 
     private func episodeRow(_ item: PlexMetadata, selected: Bool) -> some View {
@@ -318,6 +365,12 @@ struct SearchPanel: View {
             episodes = Array(local.filter { $0.kind == .episode }.prefix(4))
             total = local.count
         }
+        let music = await library.searchMusic(q)
+        guard !Task.isCancelled else { return }
+        artists = Array(music.filter { $0.kind == .artist }.prefix(3))
+        albums = Array(music.filter { $0.kind == .album }.prefix(4))
+        songs = Array(music.filter { $0.kind == .track }.prefix(5))
+        total += music.count
         searched = q
         // People (and, before the index exists, titles) come from the server once typing settles.
         guard q.count >= 3, let client = session.client else { people = []; return }
@@ -332,7 +385,7 @@ struct SearchPanel: View {
             episodes = Array(found.filter { $0.kind == .episode }.prefix(4))
             total = found.count
         }
-        let n = titles.count + people.count + episodes.count
+        let n = titles.count + people.count + episodes.count + musicHits.count
         AccessibilityNotification.Announcement(n == 0 ? "No results" : "\(n) results").post()
         #if DEBUG
         print("SEARCHPANEL q=\(q) titles=\(titles.map(\.title)) people=\(people.map(\.name)) episodes=\(episodes.map(\.title)) total=\(total)")
@@ -345,7 +398,9 @@ struct SearchPanel: View {
         commands.recordSearch(query)
         commands.query = ""
         commands.recentsShown = false
-        if play {
+        if item.isMusic {
+            if play { musicActions.play(item) } else { commands.open(item) }
+        } else if play {
             Task { await playback.play(item, from: nil) }
         } else {
             commands.open(item)
@@ -374,6 +429,7 @@ struct SearchPanel: View {
         switch hits[i] {
         case .title(let id): if let item = titles.first(where: { $0.id == id }) { open(item, play: play) }
         case .episode(let id): if let item = episodes.first(where: { $0.id == id }) { open(item, play: play) }
+        case .music(let id): if let item = musicHits.first(where: { $0.id == id }) { open(item, play: play) }
         case .person(let id): if let person = people.first(where: { $0.id == id }) { narrow(to: person) }
         case .seeAll: seeAll()
         case .clearRecents: commands.clearRecentSearches()

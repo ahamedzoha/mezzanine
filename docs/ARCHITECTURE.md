@@ -526,7 +526,7 @@ were built differently:
   `credits` joins the FTS table; `external_id(ratingKey, scheme, value)` indexed by (scheme, value); `musicDetail` holds
   the batched detail JSON (the listing lacks streams, moods, formats). Upsert is `INSERT … ON CONFLICT DO UPDATE` and keeps
   detail columns and clean posters. Sync types for a music section are 8 artists, 9 albums, 10 tracks, then
-  `musicDetailPass` (100 per call, only new or changed rows). The app still filters music sections out of its shell.
+  `musicDetailPass` (100 per call, only new or changed rows). The app shell lists music sections (`commands.musicSections`) and syncs them.
 - Lab: `-LabMusic YES` (muted rows per codec, offline join gaps); `-LabOnly <row>`.
 
 ## 10. Distribution and updates

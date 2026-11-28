@@ -10,8 +10,7 @@ Ship with `Scripts/release.sh <x.y.z>` (CLAUDE.md ▸ Releases and updates). Nex
 Tautulli and Playbill integrations); the owner picks the order. **Music is next** (the owner's call,
 2026-11-28; plan in `~/.claude/plans/let-s-make-a-plan-kind-seahorse-of-5ad056f4-2273-4581-b78a-320a2ea6c15c.md`): M0
 spikes are done and M1's foundations are built (kit, engine, queue, index v4, session, Lab; see below);
-the music UI surfaces (sidebar, album and artist pages, Now Playing bar) wait for a design round with the owner, and
-the shell still hides music sections.
+the music screens are built to the owner's pick (Sleeve; see the 2026-11-28 entry) and wait for the HIG review.
 
 Open, waiting on the owner:
 - API work, deferred by the owner: OpenSubtitles and Subdl keys (Find Subtitles skips those two
@@ -24,6 +23,36 @@ Open, waiting on the owner:
 
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
 donations wait for the Patreon page.
+
+## 2026-11-28 — Music M1 screens, built to Sleeve (not committed)
+
+Built
+- Shell: music sections reach the sidebar (`commands.allSections` / `musicSections`; `commands.sections` stays video-only, so Surprise Me, Home, library pages, smart shelves, Spotlight and the Go digits are unchanged). A Music row opens the root; Artists, Albums, Songs and Playlists are `SidebarItem.musicSlice` (storage key `slice:albums:<key>`), clicked through `Sidebar.deferredSelection`. The library syncs music (counts in the sidebar). Radio has no row until M4.
+- Screens in `Mezzanine/Music/`: root (cover wall + Plex's music rows), Albums and Artists grids (one page, sort in the toolbar and View ▸ Sort Music By), Songs table, Playlists grid (read-only), album, artist and playlist pages on a shared `SleevePage`, `NowPlayingBar`, `MusicActions` (play, shuffle, Play Next/Later, Go to Artist/Album, Shuffle All). Surprise Me on a Music page opens a random album.
+- Kit: `PlexMetadata` decodes `composite`, `playlistType`, `smart`; `SessionStore.squareURL`; `RoomLight.Style.sleeve`.
+- Search panel and Quick Open: Artists, Albums, Songs groups, Return opens, ⌘Return plays; Go To rows for Music and its pages.
+- Keys and menus: see DESIGN.md ▸ Music. Contract: `.impeccable/surfaces/mezzanine-music-sleeve-swift.md`.
+
+Differs from the sketch
+- The bar is not a `.safeAreaInset` outside the NavigationStack: a stack draws a pushed page above anything outside it (verified on a pushed album and a title page), so each page carries the bar and only the top one shows it.
+- No Lyrics button (M3) and no station tiles or Library Radio (M4). Clicking the bar opens the playing album (the room is M3).
+- Appears On (albums by other artists) is not on the artist page; Formed is not in Plex data.
+- Shuffle All plays 500 random songs (the queue is saved whole).
+
+Checked
+- `swift test` (163 tests) passes; the Debug build has no new warnings. Window captures of every screen at 1440 × 900 and 900 × 600 (local, gitignored `.impeccable/review/music-m1/captures/`); the bar on Home, a title page and a pushed album; real sidebar clicks on the Music rows survive (`sidebar-clicks.sh` with `-WindowSize`).
+
+Not checked
+- Keyboard-only run of every page, VoiceOver, Increase Contrast, the scrub gesture, AirPlay picking, a play of every codec from the new pages, Plex apps' Item-menu keys against the rebinding UI (none yet).
+- HIG review (`apple:hig-reviewer`) of the milestone.
+
+## 2026-11-28 — Music M1 review fixes (not committed)
+
+- Bar: the scrub layer no longer covers the bar (a 20 pt strip behind the controls; a real Next click lands), Reduce Transparency and Increase Contrast honoured, Previous/Next kept to 600 pt, restored queues show their length at once.
+- Keys: Settings ▸ Shortcuts ▸ Music and the ⌘/ sheet list every `MusicKey` (a Form drops sections and rows whose ids repeat the player's, so ids are the titles); Skip Back/Forward 10 Seconds; Space pauses or resumes what plays; double-click plays a row; ← goes to the sidebar; Prev/Next ⌘←/⌘→ yield to text fields; Play Now / Play Shuffled; sort Ascending/Descending and clickable Songs headings; biography Show More/Less (button and View menu).
+- Bugs: stale plays drop (generation token; Play Next/Later run in order and drop if a new play started); Surprise Me says "Nothing here" on Music; blank titles are "Untitled Song".
+- Words and access: spoken durations, "Added to Play Next / Up Next", "Couldn't play this song" announced, no `isSelected` for hover focus, facts lines wrap between facts, `inkTertiary` 0.46 to 0.62 (see DESIGN.md).
+- Not done: Controls ▸ AirPlay (M3); an app-level unit test for the key defaults (the app has no test target on disk; DEBUG asserts in `MusicShortcuts.init` check them against the fixed menu keys instead); Full Keyboard Access Tab walk not driven.
 
 ## 2026-11-28 — Music M1 design: the owner picked "Sleeve"
 

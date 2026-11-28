@@ -42,6 +42,11 @@ struct RoomLight: View {
     var palette: RoomPalette
     /// 0…1. The player turns the lights down to 0.
     var intensity: Double = 1
+    /// `.sleeve` lights only the left 760 pt, fading out to the right: the room behind an album,
+    /// artist or playlist page, where the list on the right should sit on steady graphite.
+    var style: Style = .full
+
+    enum Style { case full, sleeve }
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -51,7 +56,17 @@ struct RoomLight: View {
             MeshGradient(width: 2, height: 2,
                          points: [[0, 0], [1, 0], [0, 1], [1, 1]],
                          colors: [palette.topLeft, palette.topRight, palette.bottomLeft, palette.bottomRight])
-                .opacity((reduceTransparency ? 0.36 : 0.74) * intensity)
+                .opacity((reduceTransparency ? 0.36 : (style == .sleeve ? 0.56 : 0.74)) * intensity)
+                .frame(width: style == .sleeve ? 760 : nil)
+                .mask {
+                    if style == .sleeve {
+                        LinearGradient(stops: [.init(color: .black, location: 0.3), .init(color: .clear, location: 1)],
+                                       startPoint: .leading, endPoint: .trailing)
+                    } else {
+                        Rectangle()
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             // The floor of the room stays graphite: shelves read on a steady ground.
             LinearGradient(stops: [
                 .init(color: Theme.graphite.opacity(0), location: 0),

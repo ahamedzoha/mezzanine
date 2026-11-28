@@ -44,6 +44,7 @@ struct ShortcutSettings: View {
                     ForEach(ShortcutReference.fixedPlayerKeys(in: group), id: \.keys) { fixedRow($0.keys, $0.action) }
                 }
             }
+            MusicShortcutSections()
             ForEach(ShortcutReference.pages, id: \.title) { page in
                 Section(page.title) {
                     ForEach(page.keys, id: \.keys) { fixedRow($0.keys, $0.action) }
@@ -259,6 +260,14 @@ enum ShortcutReference {
             .init(keys: "⌃⌘1 – ⌃⌘5", action: "Posters, wide, list, folders, shelves"),
             .init(keys: "⌘↑", action: "Enclosing folder"),
         ]),
+        Page(title: "Music pages", keys: [
+            .init(keys: "← → ↑ ↓", action: "Move between covers and songs (← goes to the sidebar)"),
+            .init(keys: "Return", action: "Open a cover; play the song in hand"),
+            .init(keys: "Space", action: "Play the cover or song in hand; pause or resume what is playing"),
+            .init(keys: "Home  End", action: "First / last"),
+            .init(keys: "⌃⌘A  ⌃⌘B  ⌃⌘T  ⌃⌘P", action: "Artists, Albums, Songs, Playlists"),
+            .init(keys: "Esc or ⌘[", action: "Back"),
+        ]),
         Page(title: "Edit Shelves (⌘E)", keys: [
             .init(keys: "↑ ↓", action: "Select a shelf"),
             .init(keys: "⌥↑ ⌥↓", action: "Move it"),
@@ -320,6 +329,7 @@ struct ShortcutsWindow: View {
                     }
                 }
             }
+            MusicShortcutList()
             ForEach(ShortcutReference.pages, id: \.title) { page in
                 Section(page.title) {
                     ForEach(page.keys, id: \.keys) { entry in

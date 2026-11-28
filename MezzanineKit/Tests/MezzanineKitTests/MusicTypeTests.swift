@@ -257,3 +257,21 @@ import Testing
         #expect(MusicRoute.choose(codec: "flac", channels: 2, nativeFailed: true) == .engine)
     }
 }
+
+@Suite("Playlist metadata")
+struct PlaylistMetadataTests {
+    @Test func decodesCoverTypeAndSmart() throws {
+        let json = #"{"ratingKey":"1","key":"/playlists/1/items","type":"playlist","title":"Mix","playlistType":"audio","smart":true,"composite":"/playlists/1/composite/9","leafCount":12}"#
+        let m = try JSONDecoder().decode(PlexMetadata.self, from: Data(json.utf8))
+        #expect(m.playlistType == "audio")
+        #expect(m.isSmart)
+        #expect(m.posterPath == "/playlists/1/composite/9")
+    }
+
+    @Test func smartDefaultsToFalseAndAcceptsNumbers() throws {
+        let plain = try JSONDecoder().decode(PlexMetadata.self, from: Data(#"{"ratingKey":"2","type":"playlist","title":"A"}"#.utf8))
+        #expect(!plain.isSmart)
+        let numeric = try JSONDecoder().decode(PlexMetadata.self, from: Data(#"{"ratingKey":"3","type":"playlist","title":"B","smart":1}"#.utf8))
+        #expect(numeric.isSmart)
+    }
+}

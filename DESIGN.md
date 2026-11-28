@@ -7,7 +7,7 @@ colors:
   raised-hover: "#24272C"
   ink: "#F2F2F0"
   ink-secondary: "rgba(242, 242, 240, 0.66)"
-  ink-tertiary: "rgba(242, 242, 240, 0.46)"
+  ink-tertiary: "rgba(242, 242, 240, 0.62)"
   rule: "rgba(242, 242, 240, 0.14)"
   lilac: "#A08CFF"
   on-lilac: "#0E0F11"
@@ -160,7 +160,7 @@ A matte graphite room, warm-white ink, one lilac. All other hue is borrowed from
 - **Raised** (`colors.raised`) and **Raised Hover** (`colors.raised-hover`): poster placeholders, the poster well, solid secondary buttons and their hover.
 - **Ink** (`colors.ink`): primary type, icons, the progress fill, the play disc.
 - **Ink Secondary** (`colors.ink-secondary`): captions, card meta, messages. About 7:1 on graphite and still AA over the room light.
-- **Ink Tertiary** (`colors.ink-tertiary`): quiet supporting marks only.
+- **Ink Tertiary** (`colors.ink-tertiary`): quiet supporting marks only. 0.62 alpha (it was 0.46, 4.3:1): 6.9:1 on graphite, 6.1:1 on Raised Hover, AA over room light up to about #434343; the strictest rooms need 0.66, which is Secondary.
 - **Rule** (`colors.rule`): the 48 pt by 1 pt hairline above the hero caption, separators.
 
 ### Room light (derived, not tokenised)
@@ -470,3 +470,18 @@ All three run on this Mac (SpeechAnalyzer, Translation): the audio and the text 
 - Settings ▸ Playback ▸ "Plex apps can control Mezzanine" (off by default since the Plex mobile apps stopped casting to Plex players), with "Last controlled by <app>" and any problem (a title from another server, or the port couldn't open).
 - Only titles from the signed-in server play; another server's titles are refused with a note in Settings.
 - The Plex mobile apps list only players on the account's plex.tv device list, so Settings has a "Plex mobile apps" row: **Show in Plex Apps…** opens Plex's approval page in the browser (the sign-in page, for Mezzanine's player identity); while waiting, a small spinner and Cancel; then "Listed" with a check. Never linked without the owner's approval. Each launch republishes the Mac's LAN addresses.
+
+## Music
+
+Direction "Sleeve" (owner's pick, 2026-11-28; contract in `.impeccable/surfaces/mezzanine-music-sleeve-swift.md`). Music is a library in the sidebar with Artists, Albums, Songs and Playlists inside it; the Bias Light rules hold unchanged.
+
+- **Root:** a 4 × 2 wall of the eight most recent albums (200 pt tiles, 8 pt gaps) leads; the page name, a facts line and a lilac Shuffle All sit beside it (above it in narrow windows). Under the wall, a ruled caption names the focused cover (title lilac). Plex's music rows follow as 150 pt shelves; cards are square, artists round.
+- **Cards:** square art (round for artists), title always, facts only while lifted, play disc on lift. A click opens (music has no focus-then-open step); Return opens, Space plays.
+- **Sleeve pages (album, artist, playlist):** the art, name, ruled caption and Play / Shuffle / ⋯ stay in a left column (art 340 pt, squeezing to 190 pt); the list scrolls beside it. The room light is the medium kind: the cover's colours across the left 760 pt only. The playing song's title is lilac and its number is the ink level glyph. Album captions: "1997 · 12 songs · 53 min" and "FLAC · 24-bit · 96 kHz · Label". Songs group by disc. Artist pages: Popular, one shelf per release kind, Similar Artists.
+- **Songs and playlists:** a plain table (28 pt thumbnail, 36 pt rows) whose columns drop as the window narrows (Quality, then Plays, then Album).
+- **Now Playing bar:** the one Liquid Glass panel that is not toolbar or sidebar (it counts as player controls): 64 pt, 16 pt radius, docked on whichever page is on top, hidden while a video is shown. Three width classes (full, no volume, art-name-play). The art and name open the playing album until the Now Playing room exists.
+- **Search and Quick Open:** Artists, Albums and Songs groups with 36 pt art (round for artists); Return opens, ⌘Return plays.
+- **Keys:** Go ▸ Artists ⌃⌘A, Albums ⌃⌘B, Songs ⌃⌘T, Playlists ⌃⌘P; Item menu (Music items) Play Now, Play Shuffled ⌥⇧⌘S, Play Next ⇧⌘N, Play Later ⇧⌘L, Go to Artist ⇧⌘A, Go to Album ⇧⌘B; Controls ▸ Play/Pause ⌥Space, Next ⌘→, Previous ⌘←, Skip Back / Forward 10 Seconds ⌥⌘← ⌥⌘→, volume, Shuffle, Repeat, ratings, Now Playing ⌘L; View ▸ Sort Music By (a sort, then Ascending or Descending) and Show More / Less of Biography. All are `MusicKey`s, rebindable in Settings ▸ Shortcuts ▸ Music (menu keys: they need ⌘ or ⌥, and may not take a fixed menu key; the ⌘/ sheet lists them). ⌘←/⌘→ stay with a text field while one is being edited.
+- **Pointer and keys on lists:** a song row's single click puts it in hand, a double-click plays it, Return plays the one in hand; cards open on one click. Space plays the one in hand, and pauses or resumes instead when it is already what plays (a song, or the album, artist or playlist the queue came from). ← on any Music page goes to the sidebar; Back is ⌘[ and Esc. ↑ in a grid's first row does nothing; grid focus is kept by item, not place. Songs headings click to sort.
+- **Words:** a song with no title is "Untitled Song". Empty libraries say "No Music Yet". Toolbar search reads "Artists, albums, songs". Facts lines wrap only between facts (no "·" left at a line end). Cards show the artist at rest and every fact when lifted. VoiceOver reads lengths spoken ("3 minutes, 48 seconds") and joins facts with commas.
+- **Bar details:** only a 20 pt strip along the bottom edge scrubs (behind the controls, so nothing in the bar is covered). Width classes: full 1,000 pt; no volume under 1,000; no AirPlay or count under 800; no times under 700; no Previous/Next under 600. Reduce Transparency gives a solid Raised fill; Increase Contrast a 2 pt secondary-ink border.

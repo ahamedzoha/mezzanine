@@ -6,6 +6,8 @@ enum SidebarItem: Hashable {
     case library(String)
     /// A useful cut of a library.
     case slice(String, LibrarySlice)
+    /// A page of a music library (Artists, Albums, Songs, Playlists).
+    case musicSlice(String, MusicSlice)
     case pinned(String)
     /// A title in Continue: its page, as the window's root.
     case title(String)
@@ -19,6 +21,7 @@ enum SidebarItem: Hashable {
         case .watchlist: "watchlist"
         case .library(let key): "library:\(key)"
         case .slice(let key, let slice): "slice:\(slice.rawValue):\(key)"
+        case .musicSlice(let key, let slice): "slice:\(slice.rawValue):\(key)"
         case .pinned(let id): "pinned:\(id)"
         // Titles aren't restored.
         case .title: nil
@@ -34,8 +37,10 @@ enum SidebarItem: Hashable {
         else if let id = rest("pinned:") { self = .pinned(id) }
         else if let tail = rest("slice:") {
             let parts = tail.split(separator: ":", maxSplits: 1).map(String.init)
-            guard parts.count == 2, let slice = LibrarySlice(rawValue: parts[0]) else { return nil }
-            self = .slice(parts[1], slice)
+            guard parts.count == 2 else { return nil }
+            if let slice = LibrarySlice(rawValue: parts[0]) { self = .slice(parts[1], slice) }
+            else if let slice = MusicSlice(rawValue: parts[0]) { self = .musicSlice(parts[1], slice) }
+            else { return nil }
         } else { return nil }
     }
 }
@@ -112,6 +117,7 @@ struct Sidebar: View {
         // A slice reached some other way (restored at launch): its library opens to show it.
         .onChange(of: commands.selection, initial: true) { _, item in
             if case .slice(let key, _) = item { setOpen(key, true) }
+            if case .musicSlice(let key, _) = item { setOpen(key, true) }
         }
         .onKeyPress(.rightArrow) {
             // A library with nothing inside it doesn't open: → goes straight to the content.
@@ -121,7 +127,7 @@ struct Sidebar: View {
         .onKeyPress(.leftArrow) {
             switch commands.selection {
             case .library(let key) where isOpen(key): setOpen(key, false); return .handled
-            case .slice(let key, _): select(.library(key)); return .handled
+            case .slice(let key, _), .musicSlice(let key, _): select(.library(key)); return .handled
             default: return .ignored
             }
         }
@@ -162,7 +168,8 @@ struct Sidebar: View {
     }
 
     private func hasSlices(_ key: String) -> Bool {
-        commands.sections.first { $0.key == key }.map { !slices($0).isEmpty } ?? false
+        if commands.musicSections.contains(where: { $0.key == key }) { return true }
+        return commands.sections.first { $0.key == key }.map { !slices($0).isEmpty } ?? false
     }
 
     @ViewBuilder private var rows: some View {
@@ -178,7 +185,9 @@ struct Sidebar: View {
             }
         }
         Section("Libraries", isExpanded: $librariesOpen) {
-            ForEach(commands.sections) { section in libraryRows(section) }
+            ForEach(commands.allSections) { section in
+                if section.kind == .artist { musicRows(section) } else { libraryRows(section) }
+            }
             if let sectionsError {
                 Button("Libraries didn’t load. Try Again", action: retrySections).help(sectionsError)
             }
@@ -224,6 +233,29 @@ struct Sidebar: View {
                         .tag(SidebarItem.slice(section.key, slice))
                 }
             } label: { title }
+        }
+    }
+
+    /// The Music library: a row that opens its root, and Artists, Albums, Songs and Playlists inside it.
+    @ViewBuilder private func musicRows(_ section: PlexLibrarySection) -> some View {
+        let counts = library.musicCounts[section.key]
+        DisclosureGroup(isExpanded: Binding(get: { isOpen(section.key) }, set: { setOpen(section.key, $0) })) {
+            ForEach(MusicSlice.allCases, id: \.self) { slice in
+                Label(slice.label, systemImage: slice.symbol)
+                    .badge(count(slice, counts))
+                    .tag(SidebarItem.musicSlice(section.key, slice))
+            }
+        } label: {
+            Label(section.title, systemImage: "music.note").tag(SidebarItem.library(section.key))
+        }
+    }
+
+    private func count(_ slice: MusicSlice, _ counts: LibraryStore.MusicCounts?) -> Int {
+        switch slice {
+        case .artists: counts?.artists ?? 0
+        case .albums: counts?.albums ?? 0
+        case .songs: counts?.songs ?? 0
+        case .playlists: counts?.playlists ?? 0
         }
     }
 
@@ -307,6 +339,7 @@ struct Sidebar: View {
         openLibraries = keys.sorted().joined(separator: ",")
         // A closed library's selected row would vanish: the library takes the selection.
         if !open, case .slice(key, _) = commands.selection { select(.library(key)) }
+        if !open, case .musicSlice(key, _) = commands.selection { select(.library(key)) }
     }
 
     private func movePin(_ id: String, _ delta: Int) {

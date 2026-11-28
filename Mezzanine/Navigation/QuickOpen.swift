@@ -12,6 +12,7 @@ struct QuickOpen: View {
     @Environment(LibraryStore.self) private var library
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
+    @Environment(MusicActions.self) private var musicActions
     @Environment(\.openSettings) private var openSettings
     @State private var query = ""
     @State private var rows: [Row] = []
@@ -144,7 +145,11 @@ struct QuickOpen: View {
 
     private func rowView(_ row: Row, selected: Bool) -> some View {
         HStack(spacing: Theme.Space.m) {
-            if let item = row.item {
+            if let item = row.item, item.isMusic {
+                MusicArt(path: item.kind == .track ? (item.parentThumb ?? item.thumb) : item.posterPath, round: item.kind == .artist,
+                         pixelWidth: 80, radius: 4)
+                    .frame(width: 34, height: 34)
+            } else if let item = row.item {
                 RemoteImage(url: session.posterURL(library.posterPath(for: item), pixelWidth: 84), pixelWidth: 84)
                     .frame(width: 28, height: 42)
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
@@ -216,6 +221,14 @@ struct QuickOpen: View {
                 out.append(Row(id: "next-\(show.ratingKey)", section: "Actions", title: "Play Next Episode of \(show.title)",
                                caption: "Resumes where you left off", symbol: "play.fill", kind: .play(show)))
             }
+            // Music: artists, albums, songs. Return opens, ⌘Return plays.
+            let music = await library.searchMusic(q)
+            guard !Task.isCancelled, q == query.trimmingCharacters(in: .whitespaces) else { return }
+            for (name, kind, limit) in [("Artists", PlexMetadata.Kind.artist, 3), ("Albums", .album, 4), ("Songs", .track, 5)] {
+                for item in music.filter({ $0.kind == kind }).prefix(limit) {
+                    out.append(Row(id: "music-\(item.ratingKey)", section: name, title: item.kind == .track ? MusicFormat.songTitle(item.title) : item.title, caption: musicCaption(item), symbol: nil, kind: .title(item)))
+                }
+            }
         }
         out += places(matching: q)
         rows = out
@@ -237,11 +250,26 @@ struct QuickOpen: View {
             all.append(Row(id: "go-\(section.key)", section: "Go To", title: section.title,
                            caption: i < 8 ? "⌘\(i + 2)" : "", symbol: section.kind == .show ? "tv" : "film", kind: .go(.library(section.key))))
         }
+        for section in commands.musicSections {
+            all.append(Row(id: "go-\(section.key)", section: "Go To", title: section.title, caption: "", symbol: "music.note", kind: .go(.library(section.key))))
+            for slice in MusicSlice.allCases {
+                all.append(Row(id: "go-\(section.key)-\(slice.rawValue)", section: "Go To", title: slice.label, caption: "\(section.title)",
+                               symbol: slice.symbol, kind: .go(.musicSlice(section.key, slice))))
+            }
+        }
         all.append(Row(id: "settings", section: "Go To", title: "Settings", caption: "⌘,", symbol: "gearshape", kind: .settings))
         all.append(Row(id: "edit", section: "Actions", title: "Edit Shelves", caption: "Home · ⌘E", symbol: "rectangle.stack", kind: .editShelves))
         all.append(Row(id: "smart", section: "Actions", title: "New Smart Shelf…", caption: "Home · ⌘N", symbol: "wand.and.stars", kind: .newSmartShelf))
         guard !q.isEmpty else { return all }
         return all.filter { $0.title.localizedCaseInsensitiveContains(q) }
+    }
+
+    private func musicCaption(_ item: PlexMetadata) -> String {
+        switch item.kind {
+        case .artist: return item.childCount.map(MusicFormat.albums) ?? "Artist"
+        case .album: return [item.parentTitle, item.year.map(String.init)].compactMap { $0 }.joined(separator: " · ")
+        default: return [item.originalTitle ?? item.grandparentTitle, item.parentTitle].compactMap { $0 }.joined(separator: " · ")
+        }
     }
 
     private func caption(_ item: PlexMetadata) -> String {
@@ -268,7 +296,8 @@ struct QuickOpen: View {
         close()
         switch row.kind {
         case .title(let item):
-            if play { Task { await playback.play(item, from: nil) } } else { commands.open(item) }
+            if item.isMusic { if play { musicActions.play(item) } else { commands.open(item) } }
+            else if play { Task { await playback.play(item, from: nil) } } else { commands.open(item) }
         case .play(let item):
             Task { await playback.play(item, from: nil) }
         case .go(let place):

@@ -5,6 +5,8 @@ import MezzanineKit
 struct DetailRoute: Hashable {
     let ratingKey: String
     var isCollection = false
+    /// A Music page (album, artist, playlist) instead of a film or show.
+    var music: MusicPageKind? = nil
 }
 
 /// A title's page: the hero at full width, then what it is, who made it,

@@ -40,6 +40,7 @@ struct MezzanineApp: App {
     @State private var subtitleFinder = SubtitleFinder()
     @State private var music = MusicSession()
     @State private var mediaFocus = MediaFocus()
+    @State private var musicActions = MusicActions()
 
     init() {
         #if DEBUG
@@ -76,7 +77,9 @@ struct MezzanineApp: App {
                 .environment(spotlight)
                 .environment(music)
                 .environment(mediaFocus)
+                .environment(musicActions)
                 .task {
+                    musicActions.configure(session: session, library: library, music: music, commands: commands)
                     playback.downloads = downloads
                     playback.mediaFocus = mediaFocus
                     mediaFocus.playback = playback
@@ -122,7 +125,7 @@ struct MezzanineApp: App {
         .defaultSize(width: 1440, height: 900)
         .windowResizability(.contentMinSize)
         .commands { MezzanineCommands(center: commands, sound: sound, session: session, downloads: downloads, updater: updater,
-                                        actions: titleActions, library: library, diagnostics: diagnostics, music: music) }
+                                        actions: titleActions, library: library, diagnostics: diagnostics, music: music, musicActions: musicActions) }
 
         Settings {
             SettingsView()
