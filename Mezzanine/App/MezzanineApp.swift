@@ -38,6 +38,8 @@ struct MezzanineApp: App {
     @State private var sound: SoundSettings
     @State private var subtitleSources = SubtitleSourceSettings()
     @State private var subtitleFinder = SubtitleFinder()
+    @State private var music = MusicSession()
+    @State private var mediaFocus = MediaFocus()
 
     init() {
         #if DEBUG
@@ -72,8 +74,14 @@ struct MezzanineApp: App {
                 .environment(pins)
                 .environment(watchlist)
                 .environment(spotlight)
+                .environment(music)
+                .environment(mediaFocus)
                 .task {
                     playback.downloads = downloads
+                    playback.mediaFocus = mediaFocus
+                    mediaFocus.playback = playback
+                    mediaFocus.music = music
+                    music.configure(session: session, mediaFocus: mediaFocus)
                     diagnostics.start(session: session, library: library, playback: playback, sound: sound)
                     #if DEBUG
                     // -DiagnosticsReport YES writes the report into the container after 15 s (tests).
@@ -96,9 +104,10 @@ struct MezzanineApp: App {
                     }
                     #endif
                     remote.start(playback: playback, session: session)
-                    appDelegate.beforeQuit = { [playback, downloads, remote] in
+                    appDelegate.beforeQuit = { [playback, downloads, remote, music] in
                         remote.stop()
                         await playback.finishForQuit()
+                        await music.flushBeforeQuit()
                         await downloads.suspendForQuit()
                     }
                     playback.onStopped = { [library] item, time, duration in
@@ -113,7 +122,7 @@ struct MezzanineApp: App {
         .defaultSize(width: 1440, height: 900)
         .windowResizability(.contentMinSize)
         .commands { MezzanineCommands(center: commands, sound: sound, session: session, downloads: downloads, updater: updater,
-                                        actions: titleActions, library: library, diagnostics: diagnostics) }
+                                        actions: titleActions, library: library, diagnostics: diagnostics, music: music) }
 
         Settings {
             SettingsView()
@@ -128,6 +137,7 @@ struct MezzanineApp: App {
                 .environment(updater)
                 .environment(remote)
                 .environment(spotlight)
+                .environment(music)
         }
 
         Window("Keyboard Shortcuts", id: "shortcuts") {
@@ -173,7 +183,7 @@ private struct LabLauncher: ViewModifier {
     @Environment(\.openSettings) private var openSettings
     func body(content: Content) -> some View {
         content.task {
-            if LabAutoRunner.isEnabled { openWindow(id: "lab") }
+            if LabAutoRunner.isEnabled || LabMusicRunner.isEnabled { openWindow(id: "lab") }
             // -MezzanineOpenWindow shortcuts: open a window at launch, for review captures.
             if let id = UserDefaults.standard.string(forKey: "MezzanineOpenWindow") {
                 if id == "settings" { openSettings() } else { openWindow(id: id) }

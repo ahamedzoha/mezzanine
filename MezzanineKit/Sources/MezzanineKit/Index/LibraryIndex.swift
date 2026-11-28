@@ -43,9 +43,42 @@ public struct IndexedItem: Codable, Sendable, Hashable, FetchableRecord, Persist
     public var parentIndex: Int?
     /// The clean (pre-overlay) poster, resolved lazily when the clean-poster setting is on.
     public var cleanPosterPath: String?
+
+    // Music (also filled for video where Plex sends them: episodes carry their show's title).
+    /// A track's album, an album's artist, an episode's season.
+    public var parentTitle: String?
+    /// A track's artist, an episode's show.
+    public var grandparentTitle: String?
+    /// A track's own artist when it differs from the album artist.
+    public var originalTitle: String?
+    /// An album's label (a track's comes from its album).
+    public var studio: String?
+    /// `AlbumType` raw value, on albums (needs the detail pass).
+    public var albumType: String?
+    /// "|Mellow|Dark|", pipe-wrapped like genres (moods, styles and countries need the detail pass).
+    public var moods: String
+    public var styles: String
+    public var countries: String
+    /// Artist, album, track artist and label as plain words, for search.
+    public var credits: String
+    public var userRating: Double?
+    public var skipCount: Int?
+    public var ratingCount: Int?
+    // A track's audio, from the detail pass.
+    public var audioCodec: String?
+    public var bitDepth: Int?
+    public var samplingRate: Int?
+    public var gainDB: Double?
+    public var albumGainDB: Double?
+    public var peak: Double?
+    public var loudness: Double?
+    public var hasLyrics: Bool
+    /// MusicBrainz id (also in `external_id`).
+    public var mbid: String?
     public var json: Data
 
     public var isWatched: Bool {
+        if kind == "artist" || kind == "album" { return false }
         if kind == "show" || kind == "season" {
             guard let leafCount, leafCount > 0 else { return false }
             return (viewedLeafCount ?? 0) >= leafCount
@@ -74,6 +107,8 @@ struct SectionSyncState: Codable, FetchableRecord, PersistableRecord {
 public struct LibraryQuery: Sendable, Equatable, Hashable {
     public enum Sort: String, Sendable, CaseIterable, Codable {
         case title, addedNewest, releasedNewest, releasedOldest, rating, lastWatched, duration
+        // Music
+        case mostPlayed, artist, album, year, recentlyPlayed
 
         public var label: String {
             switch self {
@@ -84,6 +119,11 @@ public struct LibraryQuery: Sendable, Equatable, Hashable {
             case .rating: return "Rating"
             case .lastWatched: return "Recently Watched"
             case .duration: return "Longest"
+            case .mostPlayed: return "Most Played"
+            case .artist: return "Artist"
+            case .album: return "Album"
+            case .year: return "Year"
+            case .recentlyPlayed: return "Recently Played"
             }
         }
     }
@@ -100,6 +140,14 @@ public struct LibraryQuery: Sendable, Equatable, Hashable {
     public var hdrOnly = false
     public var minAudioChannels: Int?
     public var text: String?
+    // Music
+    /// Children of one artist or album (`parentRatingKey`), or of an artist's albums for tracks (`grandparentRatingKey`).
+    public var parentRatingKey: String?
+    public var grandparentRatingKey: String?
+    /// `AlbumType` raw value.
+    public var albumType: String?
+    public var mood: String?
+    public var style: String?
 
     public init(section: String, kinds: [String], sort: Sort = .title) {
         self.section = section
@@ -109,15 +157,18 @@ public struct LibraryQuery: Sendable, Equatable, Hashable {
 
     public var hasFilters: Bool {
         unwatchedOnly || inProgressOnly || watchedOnly || genre != nil || decade != nil || resolution != nil || hdrOnly || minAudioChannels != nil
+            || parentRatingKey != nil || grandparentRatingKey != nil || albumType != nil || mood != nil || style != nil
     }
 }
 
 /// Watch state as SQL over `item`: shows and seasons by their episodes' counts, the rest by
 /// their own. Library filters, smart shelves and sidebar counts share these.
 enum WatchSQL {
-    static let unwatched = "((item.kind IN ('show','season') AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0)) OR (item.kind NOT IN ('show','season') AND item.viewCount = 0))"
-    static let inProgress = "(item.viewOffset > 0 OR (item.kind IN ('show','season') AND COALESCE(item.viewedLeafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0)))"
-    static let watched = "((item.kind IN ('show','season') AND COALESCE(item.leafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) >= item.leafCount) OR (item.kind NOT IN ('show','season') AND item.viewCount > 0 AND item.viewOffset = 0))"
+    /// Artists and albums are containers of music: they never read as watched, unwatched or in
+    /// progress (their tracks do, as played and unplayed).
+    static let unwatched = "(item.kind NOT IN ('artist','album') AND ((item.kind IN ('show','season') AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0)) OR (item.kind NOT IN ('show','season') AND item.viewCount = 0)))"
+    static let inProgress = "(item.kind NOT IN ('artist','album') AND (item.viewOffset > 0 OR (item.kind IN ('show','season') AND COALESCE(item.viewedLeafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) < COALESCE(item.leafCount,0))))"
+    static let watched = "(item.kind NOT IN ('artist','album') AND ((item.kind IN ('show','season') AND COALESCE(item.leafCount,0) > 0 AND COALESCE(item.viewedLeafCount,0) >= item.leafCount) OR (item.kind NOT IN ('show','season') AND item.viewCount > 0 AND item.viewOffset = 0)))"
 }
 
 /// The local mirror of one server's libraries for one Plex user.
@@ -210,21 +261,142 @@ public final class LibraryIndex: Sendable {
             try db.create(indexOn: "item", columns: ["guid"])
             try db.execute(sql: "UPDATE item SET guid = json_extract(CAST(json AS TEXT), '$.guid') WHERE kind IN ('movie','show')")
         }
+        // v4: music. Item columns for artists, albums and tracks (backfilled from the stored JSON
+        // like v3), a search column for credits (artist, album, label), the external-id table
+        // (MusicBrainz now; TMDB/TVDB later) and the detail table the music detail pass fills.
+        m.registerMigration("v4") { db in
+            try db.alter(table: "item") { t in
+                t.add(column: "parentTitle", .text)
+                t.add(column: "grandparentTitle", .text)
+                t.add(column: "originalTitle", .text)
+                t.add(column: "studio", .text)
+                t.add(column: "albumType", .text)
+                t.add(column: "moods", .text).notNull().defaults(to: "")
+                t.add(column: "styles", .text).notNull().defaults(to: "")
+                t.add(column: "countries", .text).notNull().defaults(to: "")
+                t.add(column: "credits", .text).notNull().defaults(to: "")
+                t.add(column: "userRating", .double)
+                t.add(column: "skipCount", .integer)
+                t.add(column: "ratingCount", .integer)
+                t.add(column: "audioCodec", .text)
+                t.add(column: "bitDepth", .integer)
+                t.add(column: "samplingRate", .integer)
+                t.add(column: "gainDB", .double)
+                t.add(column: "albumGainDB", .double)
+                t.add(column: "peak", .double)
+                t.add(column: "loudness", .double)
+                t.add(column: "hasLyrics", .boolean).notNull().defaults(to: false)
+                t.add(column: "mbid", .text)
+            }
+            try db.create(indexOn: "item", columns: ["mbid"])
+            try db.create(indexOn: "item", columns: ["section", "kind"])
+            try db.execute(sql: """
+                UPDATE item SET
+                    parentTitle = json_extract(CAST(json AS TEXT), '$.parentTitle'),
+                    grandparentTitle = json_extract(CAST(json AS TEXT), '$.grandparentTitle'),
+                    originalTitle = json_extract(CAST(json AS TEXT), '$.originalTitle'),
+                    studio = COALESCE(json_extract(CAST(json AS TEXT), '$.studio'), json_extract(CAST(json AS TEXT), '$.parentStudio')),
+                    userRating = json_extract(CAST(json AS TEXT), '$.userRating'),
+                    skipCount = json_extract(CAST(json AS TEXT), '$.skipCount'),
+                    ratingCount = json_extract(CAST(json AS TEXT), '$.ratingCount')
+                """)
+            try db.execute(sql: """
+                UPDATE item SET
+                    credits = trim(COALESCE(grandparentTitle, '') || ' ' || COALESCE(parentTitle, '') || ' ' ||
+                                   COALESCE(originalTitle, '') || ' ' || COALESCE(studio, ''))
+                WHERE kind IN ('artist', 'album', 'track')
+                """)
+            try db.create(table: "external_id", options: .withoutRowID) { t in
+                t.column("ratingKey", .text).notNull().references("item", onDelete: .cascade)
+                t.column("scheme", .text).notNull()
+                t.column("value", .text).notNull()
+                t.primaryKey(["ratingKey", "scheme", "value"])
+            }
+            try db.create(indexOn: "external_id", columns: ["scheme", "value"])
+            try db.execute(sql: """
+                INSERT OR IGNORE INTO external_id (ratingKey, scheme, value)
+                SELECT ratingKey, substr(g, 1, instr(g, '://') - 1), substr(g, instr(g, '://') + 3)
+                FROM (SELECT item.ratingKey AS ratingKey, json_extract(j.value, '$.id') AS g
+                      FROM item, json_each(CAST(item.json AS TEXT), '$.Guid') j)
+                WHERE g LIKE '%://%'
+                """)
+            try db.execute(sql: """
+                UPDATE item SET mbid = (SELECT value FROM external_id e WHERE e.ratingKey = item.ratingKey AND e.scheme = 'mbid' LIMIT 1)
+                """)
+            try db.create(table: "musicDetail") { t in
+                t.primaryKey("ratingKey", .text).references("item", onDelete: .cascade)
+                t.column("updatedAt", .double).notNull()
+                t.column("json", .blob).notNull()
+            }
+            // Search gains the credits column: rebuild the FTS table (and its triggers) around it.
+            for trigger in ["__item_ft_ai", "__item_ft_ad", "__item_ft_au"] {
+                try db.execute(sql: "DROP TRIGGER IF EXISTS \(trigger)")
+            }
+            try db.drop(table: "item_ft")
+            try db.create(virtualTable: "item_ft", using: FTS5()) { t in
+                t.synchronize(withTable: "item")
+                t.tokenizer = .unicode61(diacritics: .remove)
+                t.column("title")
+                t.column("people")
+                t.column("collections")
+                t.column("summary")
+                t.column("credits")
+            }
+        }
         return m
     }
 
     // MARK: Writes
 
-    /// Inserts or replaces items, keeping any clean poster already resolved.
+    /// Columns the detail pass owns: a listing row (which lacks them) must not blank what the
+    /// pass stored. Text columns keep the old value when the new one is empty, numbers when it is NULL.
+    static let detailText: Set<String> = ["moods", "styles", "countries"]
+    static let detailNumber: Set<String> = ["albumType", "audioCodec", "bitDepth", "samplingRate", "gainDB", "albumGainDB", "peak", "loudness"]
+
+    /// Inserts items or updates them in one statement each (no read first), keeping any clean
+    /// poster already resolved and the music detail a plain listing doesn't carry.
     public func upsert(_ entries: [(PlexMetadata, Data)], section: String) throws {
         try pool.write { db in
+            var sql: String?
             for (meta, json) in entries {
-                var row = IndexedItem(meta, json: json, section: section)
-                row.cleanPosterPath = try String.fetchOne(db, sql: "SELECT cleanPosterPath FROM item WHERE ratingKey = ?",
-                                                          arguments: [meta.ratingKey])
-                try row.save(db)
+                let row = IndexedItem(meta, json: json, section: section)
+                let values = try row.databaseDictionary
+                let columns = values.keys.sorted()
+                if sql == nil {
+                    let names = columns.map { "\"\($0)\"" }.joined(separator: ", ")
+                    let marks = columns.map { _ in "?" }.joined(separator: ", ")
+                    let updates = columns.compactMap { c -> String? in
+                        let q = "\"\(c)\""
+                        switch c {
+                        case "ratingKey", "cleanPosterPath": return nil
+                        case _ where Self.detailText.contains(c): return "\(q) = CASE WHEN excluded.\(q) = '' THEN item.\(q) ELSE excluded.\(q) END"
+                        case _ where Self.detailNumber.contains(c): return "\(q) = COALESCE(excluded.\(q), item.\(q))"
+                        case "hasLyrics": return "\(q) = MAX(excluded.\(q), item.\(q))"
+                        default: return "\(q) = excluded.\(q)"
+                        }
+                    }.joined(separator: ", ")
+                    sql = "INSERT INTO item (\(names)) VALUES (\(marks)) ON CONFLICT(ratingKey) DO UPDATE SET \(updates)"
+                }
+                let statement = try db.cachedStatement(sql: sql!)
+                try statement.execute(arguments: StatementArguments(columns.map { values[$0] ?? .null }))
+                try Self.syncExternalIDs(db, ratingKey: meta.ratingKey, guids: meta.externalGuids)
             }
         }
+    }
+
+    /// `scheme://value` guids into `external_id`, replacing what the item had.
+    static func syncExternalIDs(_ db: Database, ratingKey: String, guids: [String]) throws {
+        let pairs: [(String, String)] = guids.compactMap { guid in
+            guard let r = guid.range(of: "://") else { return nil }
+            return (String(guid[..<r.lowerBound]), String(guid[r.upperBound...]))
+        }
+        guard !pairs.isEmpty else { return }
+        let insert = try db.cachedStatement(sql: "INSERT OR IGNORE INTO external_id (ratingKey, scheme, value) VALUES (?, ?, ?)")
+        for (scheme, value) in pairs { try insert.execute(arguments: [ratingKey, scheme, value]) }
+        // Plex re-matched the title: drop ids it no longer lists.
+        let keep = pairs.map { "\($0.0)\u{1F}\($0.1)" }
+        try db.execute(sql: "DELETE FROM external_id WHERE ratingKey = ? AND scheme || char(31) || value NOT IN (\(keep.map { _ in "?" }.joined(separator: ",")))",
+                       arguments: StatementArguments([ratingKey] + keep))
     }
 
     /// Removes items of a section that the server no longer lists.
@@ -338,6 +510,11 @@ public final class LibraryIndex: Sendable {
         if let genre = q.genre { clauses.append("item.genres LIKE ?"); args.append("%|\(genre)|%") }
         if let decade = q.decade { clauses.append("item.year BETWEEN ? AND ?"); args += [decade, decade + 9] }
         if let res = q.resolution { clauses.append("item.resolution = ?"); args.append(res) }
+        if let key = q.parentRatingKey { clauses.append("item.parentRatingKey = ?"); args.append(key) }
+        if let key = q.grandparentRatingKey { clauses.append("item.grandparentRatingKey = ?"); args.append(key) }
+        if let type = q.albumType { clauses.append("item.albumType = ?"); args.append(type) }
+        if let mood = q.mood { clauses.append("item.moods LIKE ?"); args.append("%|\(mood)|%") }
+        if let style = q.style { clauses.append("item.styles LIKE ?"); args.append("%|\(style)|%") }
         if q.hdrOnly { clauses.append("item.isHDR = 1") }
         if let ch = q.minAudioChannels { clauses.append("item.audioChannels >= ?"); args.append(ch) }
         return (sql + " WHERE " + clauses.joined(separator: " AND "), args)
@@ -364,7 +541,7 @@ public final class LibraryIndex: Sendable {
                                 OR lower(item.title) LIKE '%.' || ? || '%' OR lower(item.title) LIKE '%:' || ? || '%'
                                 OR lower(item.title) LIKE '%(' || ? || '%' THEN 1 ELSE 2 END,
                          CASE WHEN item.section IN (\(demoted)) THEN 1 ELSE 0 END,
-                         bm25(item_ft, 10.0, 3.0, 2.0, 1.0)
+                         bm25(item_ft, 10.0, 3.0, 2.0, 1.0, 4.0)
                 LIMIT ?
                 """, arguments: StatementArguments([pattern.rawPattern] + kinds + Array(repeating: typed, count: 6) + demotedSections + [limit]))
         }
@@ -445,6 +622,10 @@ public final class LibraryIndex: Sendable {
         return try count(LibraryQuery(section: section, kinds: kinds))
     }
 
+    /// The artist a row belongs to: a track's, an album's, an artist's own name.
+    private static let artistSortKey = "CASE item.kind WHEN 'track' THEN item.grandparentTitle WHEN 'album' THEN item.parentTitle ELSE item.titleSort END"
+    private static let albumSortKey = "CASE item.kind WHEN 'track' THEN item.parentTitle WHEN 'album' THEN item.titleSort ELSE '' END"
+
     static func order(_ sort: LibraryQuery.Sort) -> String {
         switch sort {
         case .title: return "item.titleSort COLLATE NOCASE ASC"
@@ -454,6 +635,12 @@ public final class LibraryIndex: Sendable {
         case .rating: return "COALESCE(item.audienceRating, item.rating, 0) DESC"
         case .lastWatched: return "COALESCE(item.lastViewedAt, 0) DESC"
         case .duration: return "COALESCE(item.duration, 0) DESC"
+        case .mostPlayed: return "item.viewCount DESC, COALESCE(item.lastViewedAt, 0) DESC, item.titleSort COLLATE NOCASE ASC"
+        case .artist:
+            return "\(artistSortKey) COLLATE NOCASE ASC, \(albumSortKey) COLLATE NOCASE ASC, COALESCE(item.parentIndex, 0), COALESCE(item.\"index\", 0)"
+        case .album: return "\(albumSortKey) COLLATE NOCASE ASC, COALESCE(item.parentIndex, 0), COALESCE(item.\"index\", 0)"
+        case .year: return "COALESCE(item.year, 0) DESC, \(artistSortKey) COLLATE NOCASE ASC, \(albumSortKey) COLLATE NOCASE ASC"
+        case .recentlyPlayed: return "COALESCE(item.lastViewedAt, 0) DESC"
         }
     }
 }
@@ -493,6 +680,31 @@ extension IndexedItem {
         index = m.index
         parentIndex = m.parentIndex
         cleanPosterPath = nil
+        parentTitle = m.parentTitle
+        grandparentTitle = m.grandparentTitle
+        originalTitle = m.originalTitle
+        studio = m.studio ?? m.parentStudio
+        let isMusic = m.kind == .artist || m.kind == .album || m.kind == .track
+        albumType = m.kind == .album && !(m.formats.isEmpty && m.subformats.isEmpty) ? AlbumType(m).rawValue : nil
+        moods = Self.wrapped(m.moods.map(\.tag))
+        styles = Self.wrapped(m.styles.map(\.tag))
+        countries = Self.wrapped(m.countries.map(\.tag))
+        credits = isMusic ? [m.grandparentTitle, m.parentTitle, m.originalTitle, m.studio ?? m.parentStudio]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ") : ""
+        userRating = m.userRating
+        skipCount = m.skipCount
+        ratingCount = m.ratingCount
+        let audio = m.kind == .track ? media?.parts.first?.streams.first { $0.streamType == .audio } : nil
+        audioCodec = audio?.codec ?? (m.kind == .track ? media?.audioCodec : nil)
+        bitDepth = audio?.bitDepth
+        samplingRate = audio?.samplingRate
+        gainDB = audio?.gain
+        albumGainDB = audio?.albumGain
+        peak = audio?.peak
+        loudness = audio?.loudness
+        hasLyrics = m.kind == .track && (media?.parts.first?.streams.contains { $0.streamType == .lyrics } ?? false)
+        mbid = m.mbid
+        if m.kind == .track, year == nil { year = m.parentYear }
         self.json = json
     }
 

@@ -55,6 +55,10 @@ final class PlaybackCoordinator {
     /// Called after a session ends with the item and where it stopped, so the
     /// local library reflects the new resume point at once.
     var onStopped: ((PlexMetadata, TimeInterval, TimeInterval) -> Void)?
+    @ObservationIgnored weak var mediaFocus: MediaFocus?
+
+    var isVideoActive: Bool { item != nil }
+    func pauseForMusic() { player.pause() }
 
     // MARK: Binge state
 
@@ -249,6 +253,10 @@ final class PlaybackCoordinator {
             let stopped = self.item.map { (item: $0, time: stopTime, duration: player.duration) }
             onDevice.end()
             withAnimation(Theme.Motion.object) { self.item = detail }
+            mediaFocus?.videoWillStart(
+                title: Format.displayTitle(detail),
+                duration: detail.duration.map { Double($0) / 1000 } ?? 0
+            )
             // What was next may be what's on screen now.
             followingEpisode = nil
             queuedNext = nil
@@ -584,6 +592,7 @@ final class PlaybackCoordinator {
         stopTranscode()
         mode = .direct
         withAnimation(Theme.Motion.object) { self.item = nil }
+        mediaFocus?.videoDidClose()
     }
 
     /// For app quit: the final report, waited for (at most ~2 s).

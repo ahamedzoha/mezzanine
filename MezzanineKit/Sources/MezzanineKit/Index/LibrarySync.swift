@@ -29,6 +29,7 @@ public actor LibrarySync {
         switch section.kind {
         case .movie: return [(1, "movie")]
         case .show: return [(2, "show"), (4, "episode")]
+        case .artist: return [(8, "artist"), (9, "album"), (10, "track")]
         default: return []
         }
     }
@@ -46,6 +47,7 @@ public actor LibrarySync {
         if needsFull {
             try await fullSync(section, types: types, progress: progress)
             try index.recordSync(section: section.key, at: now, full: true)
+            try await musicDetailPass(section)
             return true
         }
         // Incremental, with a small overlap for clock skew.
@@ -66,11 +68,34 @@ public actor LibrarySync {
             if serverCount != local {
                 try await fullSync(section, types: types, progress: progress)
                 try index.recordSync(section: section.key, at: now, full: true)
+                try await musicDetailPass(section)
                 return true
             }
         }
         try index.recordSync(section: section.key, at: now, full: false)
+        if try await musicDetailPass(section) > 0 { changed = true }
         return changed
+    }
+
+    /// Fetches the detail a music listing lacks (streams with loudness, ramps and lyrics, moods,
+    /// styles, album formats, guids), 100 items a call, only for rows that are new or changed
+    /// since their detail was stored. A first pass over a few thousand tracks is a few dozen
+    /// calls (about 12 s on a LAN). Returns how many items it filled; does nothing for video.
+    @discardableResult
+    public func musicDetailPass(_ section: PlexLibrarySection,
+                                progress: (@Sendable (Progress) -> Void)? = nil) async throws -> Int {
+        guard section.kind == .artist else { return 0 }
+        let pending = try index.musicKeysNeedingDetail(section: section.key)
+        guard !pending.isEmpty else { return 0 }
+        var done = 0
+        for batch in pending.chunked(into: PlexServerClient.musicBatchSize) {
+            try Task.checkCancellation()
+            let rows = try await client.rawMusicMetadata(keys: batch)
+            try index.storeMusicDetail(rows)
+            done += batch.count
+            progress?(Progress(section: section.title, done: done, total: pending.count))
+        }
+        return done
     }
 
     /// Drops libraries the server no longer lists (deleted, or no longer shared with this
@@ -88,7 +113,7 @@ public actor LibrarySync {
             ?? item.librarySectionID.map(String.init) else { return }
         var rows = try await client.rawMetadata(keys)
         rows += try await client.rawEpisodes(of: item)
-        try index.upsert(rows.filter { [.movie, .show, .episode].contains($0.0.kind) }, section: section)
+        try index.upsert(rows.filter { [.movie, .show, .episode, .artist, .album, .track].contains($0.0.kind) }, section: section)
     }
 
     private func fullSync(_ section: PlexLibrarySection, types: [(type: Int, kind: String)],

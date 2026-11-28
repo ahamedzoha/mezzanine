@@ -1,0 +1,16 @@
+{"MediaContainer":{"size":3,"Metadata":[
+{"ratingKey":"9001","key":"/library/metadata/9001/children","guid":"plex://artist/aaaaaaaaaaaaaaaaaaaaaaaa","type":"artist","title":"The Example Band","titleSort":"Example Band","summary":"An invented band.","skipCount":2,"updatedAt":1700001000,"userRating":8.0,
+ "Genre":[{"id":1,"tag":"Indie"}],"Country":[{"id":9,"tag":"Exampleland"}],"Style":[{"id":20,"tag":"Dream Pop"}],"Mood":[{"id":30,"tag":"Mellow"},{"id":31,"tag":"Wistful"}],
+ "Similar":[{"id":40,"tag":"Another Invented Band"}],"Location":[{"path":"/music/invented"}],
+ "Guid":[{"id":"mbid://11111111-1111-1111-1111-111111111111"}],
+ "PopularLeaves":{"size":1,"key":"/library/sections/1/all?sort=ratingCount:desc","Metadata":[{"ratingKey":"9003","key":"/library/metadata/9003","type":"track","title":"Quiet Arithmetic","grandparentTitle":"The Example Band","parentTitle":"Invented Hours","duration":215000}]}},
+{"ratingKey":"9002","key":"/library/metadata/9002/children","parentRatingKey":"9001","guid":"plex://album/bbbbbbbbbbbbbbbbbbbbbbbb","studio":"Sample Records","type":"album","title":"Invented Hours","parentTitle":"The Example Band","year":2019,"leafCount":2,"viewedLeafCount":1,"updatedAt":1700001000,
+ "Format":[{"id":50,"tag":"Album"}],"Subformat":[{"id":51,"tag":"Live"}],"Style":[{"id":20,"tag":"Dream Pop"}],"Mood":[{"id":30,"tag":"Mellow"}],"Genre":[{"id":1,"tag":"Indie"}],
+ "Guid":[{"id":"mbid://22222222-2222-2222-2222-222222222222"}]},
+{"ratingKey":"9003","key":"/library/metadata/9003","parentRatingKey":"9002","grandparentRatingKey":"9001","guid":"plex://track/cccccccccccccccccccccccc","parentStudio":"Sample Records","type":"track","title":"Quiet Arithmetic","grandparentTitle":"The Example Band","parentTitle":"Invented Hours","originalTitle":"Guest Singer","index":1,"parentIndex":1,"ratingCount":1200,"viewCount":3,"skipCount":1,"userRating":6.0,"parentYear":2019,"duration":215000,"updatedAt":1700001000,
+ "Media":[{"id":501,"duration":215000,"bitrate":900,"audioChannels":2,"audioCodec":"flac","container":"flac","Part":[{"id":601,"key":"/library/parts/601/1700000000/file.flac","duration":215000,"size":24000000,"container":"flac","Stream":[
+  {"id":701,"streamType":2,"codec":"flac","index":0,"channels":2,"bitrate":900,"bitDepth":24,"samplingRate":96000,"selected":true,"albumGain":"-4.56","albumPeak":"0.977112","gain":"-3.10","peak":"0.635925","loudness":"-19.04","lra":"6.36","startRamp":"-51.00 0.00;-8.03 0.10;0.49 8.10;","endRamp":"-51.00 0.13;-20.68 9.53;0.23 52.23;"},
+  {"id":702,"key":"/library/streams/702","streamType":4,"codec":"lrc","format":"lrc","minLines":"3","provider":"com.plexapp.agents.lyricfind","timed":"1"},
+  {"id":703,"key":"/library/streams/703","streamType":4,"codec":"txt","format":"txt","provider":"com.plexapp.agents.lyricfind"}]}]}],
+ "Guid":[{"id":"mbid://33333333-3333-3333-3333-333333333333"}]}
+]}}

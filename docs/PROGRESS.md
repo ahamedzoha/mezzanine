@@ -1,13 +1,15 @@
 # Progress
 
-## Where things stand (2026-11-27: 1.0.3)
+## Where things stand (2026-11-28: 1.0.3, Music M0 done)
 
 Done and installed: M1–M9, M11–M13, multi-source Find Subtitles, app icon, stability sweep,
 picture size, prewarm, mini player, new-episode notifications, Google Cast, full-screen chrome
 watch, and distribution: Sparkle updates, the DMG installer and release CI (see below).
 Ship with `Scripts/release.sh <x.y.z>` (CLAUDE.md ▸ Releases and updates). Next features:
 `docs/ROADMAP.md` (Plex-only features first, then optional Seerr, Sonarr/Radarr, Bazarr,
-Tautulli and Playbill integrations); the owner picks the order.
+Tautulli and Playbill integrations); the owner picks the order. **Music is next** (the owner's call,
+2026-11-28; plan in `~/.claude/plans/let-s-make-a-plan-kind-seahorse-of-5ad056f4-2273-4581-b78a-320a2ea6c15c.md`): M0
+spikes are done (see below), development has not started and waits for the owner's go-ahead.
 
 Open, waiting on the owner:
 - API work, deferred by the owner: OpenSubtitles and Subdl keys (Find Subtitles skips those two
@@ -20,6 +22,55 @@ Open, waiting on the owner:
 
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
 donations wait for the Patreon page.
+
+## 2026-11-28 — Music M0: spikes (no feature code; nothing shipped)
+
+- Engine: option B (AVAudioEngine, two decks, whole files from a local cache) passes. `AVAudioFile` reads raw
+  FLAC bit-identical to ffmpeg and seeks bit-exact (16/44, 24/48, 24/96, 24/192); the AetherEngine refusal is
+  an AVPlayer limit. Back-to-back `scheduleFile` joins have zero gap for FLAC, MP3 and AAC (offline render, the
+  decoder trims encoder delay/padding itself). `play(at:)` with a sample time starts the second deck exactly.
+  Vorbis opens but seeks 896 frames off, WMA does not open, E-AC-3 5.1 opens: those stay on AetherEngine.
+- A 31 MB FLAC is ready in 0.75 to 0.86 s on the LAN (p90 about 0.86 s); 33 to 49 MB takes 1.2 to 1.3 s, a 192 kHz
+  file 2 s: the first track of a session needs a ranged start or the AetherEngine deck. Plex's `Part.size` for MP3
+  is larger than the bytes served (about 0.6 MB): never use it as an integrity check.
+- Lyrics: `GET /library/streams/<id>.lrc|.txt` is the call (JSON `Lyrics.Line[]`), but on the owner's server every
+  lyric stream (19 % of tracks have one, 14 % timed) answers an empty `Lyrics`: Plex's lyrics service serves
+  nothing right now (forum reports say the same). LRCLIB is therefore the main synced source, Plex lyrics a
+  cheap first attempt. LRCLIB `get` returns `syncedLyrics` (`[mm:ss.xx]`), `plainLyrics`, `instrumental`,
+  `duration`, `lyricsfile` (YAML with line end times); a record is matched within about 2 s of the asked
+  duration; a miss is 404 `{message, name:"TrackNotFound", statusCode}`; no rate-limit headers.
+- Stations (Library, Deep Cuts, Time Travel, Random Album, artist radio) are smart playlists that can only be
+  played through `POST /playQueues`; every GET on a station key is 404. Radio can run client-side with no server
+  write: `sort=random`, `sort=ratingCount:asc`, year spans, `/nearest`, `/similar`, `computePath` (all GET).
+- Library facts for the plan (the owner's Music section): 819 albums / 507 artists / 3,341 tracks, one pass of
+  batched detail (34 calls) takes 12 s. FLAC 16-bit 44.1 kHz 1,462; FLAC 24-bit 1,372 (826 tracks hi-res, up to
+  192 kHz); MP3 867; Vorbis 95; AAC 56; E-AC-3 24; WMA 11; no ALAC. Loudness ramps on 99 %; MusicBrainz ids on
+  92 % of tracks, 85 % of albums, 96 % of artists. Album type = Format (Album 587, Single 127, EP 26) plus
+  Subformat on 96 (Soundtrack, Compilation, Remix, Live). Mood on 67 % of albums, Style 61 %, Genre has 369
+  distinct values (needs folding). Mood/Style/Format only arrive with detail, never in listings.
+- History (`/status/sessions/history/all?librarySectionID=…`) lists all accounts in one answer (1,959 music rows,
+  10 accounts); Tautulli holds more (2,406 music rows). Audio playlists: 12 (7 regular, 5 smart), nothing marks
+  Aurral-synced ones. Plex's own Last.fm scrobbling: no sign of it (account and server); the owner checks the
+  Plexamp toggle once. Plex Web uses `/library/streams/<id>/levels` for waveforms (not probed).
+- Aurral: owner's install is 3.0.0 (API contract 2); the repo is at 3.1.0, whose notes say 3.0.x loses its
+  metadata server on 2026-11-30 (search and uncached pages break): update first. Map: open health/bootstrap,
+  `X-Api-Key` (admin key = user id -1, fails user-scoped routes; use a per-user key) or session Bearer, discovery
+  `/api/discover`, search `/api/search` + `/search/unified`, MBID artist/release-group detail, 30 s Deezer
+  previews, album request `POST /api/library/albums/request` (not called), status `/library/downloads/status`,
+  `/requests/page`, Subsonic `/rest` with `apiKey`. Errors are `{error, message?, code?}`.
+- Tautulli: `get_history(media_type=track)`, `get_home_stats(stat_id=top_music|popular_music)`,
+  `get_plays_by_date|dayofweek|hourofday` (series "Music"), `get_library_watch_time_stats`,
+  `get_library_user_stats`, `get_user_watch_time_stats`; `X-Api-Key` header.
+- Checked: all Plex reads above (GET only), offline AVFoundation spikes (no audio output, no device or rate
+  changes), the Aurral repo read without running it, one unauthenticated health GET, Tautulli and LRCLIB docs,
+  5 LRCLIB lookups of public songs. Test files and lyric text were deleted.
+- Not checked: sample-rate switching on real outputs, mixed-rate joins, MP3 without a seek table, writes (play
+  counts via timeline/scrobble, ratings, play queues: probes written for the owner to approve with a named
+  test item), a live call to Aurral or Tautulli (keys needed: `AURRAL_URL`, `AURRAL_API_KEY` (per-user),
+  `TAUTULLI_URL`, `TAUTULLI_API_KEY` in `.mezzanine-live.env`).
+- Owner's decisions after M0: LRCLIB lyrics on by default (Settings can turn it off; it sends title, artist,
+  album and length to lrclib.net); radio runs client-side with no server writes, so Mezzanine never creates
+  Plex play queues (the station probe is dropped). Development runs on Sonnet agents.
 
 ## 2026-11-27 — 1.0.3: sidebar clicks crashed on macOS 27.2
 

@@ -1,21 +1,45 @@
 import Foundation
 
-/// Keeps the display (and the Mac) awake while a video plays: the full player or the corner
-/// tile. Paused, closed or casting to a TV, the Mac dims and sleeps as usual. AetherEngine only
-/// asks for this on its software route (`AVSampleBufferDisplayLayer`); on the native AVPlayer
-/// route nothing did, so the screen dimmed mid-film without a key press.
+/// Keeps the Mac awake while media plays:
+/// - `.film`: holds display + system sleep (`idleDisplaySleepDisabled`) so the screen never dims mid-film.
+/// - `.music`: holds only idle system sleep (`idleSystemSleepDisabled`) so the display can dim/sleep while music keeps playing.
+/// - `.none`: lets the Mac sleep as usual.
 @MainActor
 final class KeepAwake {
-    private var activity: NSObjectProtocol?
+    enum Mode: Equatable {
+        case none
+        case film
+        case music
+    }
 
-    func update(playing: Bool) {
-        if playing, activity == nil {
-            activity = ProcessInfo.processInfo.beginActivity(options: [.idleDisplaySleepDisabled, .userInitiated],
-                                                             reason: "Playing a video")
-        } else if !playing, let activity {
+    private var activity: NSObjectProtocol?
+    private(set) var mode: Mode = .none
+
+    func update(mode nextMode: Mode) {
+        guard nextMode != mode else { return }
+        if let activity {
             ProcessInfo.processInfo.endActivity(activity)
             self.activity = nil
         }
+        mode = nextMode
+        switch nextMode {
+        case .none:
+            break
+        case .film:
+            activity = ProcessInfo.processInfo.beginActivity(
+                options: [.idleDisplaySleepDisabled, .userInitiated],
+                reason: "Playing a video"
+            )
+        case .music:
+            activity = ProcessInfo.processInfo.beginActivity(
+                options: [.idleSystemSleepDisabled, .userInitiated],
+                reason: "Playing music"
+            )
+        }
+    }
+
+    func update(playing: Bool) {
+        update(mode: playing ? .film : .none)
     }
 
     var isHolding: Bool { activity != nil }

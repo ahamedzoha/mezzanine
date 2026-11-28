@@ -134,6 +134,25 @@ public struct PlexStream: Decodable, Sendable, Hashable, Identifiable {
     public let score: Int?
     public let sourceKey: String?
     public let perfectMatch: Bool?
+    // Audio loudness and quality (music). Plex sends the numbers as strings.
+    public let samplingRate: Int?
+    /// Track gain to the reference level, dB (ReplayGain-style: add it to level the track).
+    public let gain: Double?
+    public let albumGain: Double?
+    /// Linear sample peak, 0…1+.
+    public let peak: Double?
+    public let albumPeak: Double?
+    /// Integrated loudness, LUFS.
+    public let loudness: Double?
+    /// Loudness range, LU.
+    public let lra: Double?
+    /// "dB seconds;…" pairs: how loud the first and last seconds are (crossfade planning).
+    public let startRamp: String?
+    public let endRamp: String?
+    /// Lyric streams: the lines carry timestamps.
+    public let timed: Bool?
+    /// Lyric streams: who supplies the text.
+    public let provider: String?
 
     public var isExternal: Bool { key != nil }
     public var isHDR: Bool { colorTrc == "smpte2084" || colorTrc == "arib-std-b67" }
@@ -152,6 +171,7 @@ public struct PlexStream: Decodable, Sendable, Hashable, Identifiable {
         case isDefault = "default", forced, hearingImpaired, key, format
         case colorTrc, colorPrimaries, DOVIProfile, bitDepth, frameRate
         case providerTitle, score, sourceKey, perfectMatch
+        case samplingRate, gain, albumGain, peak, albumPeak, loudness, lra, startRamp, endRamp, timed, provider
     }
 
     public init(from decoder: Decoder) throws {
@@ -185,5 +205,16 @@ public struct PlexStream: Decodable, Sendable, Hashable, Identifiable {
         score = c.lenientInt(.score)
         sourceKey = try? c.decodeIfPresent(String.self, forKey: .sourceKey)
         perfectMatch = c.lenientBool(.perfectMatch)
+        samplingRate = c.lenientInt(.samplingRate)
+        gain = c.lenientDouble(.gain)
+        albumGain = c.lenientDouble(.albumGain)
+        peak = c.lenientDouble(.peak)
+        albumPeak = c.lenientDouble(.albumPeak)
+        loudness = c.lenientDouble(.loudness)
+        lra = c.lenientDouble(.lra)
+        startRamp = try? c.decodeIfPresent(String.self, forKey: .startRamp)
+        endRamp = try? c.decodeIfPresent(String.self, forKey: .endRamp)
+        timed = c.lenientBool(.timed)
+        provider = try? c.decodeIfPresent(String.self, forKey: .provider)
     }
 }

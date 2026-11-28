@@ -173,13 +173,25 @@ struct KeyBinding: Codable, Hashable, Sendable {
     var character: String?
     var shift = false
     var option = false
+    var command = false
 
-    static func code(_ code: UInt16, shift: Bool = false, option: Bool = false) -> KeyBinding {
-        KeyBinding(keyCode: code, character: nil, shift: shift, option: option)
+    enum CodingKeys: String, CodingKey { case keyCode, character, shift, option, command }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        keyCode = try c.decodeIfPresent(UInt16.self, forKey: .keyCode)
+        character = try c.decodeIfPresent(String.self, forKey: .character)
+        shift = try c.decodeIfPresent(Bool.self, forKey: .shift) ?? false
+        option = try c.decodeIfPresent(Bool.self, forKey: .option) ?? false
+        command = try c.decodeIfPresent(Bool.self, forKey: .command) ?? false
     }
 
-    static func char(_ character: String, option: Bool = false) -> KeyBinding {
-        KeyBinding(keyCode: nil, character: character, shift: false, option: option)
+    static func code(_ code: UInt16, shift: Bool = false, option: Bool = false, command: Bool = false) -> KeyBinding {
+        KeyBinding(keyCode: code, character: nil, shift: shift, option: option, command: command)
+    }
+
+    static func char(_ character: String, option: Bool = false, command: Bool = false) -> KeyBinding {
+        KeyBinding(keyCode: nil, character: character, shift: false, option: option, command: command)
     }
 
     static let space: UInt16 = 49, left: UInt16 = 123, right: UInt16 = 124, down: UInt16 = 125, up: UInt16 = 126
@@ -218,29 +230,33 @@ struct KeyBinding: Codable, Hashable, Sendable {
         self = .char(character, option: option)
     }
 
-    private init(keyCode: UInt16?, character: String?, shift: Bool, option: Bool) {
+    private init(keyCode: UInt16?, character: String?, shift: Bool, option: Bool, command: Bool = false) {
         self.keyCode = keyCode
         self.character = character
         self.shift = shift
         self.option = option
+        self.command = command
     }
 
-    /// As shown in Settings and help: "⌥←", "⇧N", "Page Down".
+    /// As shown in Settings and help: "⌥←", "⇧N", "⌥⌘S", "Page Down".
     var display: String {
         var prefix = option ? "⌥" : ""
         if let keyCode {
             if shift { prefix += "⇧" }
+            if command { prefix += "⌘" }
             return prefix + (Self.specialKeys[keyCode] ?? "Key \(keyCode)")
         }
         guard let character else { return "?" }
         if character != character.lowercased() { prefix += "⇧" }
+        if command { prefix += "⌘" }
         return prefix + character.uppercased()
     }
 
-    /// The same key as a menu key equivalent, so the Playback menu shows it.
+    /// The same key as a menu key equivalent, so the Playback / Controls menus show it.
     var menuShortcut: KeyboardShortcut? {
         var modifiers: EventModifiers = []
         if option { modifiers.insert(.option) }
+        if command { modifiers.insert(.command) }
         if let keyCode {
             if shift { modifiers.insert(.shift) }
             let key: KeyEquivalent

@@ -12,6 +12,7 @@ import MezzanineKit
 struct AppShell: View {
     @Environment(SessionStore.self) private var session
     @Environment(PlaybackCoordinator.self) private var playback
+    @Environment(MusicSession.self) private var music
     @Environment(AppCommandCenter.self) private var commands
     @Environment(LibraryStore.self) private var library
     @Environment(NewEpisodeNotifier.self) private var notifier
@@ -146,21 +147,29 @@ struct AppShell: View {
         }
         .onChange(of: playback.item == nil) { _, closed in if closed { updater.playerClosed() } }
         // The screen stays awake while a video plays (full player or the corner tile), never
-        // while paused, closed or casting. Loading and seeking count as playing: letting go for a
-        // rebuffer after a long idle stretch would blank the screen at once.
-        .onChange(of: playback.item != nil && [.playing, .loading, .seeking].contains(playback.player.status) && !playback.cast.isCasting,
-                  initial: true) { _, playing in
-            keepAwake.update(playing: playing)
+        // while paused, closed or casting. Music holds only idle system sleep so the display can dim.
+        .onChange(of: keepAwakeMode, initial: true) { _, mode in
+            keepAwake.update(mode: mode)
             #if DEBUG
-            print("KEEPAWAKE \(playing ? "on" : "off")")
+            print("KEEPAWAKE \(mode)")
             #endif
         }
         // Plex apps can control Mezzanine only while signed in to a server.
-        .onChange(of: session.client == nil) { _, _ in Task { await remote.apply() } }
+        .onChange(of: session.client == nil) { _, missing in
+            Task { await remote.apply() }
+            if !missing { music.syncServerState() }
+        }
         .onChange(of: library.index == nil) { _, missing in if !missing { notifier.openPending() } }
         .onChange(of: playback.sleep.timer.choice, initial: true) { _, choice in commands.sleepChoice = choice }
         .onChange(of: playback.item?.kind, initial: true) { _, kind in commands.playsEpisode = kind == .episode }
         .onChange(of: playback.isMini, initial: true) { _, mini in commands.hasMiniPlayer = mini }
+    }
+
+    private var keepAwakeMode: KeepAwake.Mode {
+        let videoPlaying = playback.item != nil && [.playing, .loading, .seeking].contains(playback.player.status) && !playback.cast.isCasting
+        if videoPlaying { return .film }
+        if music.isPlaying { return .music }
+        return .none
     }
 
     /// Onboarding until it's done; then the library, kept through reconnects (and the

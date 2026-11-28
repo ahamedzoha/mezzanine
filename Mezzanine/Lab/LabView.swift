@@ -10,8 +10,16 @@ struct LabView: View {
     @Environment(SessionStore.self) private var session
     @Environment(MezzaninePlayer.self) private var player
 
-    @State private var selection: LabMatrixEntry?
+    private enum LabSelection: Hashable {
+        case video(LabMatrixEntry)
+        case music(LabMusicRunner.MusicCase)
+    }
+
+    @State private var selection: LabSelection?
     @State private var item: PlexMetadata?
+    @State private var musicTrack: QueuedTrack?
+    @State private var musicEngine: MusicEngine?
+    @State private var musicCache: TrackCache?
     @State private var error: String?
     @State private var log: [String] = []
     @State private var profileKind: AudioOutputKind = .builtInSpeakers
@@ -19,24 +27,47 @@ struct LabView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(LabMatrix.entries, selection: $selection) { entry in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(entry.id).font(.callout.monospaced())
-                    Text(entry.note).font(.caption).foregroundStyle(.secondary)
+            List(selection: $selection) {
+                Section("Video") {
+                    ForEach(LabMatrix.entries) { entry in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.id).font(.callout.monospaced())
+                            Text(entry.note).font(.caption).foregroundStyle(.secondary)
+                        }
+                        .tag(LabSelection.video(entry))
+                    }
                 }
-                .tag(entry)
+                Section("Music (silent)") {
+                    ForEach(LabMusicRunner.cases) { c in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(c.id).font(.callout.monospaced())
+                            Text(c.note).font(.caption).foregroundStyle(.secondary)
+                        }
+                        .tag(LabSelection.music(c))
+                    }
+                }
             }
             .navigationSplitViewColumnWidth(min: 260, ideal: 300)
             .safeAreaInset(edge: .top) { connectionHeader }
         } detail: {
             detail
         }
-        .onChange(of: selection) { _, entry in
-            guard let entry else { return }
-            Task { await open(entry) }
+        .onChange(of: selection) { _, sel in
+            guard let sel else { return }
+            switch sel {
+            case .video(let entry):
+                musicEngine?.stop()
+                musicTrack = nil
+                Task { await open(entry) }
+            case .music(let c):
+                player.stop()
+                item = nil
+                Task { await openMusic(c) }
+            }
         }
         .task {
             if LabAutoRunner.isEnabled { await LabAutoRunner.run(session: session, player: player) }
+            if LabMusicRunner.isEnabled { await LabMusicRunner.run(session: session) }
         }
     }
 
@@ -53,26 +84,67 @@ struct LabView: View {
     }
 
     @ViewBuilder private var detail: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .bottom) {
-                PlayerSurface(player: player)
-                subtitleOverlay
-            }
-            .aspectRatio(16 / 9, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if let item { itemSummary(item) }
-                    transport
-                    audioControls
-                    tracks
-                    stats
-                    logView
-                    if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
+        if case .music = selection {
+            musicDetail
+        } else {
+            VStack(spacing: 0) {
+                ZStack(alignment: .bottom) {
+                    PlayerSurface(player: player)
+                    subtitleOverlay
                 }
-                .padding(16)
+                .aspectRatio(16 / 9, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        if let item { itemSummary(item) }
+                        transport
+                        audioControls
+                        tracks
+                        stats
+                        logView
+                        if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
+                    }
+                    .padding(16)
+                }
             }
+        }
+    }
+
+    private var musicDetail: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if let track = musicTrack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(track.artist) — \(track.title)").font(.title3.bold())
+                        Text([track.album, track.quality?.caption].compactMap { $0 }.joined(separator: " · "))
+                            .font(.callout.monospaced()).foregroundStyle(.secondary)
+                    }
+                }
+                HStack(spacing: 10) {
+                    Button("Play silent") { Task { await playMusic() } }.disabled(musicTrack == nil)
+                    Button(musicEngine?.status == .playing ? "Pause" : "Resume") { musicEngine?.togglePlayPause() }
+                        .disabled(musicEngine == nil)
+                    Button("Seek 50 %") {
+                        if let eng = musicEngine { Task { await eng.seek(to: eng.duration / 2) } }
+                    }.disabled(musicEngine == nil)
+                    Button("Stop") { musicEngine?.stop() }.disabled(musicEngine == nil)
+                    Spacer()
+                    Text("\(format(musicEngine?.position ?? 0)) / \(format(musicEngine?.duration ?? 0))")
+                        .font(.callout.monospaced())
+                }
+                if let eng = musicEngine {
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
+                        row("status", "\(eng.status) (muted)")
+                        row("route", eng.activeRoute.rawValue)
+                        row("first audio", eng.firstAudioLatency.map { $0.formatted(.units(allowed: [.milliseconds])) } ?? "–")
+                    }
+                    .font(.callout.monospaced())
+                }
+                logView
+                if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
+            }
+            .padding(16)
         }
     }
 
@@ -221,12 +293,67 @@ struct LabView: View {
         }
     }
 
+    private func openMusic(_ c: LabMusicRunner.MusicCase) async {
+        error = nil
+        musicTrack = nil
+        guard let client = session.client else { error = "Not connected"; return }
+        do {
+            let tracks = try await LabMusicRunner.sampleTracks(client: client)
+            if let match = tracks.first(where: c.match) {
+                musicTrack = match
+            } else {
+                error = "No track matched \(c.id)"
+            }
+        } catch {
+            self.error = "\(error)"
+        }
+    }
+
+    private func playMusic() async {
+        guard let client = session.client, let track = musicTrack else { return }
+        error = nil
+        do {
+            let cache: TrackCache
+            if let existing = musicCache {
+                cache = existing
+            } else {
+                let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mezzanine-lab-music", isDirectory: true)
+                let created = TrackCache(directory: dir, limitBytes: 512_000_000)
+                musicCache = created
+                cache = created
+            }
+            let engine: MusicEngine
+            if let existing = musicEngine {
+                engine = existing
+            } else {
+                let created = try MusicEngine(mode: .live)
+                created.volume = 0
+                created.isMuted = true
+                musicEngine = created
+                engine = created
+            }
+            let req = try await LabMusicRunner.makeRequest(for: track, client: client, cache: cache)
+            try await engine.play(req, startAt: 0, autoplay: true)
+        } catch is CancellationError {
+        } catch {
+            self.error = "\(error)"
+        }
+    }
+
     private func record() {
-        guard let entry = selection else { return }
-        let d = player.diagnostics
-        let ttff = d.timeToFirstFrame.map { "\(Int($0.components.seconds * 1000 + $0.components.attoseconds / 1_000_000_000_000_000))ms" } ?? "-"
-        let seek = d.lastSeekLatency.map { "\(Int($0.components.seconds * 1000 + $0.components.attoseconds / 1_000_000_000_000_000))ms" } ?? "-"
-        log.append("\(entry.id) | route=\(d.route) vdec=\(d.videoDecoder ?? "-") adec=\(d.audioDecoder ?? "-") audio=\(d.audioDelivery) shaping=\(d.audioShaping) fmt=\(d.videoFormat) ttff=\(ttff) seek=\(seek) status=\(player.status)")
+        switch selection {
+        case .video(let entry):
+            let d = player.diagnostics
+            let ttff = d.timeToFirstFrame.map { "\(Int($0.components.seconds * 1000 + $0.components.attoseconds / 1_000_000_000_000_000))ms" } ?? "-"
+            let seek = d.lastSeekLatency.map { "\(Int($0.components.seconds * 1000 + $0.components.attoseconds / 1_000_000_000_000_000))ms" } ?? "-"
+            log.append("\(entry.id) | route=\(d.route) vdec=\(d.videoDecoder ?? "-") adec=\(d.audioDecoder ?? "-") audio=\(d.audioDelivery) shaping=\(d.audioShaping) fmt=\(d.videoFormat) ttff=\(ttff) seek=\(seek) status=\(player.status)")
+        case .music(let c):
+            let route = musicEngine?.activeRoute.rawValue ?? "-"
+            let fa = musicEngine?.firstAudioLatency.map { "\($0)" } ?? "-"
+            log.append("\(c.id) | route=\(route) codec=\(musicTrack?.codec ?? "-") firstAudio=\(fa) status=\(String(describing: musicEngine?.status))")
+        case nil:
+            break
+        }
     }
 
     private func format(_ s: Double) -> String {

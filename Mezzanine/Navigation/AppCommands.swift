@@ -326,6 +326,7 @@ struct MezzanineCommands: Commands {
     let actions: TitleActions
     let library: LibraryStore
     let diagnostics: Diagnostics
+    let music: MusicSession
 
     private var downloadTitle: String {
         switch center.currentDetailItem?.kind {
@@ -651,6 +652,41 @@ struct MezzanineCommands: Commands {
                 }
                 .pickerStyle(.inline)
             }
+        }
+        CommandMenu("Controls") {
+            let musicActive = music.isActive
+            let shortcutsActive = !center.isPlayerOpen
+            let musicShortcuts = MusicShortcuts.shared
+            Group {
+                Button(music.isPlaying ? "Pause" : "Play") { music.togglePlayPause() }
+                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.playPause) : nil)
+                Button("Next Track") { music.next() }
+                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.nextTrack) : nil)
+                Button("Previous Track") { music.previous() }
+                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.previousTrack) : nil)
+                Divider()
+                Button("Increase Volume") { music.adjustVolume(by: 0.1) }
+                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.volumeUp) : nil)
+                Button("Decrease Volume") { music.adjustVolume(by: -0.1) }
+                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.volumeDown) : nil)
+                Divider()
+                Toggle("Shuffle", isOn: Binding(get: { music.queue.isShuffled }, set: { music.setShuffle($0) }))
+                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.shuffle) : nil)
+                Button("Repeat: \(music.queue.repeatMode.rawValue.capitalized)") { music.cycleRepeat() }
+                    .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.repeatMode) : nil)
+                Divider()
+                Menu("Rate Playing Song") {
+                    ForEach([MusicKey.rate5, .rate4, .rate3, .rate2, .rate1], id: \.self) { key in
+                        let stars = Int(String(key.rawValue.last ?? "0")) ?? 0
+                        Button(key.menuTitle) { music.rateCurrent(stars) }
+                            .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(key) : nil)
+                    }
+                    Divider()
+                    Button(MusicKey.rate0.menuTitle) { music.rateCurrent(0) }
+                        .keyboardShortcut(shortcutsActive ? musicShortcuts.menuShortcut(.rate0) : nil)
+                }
+            }
+            .disabled(!musicActive)
         }
     }
 }

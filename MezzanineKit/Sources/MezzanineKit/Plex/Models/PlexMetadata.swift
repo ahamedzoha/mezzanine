@@ -63,6 +63,28 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
     public let collections: [PlexTag]
     public let externalGuids: [String]
 
+    // Music (artists, albums, tracks). Empty or nil on video.
+    public let moods: [PlexTag]
+    public let styles: [PlexTag]
+    /// Album type tags ("Album", "Single", "EP"); `subformats` refine them ("Live", "Compilation").
+    public let formats: [PlexTag]
+    public let subformats: [PlexTag]
+    /// An album's release year, carried on its tracks.
+    public let parentYear: Int?
+    /// An album's label, carried on its tracks (an album's own label is `studio`).
+    public let parentStudio: String?
+    public let skipCount: Int?
+    /// How many Plex users rated the track (a popularity signal; `sort=ratingCount`).
+    public let ratingCount: Int?
+    /// An artist's similar artists, by name.
+    public let similar: [PlexTag]
+    /// An artist's most popular tracks (only with `includePopularLeaves=1`).
+    public let popularLeaves: [PlexMetadata]
+    /// Folders an artist lives in on the server.
+    public let location: [String]
+    /// Sonic distance from the seed, on `nearest` answers.
+    public let distance: Double?
+
     public let media: [PlexMedia]
     public let markers: [PlexMarker]
     public let chapters: [PlexChapter]
@@ -71,12 +93,24 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
 
     public var id: String { ratingKey }
 
+    /// The MusicBrainz id Plex matched (`mbid://…` in the guid list), without the scheme.
+    public var mbid: String? { externalGuid(scheme: "mbid") }
+
+    /// The id for a guid scheme (`mbid`, `imdb`, `tmdb`, `tvdb`), without the `scheme://` prefix.
+    public func externalGuid(scheme: String) -> String? {
+        let prefix = scheme + "://"
+        return externalGuids.first { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
+    }
+
     // MARK: Derived
 
     public var isWatched: Bool {
         switch kind {
         case .show, .season:
             if let leafCount, let viewedLeafCount { return leafCount > 0 && viewedLeafCount >= leafCount }
+            return false
+        case .artist, .album:
+            // Containers of music have no watched state; play counts belong to tracks.
             return false
         default:
             return (viewCount ?? 0) > 0 && (viewOffset ?? 0) == 0
@@ -145,7 +179,21 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
         case genres = "Genre", directors = "Director", writers = "Writer", roles = "Role"
         case countries = "Country", collections = "Collection", guids = "Guid"
         case media = "Media", markers = "Marker", chapters = "Chapter", extras = "Extras"
+        case moods = "Mood", styles = "Style", formats = "Format", subformats = "Subformat"
+        case parentYear, parentStudio, skipCount, ratingCount, similar = "Similar"
+        case popularLeaves = "PopularLeaves", location = "Location", distance
     }
+
+    struct LeavesContainer: Decodable {
+        let items: [PlexMetadata]
+        enum CodingKeys: String, CodingKey { case items = "Metadata" }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            items = c.list(PlexMetadata.self, .items)
+        }
+    }
+
+    struct LocationEntry: Decodable { let path: String? }
 
     struct ExtrasContainer: Decodable {
         let items: [PlexMetadata]
@@ -213,6 +261,18 @@ public struct PlexMetadata: Decodable, Sendable, Identifiable, Hashable {
         markers = c.list(PlexMarker.self, .markers)
         chapters = c.list(PlexChapter.self, .chapters)
         extras = (try? c.decodeIfPresent(ExtrasContainer.self, forKey: .extras))?.items ?? []
+        moods = c.list(PlexTag.self, .moods)
+        styles = c.list(PlexTag.self, .styles)
+        formats = c.list(PlexTag.self, .formats)
+        subformats = c.list(PlexTag.self, .subformats)
+        parentYear = c.lenientInt(.parentYear)
+        parentStudio = try? c.decodeIfPresent(String.self, forKey: .parentStudio)
+        skipCount = c.lenientInt(.skipCount)
+        ratingCount = c.lenientInt(.ratingCount)
+        similar = c.list(PlexTag.self, .similar)
+        popularLeaves = (try? c.decodeIfPresent(LeavesContainer.self, forKey: .popularLeaves))?.items ?? []
+        location = c.list(LocationEntry.self, .location).compactMap(\.path)
+        distance = c.lenientDouble(.distance)
     }
 
     public static func == (lhs: PlexMetadata, rhs: PlexMetadata) -> Bool {
