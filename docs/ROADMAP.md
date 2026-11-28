@@ -1,7 +1,8 @@
 # Mezzanine roadmap
 
-Written 2026-11-16, after 0.2.3. Nothing here is built yet; the owner picks the order. Status of
-what exists lives in `docs/PROGRESS.md`; the binding look in `DESIGN.md`. Every UI surface below
+Written 2026-11-16, after 0.2.3. The owner sets the order; this roadmap marks completed and
+in-progress work where known. Status of what exists lives in `docs/PROGRESS.md`; the binding look
+in `DESIGN.md`. Every UI surface below
 still gets an `/impeccable` round before it's built and an `apple:hig-reviewer` pass before it
 ships, and every action gets a menu item and a rebindable key (CLAUDE.md). Keys named below are
 proposals: check each against the shortcut table (`PlayerShortcuts`, `AppCommands`) when built.
@@ -41,15 +42,19 @@ Contents: 1 Principles · 2 Services architecture · 3 Phase 1, Plex only · 4 P
 
 ## 2. Services architecture
 
+Music sets the order for this framework: build it for music first in M6, then reuse it for Seerr.
+
 ### 2.1 Settings ▸ Services
 
 A new Settings tab (`server.rack`), one row per service: name, address, status dot (connected,
 unreachable, key refused, version too old), last check, and **Add…** / **Edit…** / **Remove**.
 
-- **Add a service** sheet: pick the kind (Seerr, Sonarr, Radarr, Bazarr, Tautulli, Playbill),
-  enter the address (`http://192.168.1.x:5055` or `https://seerr.example.com`), then either
-  **Sign in with Plex** (Seerr, Playbill: uses the Plex token Mezzanine already holds) or an
-  **API key** field (Sonarr, Radarr, Bazarr, Tautulli: "Settings ▸ General ▸ API Key" in each).
+- **Add a service** sheet: pick the kind (Aurral, Tautulli, ListenBrainz, Last.fm, Seerr, Sonarr,
+  Radarr, Bazarr, Playbill), enter the address (`http://192.168.1.x:5055` or
+  `https://seerr.example.com`), then either **Sign in with Plex** (Seerr, Playbill: uses the Plex
+  token Mezzanine already holds) or an **API key** field (Sonarr, Radarr, Bazarr, Tautulli:
+  "Settings ▸ General ▸ API Key" in each; Aurral: a per-user key from its profile, since the admin
+  key can't reach user routes; ListenBrainz: the user token; Last.fm: a signed web sign-in).
   **Test** calls the service's status endpoint and shows its name and version before saving.
 - Each service can be turned off without removing it.
 - Footer: "Mezzanine works with Plex alone. These add requests, upcoming episodes, server
@@ -63,11 +68,11 @@ unreachable, key refused, version too old), last check, and **Add…** / **Edit�
 
 | File | What |
 |---|---|
-| `ServiceKind.swift` | The six kinds, default ports, auth style (plexSSO or apiKey), the capabilities each offers |
+| `ServiceKind.swift` | The service kinds, default ports, auth style (plexSSO or apiKey), the capabilities each offers |
 | `ServiceConfig.swift` | Saved per service: kind, base URL, enabled, the Plex user it was added under; the secret goes to the Keychain |
 | `ServiceHTTP.swift` | Shared transport: JSON, timeouts (5 s), redaction, `Retry-After`, `401/403` mapped to "key refused" |
-| `SeerrClient.swift`, `SonarrClient.swift`, `RadarrClient.swift`, `BazarrClient.swift`, `TautulliClient.swift`, `PlaybillClient.swift` | Thin typed clients, lenient decoding (as `Lenient.swift`) |
-| `Capabilities.swift` | Protocols: `RequestProvider`, `DownloadStatusProvider`, `UpcomingProvider`, `MissingEpisodesProvider`, `ServerSubtitleProvider`, `StatsProvider`, `LeavingSoonProvider`, `RecapProvider` |
+| Service clients | Thin typed clients for Aurral, Tautulli, ListenBrainz, Last.fm, LRCLIB, Seerr, Sonarr, Radarr, Bazarr and Playbill; lenient decoding (as `Lenient.swift`) |
+| `Capabilities.swift` | Protocols: `RequestProvider`, `DownloadStatusProvider`, `UpcomingProvider`, `MissingEpisodesProvider`, `ServerSubtitleProvider`, `StatsProvider`, `LeavingSoonProvider`, `RecapProvider`, `DiscoveryProvider`, `MusicRequestProvider`, `RequestStatusProvider`, `PreviewProvider`, `ListeningStatsProvider`, `ScrobbleProvider`, `LyricsProvider` |
 | `TitleIdentity.swift` | Maps a Plex item to external ids and back (below) |
 
 App side: `Mezzanine/Services/ServiceRegistry.swift` (`@MainActor @Observable`): loads configs,
@@ -88,6 +93,17 @@ checks health (at launch, on wake, every 10 min), and vends the capability provi
 | Stats, year in review | Tautulli | Plex watch history (lighter) |
 | Who's watching now | Tautulli (owner) or Plex `/status/sessions` (owner) | Plex sessions |
 | Leaving soon, personal recap | Playbill | none (hidden) |
+| Music discovery | Aurral | Plex Similar items and sonic neighbours |
+| Music requests and request status | Aurral | none (hidden without Aurral) |
+| Music previews | Aurral | none (hidden without Aurral) |
+| Listening stats | Tautulli | Plex history |
+| Scrobbling | ListenBrainz, Last.fm | none (hidden) |
+| Synced lyrics | LRCLIB (keyless; the main source) | Plex's lyric stream is tried first; none (hidden) |
+
+LRCLIB is keyless and on by default. Its client ships with lyrics in M3, before the shared
+services framework. Settings ▸ Music ▸ Lyrics can turn it off and explains that lookups send the
+track title, artist, album and length. M6 moves the client under the framework; Seerr reuses that
+framework.
 
 ### 2.4 Title identity
 
@@ -99,6 +115,7 @@ requested with `includeGuids=1`): `tmdb://`, `tvdb://`, `imdb://`.
   (Sonarr's own episode ids come from `GET /api/v3/episode?seriesId=`).
 - The other way (a Seerr search result to a Plex item): look the TMDB id up in the local index.
   The GRDB index gains an `external_ids` table, filled during sync, indexed by `(kind, id)`.
+- Music services match MusicBrainz ids from Plex metadata; the same table stores those ids.
 - Items without external ids (personal media, Courses) simply have no service features.
 
 ### 2.5 Networking
@@ -233,6 +250,28 @@ none); couch mode.
 
 ---
 
+## Music — next (owner, 2026-11-28)
+
+Music replaces Plexamp on the Mac. It is a Mezzanine sidebar section with a local queue, a Now
+Playing bar and room, and a menu-bar mini player. Music plays while browsing. Every service stays
+optional; Plex alone remains a complete app.
+
+| Milestone | Work | Size | Status |
+|---|---|---|---|
+| M0 | Engine, Plex and service spikes; record decisions | M | Done 2026-11-28 |
+| M1 | Music library, pages, search, Now Playing bar, local queue and basic playback | L | In progress |
+| M2 | Crossfades, auto leveling, EQ, sample-rate matching and engine fallback | L | Planned |
+| M3 | Now Playing room, synced lyrics, spectrum, menu-bar player and sleep timer | L | Planned |
+| M4 | Client-side radio and similar-music playback | M | Planned |
+| M5 | Library facets, smart mixes, playlist editing, Spotlight and Shortcuts | L | Planned |
+| M6 | Services framework and ListenBrainz / Last.fm scrobbling | L | Planned |
+| M7 | Tautulli stats, Plex fallback, listening diary and year in review | M | Planned |
+| M8 | Aurral discovery, previews, requests, status and new-album notices | M–L | Planned |
+| M9 | Optional on-device mix descriptions, lyric translation and timing, music casting and widget | M each | Planned |
+
+Rules: Mezzanine never creates Plex play queues. Radio is built client-side from read-only calls.
+LRCLIB lyrics are on by default. Music never offers delete.
+
 ## 4. Phase 2 — Services framework and Seerr
 
 ### 4.1 Framework · M
@@ -361,8 +400,11 @@ generic one to Playbill (useful to any Playbill install, not just Mezzanine):
 
 ## 8. Not planned (and why)
 
-- **qBittorrent, Prowlarr:** no value in a player; Sonarr/Radarr already report download progress,
-  and a media app shouldn't show torrent or indexer details.
+- **Lidarr:** Aurral fronts music discovery and requests, so a separate Lidarr integration adds no user-facing need.
+- **slskd:** Mezzanine plays and organizes music; it does not manage downloads.
+- **qBittorrent:** Sonarr and Radarr already report download progress; a media app should not show
+  torrent details.
+- **Prowlarr:** Mezzanine does not expose indexer management; the planned music request flow uses Aurral.
 - **Kometa:** nothing to build. Its collections already appear as Plex collections (shelves, Edit
   Shelves sources), and Settings ▸ Library ▸ Show original posters already strips its overlays.
   Possible later: respect Kometa's "promote to home" collection flags as default shelves.
@@ -378,11 +420,14 @@ history while testing":
 
 | Service | Safe to call while developing | Never in tests without the owner naming a test item |
 |---|---|---|
-| Plex | metadata, hubs, history, playlists list | rating, watchlist add/remove, playlist create/edit, play queues (they are visible to other apps) |
+| Plex | metadata, hubs, history, playlists list; music listings, metadata, hubs, `/nearest`, `computePath`, playlists, lyrics and history | rating, watchlist add/remove, playlist create/edit; music timelines/scrobbles, ratings and playlist edits. Music play queues are never built. |
 | Seerr | `auth/me`, search, details, request lists | `POST /request` (starts real downloads), approve/decline |
 | Sonarr / Radarr | calendar, series/movie lookup, episodes, queue | any `command` (search), file deletes |
 | Bazarr | status, episode/movie subtitle state, provider search results | download, sync, delete (write files on the server) |
 | Tautulli | all `get_*` | anything else (none needed) |
+| Aurral | health, discovery, search, details, queue reads and previews | requests, flows and imports |
+| ListenBrainz / Last.fm | token checks and stats GETs | submissions (public history): dry run or throwaway accounts |
+| LRCLIB | lookups (cached; at most five per live run) | publishing (never built) |
 | Playbill | `GET` endpoints | `PUT /me/subscriptions` against the live install |
 
 - Every client gets fixture tests (recorded JSON, no network) and opt-in live read-only tests
@@ -405,8 +450,9 @@ history while testing":
 4. **Stats:** per profile: each Home profile sees its own stats; the owner's Mac can show all.
 5. **Phone remote:** now. The remote spike (3.7) comes right after the repo goes public, ahead
    of the rest of Phase 1.
-6. **Order:** confirmed: (3.7 remote spike, then) 3.1 Watchlist → 4.1–4.2 Services + Seerr →
-   3.4 Smarter downloads → 5 Sonarr/Radarr → 3.5 macOS integration → 6 Bazarr → 7.
+6. **Order (updated 2026-11-28):** Music goes first, ahead of 4.1–4.2 Services + Seerr. After
+   Music, continue with 3.1 Watchlist → 4.1–4.2 Services + Seerr → 3.4 Smarter downloads → 5
+   Sonarr/Radarr → 3.5 macOS integration → 6 Bazarr → 7.
 
 ---
 

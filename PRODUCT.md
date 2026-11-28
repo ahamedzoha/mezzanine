@@ -44,7 +44,8 @@ player. What a neighbouring app can't truthfully copy:
 
 - Server: the owner's Plex Media Server on the LAN (plex.direct) and remotely through
   `plex.example.com`; the account also sees one friend's shared server.
-- Library: ~275 movies, 65 shows, a "Courses" folder-style library, Music (left to Plexamp).
+- Library: films, shows, a folder-style library, and Music as a Mezzanine section. Music was
+  previously left to Plexamp.
   Mostly 1080p/720p SDR H.264/HEVC; many 5.1 tracks (AAC, E-AC-3, AC-3); embedded and
   sidecar subtitles in SRT, VobSub, PGS and ASS. Intro and credits markers exist for many
   episodes.
@@ -62,6 +63,10 @@ Confirmed for v1:
 - Library: every Plex library in the sidebar, collections, playlists, browse by genre, year
   and person; grid density control; poster, landscape, list and detailed-list views; sort and
   view remembered per library; artwork picker; codec badges.
+- Music: browse artists, albums, songs and playlists; gapless playback with loudness leveling;
+  a Now Playing bar and room; synced lyrics; client-side radio; and a menu-bar mini player.
+  Optional services add Aurral discovery and requests, Tautulli stats, ListenBrainz and Last.fm
+  scrobbling, and LRCLIB lyrics. LRCLIB is on by default.
 - Home: user-built shelves (Plex hubs, pinned collections and playlists, rule-based smart
   shelves), reorderable and per library.
 - Player: direct play with server-transcode fallback; full keyboard map (rebindable, every key
@@ -77,6 +82,11 @@ Confirmed for v1:
   the server), OpenSubtitles.com directly, upload back to Plex; on-device translation and
   generated subtitles (M12).
 - Trakt sync, Plex Home switching, offline downloads.
+- Audio output uses the system mixer by default. **Match source sample rate** is an optional
+  setting per output device, for DACs and receivers. Playback is bit-perfect only with leveling,
+  EQ and crossfade off and volume at 100 %.
+- Plex alone remains a complete app. Every other service is optional and its features stay hidden
+  when that service is absent.
 - Constraints: macOS 26 only; public, signed but not notarized (Sparkle updates); app sandbox;
   token never in URLs or logs; testing never writes play history.
 
