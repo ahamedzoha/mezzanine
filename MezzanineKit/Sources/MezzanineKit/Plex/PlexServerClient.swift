@@ -282,21 +282,35 @@ public actor PlexServerClient {
     /// session in Now Playing (and Tautulli), and marks the item watched when a
     /// stop lands past ~90 %. `sessionID` identifies this playback session.
     ///
-    /// `type` is nil for video (the default, unchanged); music passes `"music"`.
+    /// `type` is nil for video (the default, unchanged); music passes `"track"` and also sends
+    /// `playbackTime`, as Plex Web does. The server counts a track (viewCount and a history row) when
+    /// a session's timelines run up from its start (reports under 60 s are ignored) and pass half
+    /// the track; a session whose first report already sits near the end is ignored. No play queue
+    /// is needed.
     public func reportTimeline(ratingKey: String, state: TimelineState, time: TimeInterval,
                                duration: TimeInterval, sessionID: String, type: String? = nil) async throws {
+        _ = try await perform(timelineRequest(ratingKey: ratingKey, state: state, time: time,
+                                              duration: duration, sessionID: sessionID, type: type))
+    }
+
+    func timelineRequest(ratingKey: String, state: TimelineState, time: TimeInterval,
+                         duration: TimeInterval, sessionID: String, type: String? = nil) -> URLRequest {
+        let millis = String(Int(time * 1000))
         var query = [
             URLQueryItem(name: "ratingKey", value: ratingKey),
             URLQueryItem(name: "key", value: "/library/metadata/\(ratingKey)"),
             URLQueryItem(name: "state", value: state.rawValue),
-            URLQueryItem(name: "time", value: String(Int(time * 1000))),
+            URLQueryItem(name: "time", value: millis),
             URLQueryItem(name: "duration", value: String(Int(duration * 1000))),
             URLQueryItem(name: "hasMDE", value: "1"),
         ]
-        if let type { query.append(URLQueryItem(name: "type", value: type)) }
+        if let type {
+            query.append(URLQueryItem(name: "type", value: type))
+            query.append(URLQueryItem(name: "playbackTime", value: millis))
+        }
         var request = makeRequest("GET", "/:/timeline", query: query)
         request.setValue(sessionID, forHTTPHeaderField: "X-Plex-Session-Identifier")
-        _ = try await perform(request)
+        return request
     }
 
     /// Remembers the chosen audio and subtitle streams for a file on the server

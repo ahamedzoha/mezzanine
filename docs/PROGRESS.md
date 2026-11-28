@@ -25,6 +25,27 @@ Open, waiting on the owner:
 Next (owner, 2026-11-16): the phone-as-remote spike (ROADMAP 3.7), then the roadmap order. The GitHub Pages website is up (2026-11-24);
 donations wait for the Patreon page.
 
+## 2026-11-28 — Music: plays count (timelines work without a play queue)
+
+Found
+- The earlier probe was misleading: the server does count music from `/:/timeline`, with no play queue, but it
+  reports `playbackState: ignore` for a session that jumps (first report near the end, or only reports under 60 s).
+  A session whose reports run up from the start (heartbeat ticks past 60 s) answers `progress`, and the first report
+  past half the track answers `complete`: viewCount +1, lastViewedAt set, one history row, the session shows in
+  `/status/sessions` (so Tautulli sees it) and leaves it on `stopped`. Further ticks and the stop add nothing
+  (one row per session). `type=track|music`, `identifier`, `containerKey`, `playbackTime` make no difference;
+  Plex Web sends `ratingKey, key, state, time, duration, playbackTime, playQueueItemID, hasMDE=1` and the
+  `X-Plex-Session-Identifier` header. Seeking past half counts too (the server only looks at the position).
+  "Store track progress" off only means no resume offset. No play queue was created, and none is needed.
+- Bug fixed: `MusicSession.startTrack` reset `position` before capturing it, so the previous track was always stopped
+  at 0 s. Debug run (`-MezzanineNoActivity YES`, two tracks, seek, next): `stopped time=100/172`.
+
+Changed
+- `PlexServerClient.timelineRequest` (testable seam; video shape unchanged and tested), music also sends `playbackTime`.
+- DEBUG hooks `-MusicAutoplay <key[,key]>` (muted) `-MusicAutoSeek 70,100` `-MusicAutoNext YES` `-MusicAutoClose <s>`.
+- End to end, real reports, muted, one short track: viewCount none to 1, one new history row, session visible while
+  playing and gone after the stop. The probe track was unscrobbled and its probe history rows deleted afterwards.
+
 ## 2026-11-28 — Music M1 (parts 1–2): foundations and app integration (not released)
 
 Built

@@ -4,6 +4,16 @@
     "ignoreFiles": [
       ".impeccable/mocks/**"
     ],
-    "ignoreValues": []
+    "ignoreValues": [
+      {
+        "rule": "radial-halo",
+        "value": "*",
+        "files": [
+          ".impeccable/review/music-m1/*.html"
+        ],
+        "createdAt": "2026-11-28T11:19:45.576Z",
+        "reason": "Agent: DESIGN.md Bias Light — the room light is a documented art-derived UltraBlur wash; music-m1 decision sketches draw it on purpose"
+      }
+    ]
   }
 }

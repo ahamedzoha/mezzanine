@@ -95,6 +95,33 @@ import Testing
 }
 
 @Suite struct ServerClientRequestTests {
+    private func timelineQuery(type: String?) async -> (query: [String: String], session: String?) {
+        let client = PlexServerClient(baseURL: URL(string: "http://127.0.0.1:32400")!, token: "T",
+                                      machineIdentifier: "m", identity: PlexIdentity(clientIdentifier: "c"))
+        let request = await client.timelineRequest(ratingKey: "900", state: .playing, time: 70.5,
+                                                   duration: 188.373, sessionID: "sess", type: type)
+        let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems ?? []
+        return (Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") }),
+                request.value(forHTTPHeaderField: "X-Plex-Session-Identifier"))
+    }
+
+    @Test func videoTimelineShapeIsUnchanged() async {
+        let (q, session) = await timelineQuery(type: nil)
+        #expect(q == ["ratingKey": "900", "key": "/library/metadata/900", "state": "playing",
+                      "time": "70500", "duration": "188373", "hasMDE": "1"])
+        #expect(session == "sess")
+    }
+
+    @Test func musicTimelineAddsTypeAndPlaybackTime() async {
+        let (q, session) = await timelineQuery(type: "track")
+        #expect(q["type"] == "track")
+        #expect(q["playbackTime"] == "70500")
+        #expect(q["time"] == "70500")
+        #expect(q["key"] == "/library/metadata/900")
+        #expect(q["playQueueItemID"] == nil && q["containerKey"] == nil)
+        #expect(session == "sess")
+    }
+
     @Test func timelinePathKeepsColon() async {
         let client = PlexServerClient(baseURL: URL(string: "http://127.0.0.1:32400")!, token: "T",
                                       machineIdentifier: "m", identity: PlexIdentity(clientIdentifier: "c"))

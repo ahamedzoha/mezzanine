@@ -319,6 +319,32 @@ struct AppShell: View {
             try? await Task.sleep(for: .seconds(4))
             for i in 1...q.count { commands.query = String(q.prefix(i)); try? await Task.sleep(for: .milliseconds(40)) }
         }
+        // -MusicAutoplay <trackKey> plays a track at launch, muted (engine volume 0). -MusicAutoSeek "70,100"
+        // seeks to each second mark 11 s apart (the 10 s heartbeat reports it); -MusicAutoClose <s> stops
+        // that long after the last seek. Counting a play needs ticks past 60 s and 50 %: with
+        // -MezzanineNoActivity YES this prints `ACTION music timeline …`, without it, it writes to Plex.
+        // A comma list queues several; -MusicAutoNext YES skips to the next one after the seeks.
+        if let keys = UserDefaults.standard.string(forKey: "MusicAutoplay")?.split(separator: ",").map(String.init),
+           let client = session.client,
+           let found = try? await client.musicMetadata(keys: keys).compactMap({ QueuedTrack($0) }), !found.isEmpty {
+            let tracks = keys.compactMap { key in found.first { $0.ratingKey == key } }
+            music.volume = 0
+            music.play(tracks: tracks)
+            try? await Task.sleep(for: .seconds(3))
+            let marks = (UserDefaults.standard.string(forKey: "MusicAutoSeek") ?? "").split(separator: ",").compactMap { Double($0) }
+            for (i, mark) in marks.enumerated() {
+                if i > 0 { try? await Task.sleep(for: .seconds(11)) }
+                await music.seek(to: mark)
+                print("MUSICAUTO seek \(Int(mark))"); fflush(stdout)
+            }
+            if UserDefaults.standard.bool(forKey: "MusicAutoNext") { music.next(); print("MUSICAUTO next"); fflush(stdout) }
+            let close = UserDefaults.standard.integer(forKey: "MusicAutoClose")
+            if close > 0 {
+                try? await Task.sleep(for: .seconds(close))
+                await music.flushBeforeQuit()
+                print("MUSICAUTO closed"); fflush(stdout)
+            }
+        }
         // -MezzanineAutoplay <ratingKey> starts a title at launch (player tests).
         if let key = UserDefaults.standard.string(forKey: "MezzanineAutoplay"), let client = session.client,
            let item = try? await client.metadata(key) {

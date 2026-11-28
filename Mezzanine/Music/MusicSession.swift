@@ -274,6 +274,11 @@ final class MusicSession {
 
     private func startTrack(_ track: QueuedTrack) {
         loadTask?.cancel()
+        // Take the previous track's reporter and its position before the state resets,
+        // or it would be stopped at 0 s.
+        let previousReporter = reporter
+        let prevPos = position
+        reporter = nil
         error = nil
         status = .loading
         position = 0
@@ -283,9 +288,6 @@ final class MusicSession {
 
         loadTask = Task { [weak self] in
             guard let self else { return }
-            let previousReporter = self.reporter
-            let prevPos = self.position
-            self.reporter = nil
             if let previousReporter {
                 await previousReporter.stop(at: prevPos)
             }
